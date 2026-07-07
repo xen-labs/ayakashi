@@ -1,0 +1,301 @@
+@import "tailwindcss";
+
+@theme {
+  --color-astral-gold: #d4af37;
+  --color-astral-navy: #0a0a1a;
+}
+
+/* ── Background classes ───────────────────────────────────────────── */
+.bg-dark-texture {
+  background-image: url('/backgrounds/dark-bg.jpeg');
+  background-size: cover;
+  background-position: center;
+}
+
+.bg-light-texture {
+  background-image: url('/backgrounds/light-bg.jpeg');
+  background-size: cover;
+  background-position: center;
+}
+
+/* ── Theme-aware background helper ───────────────────────────────── */
+/* Applied on <main> via .bg-theme-texture.
+   The html element carries the "dark" or "light" class set by ThemeProvider. */
+.bg-theme-texture {
+  background-image: url('/backgrounds/dark-bg.jpeg');
+  background-size: cover;
+  background-position: center;
+}
+
+html.light .bg-theme-texture {
+  background-image: url('/backgrounds/light-bg.jpeg');
+}
+
+/* ── Light-mode overlay tint ─────────────────────────────────────── */
+/* Dark mode overlays are inline (bg-black/35 etc.).
+   Light mode needs lighter tints defined here so we can swap them. */
+.overlay-theme {
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
+html.light .overlay-theme {
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+.overlay-theme-heavy {
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
+html.light .overlay-theme-heavy {
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Light-mode text overrides ───────────────────────────────────── */
+html.light .theme-heading {
+  color: #1a1a1a;
+}
+
+html.light .theme-body {
+  color: #3a3a3a;
+}
+
+html.light .theme-stat-heading {
+  color: #1a1a1a;
+}
+
+/* Dark mode (default) */
+.theme-heading {
+  color: #ffffff;
+}
+
+.theme-body {
+  color: #d1d5db; /* gray-300 */
+}
+
+.theme-stat-heading {
+  color: #ffffff;
+}
+
+/* ── Light-mode footer bar ───────────────────────────────────────── */
+.footer-bar {
+  background-color: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+html.light .footer-bar {
+  background-color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* ── Light-mode form card ────────────────────────────────────────── */
+.form-card {
+  background-color: rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.light .form-card {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+/* ── Light-mode form inputs ──────────────────────────────────────── */
+.form-input {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+html.light .form-input {
+  background-color: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #1a1a1a;
+}
+
+.form-select {
+  background-color: #000000;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+html.light .form-select {
+  background-color: #ffffff;
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #1a1a1a;
+}
+
+/* ── PhoneInput component overrides ─────────────────────────────── */
+/* Import the library's base styles */
+.phone-field-wrapper {
+  --PhoneInput-color--focus: #d4af37;
+  --PhoneInputCountrySelectArrow-color: rgba(255, 255, 255, 0.6);
+  --PhoneInputCountryFlag-height: 1.1em;
+  --PhoneInputCountryFlag-borderColor: rgba(255, 255, 255, 0.2);
+  --PhoneInputCountryFlag-borderColor--focus: #d4af37;
+}
+
+html.light .phone-field-wrapper {
+  --PhoneInputCountrySelectArrow-color: rgba(0, 0, 0, 0.5);
+  --PhoneInputCountryFlag-borderColor: rgba(0, 0, 0, 0.2);
+}
+
+/* The outer flex wrapper */
+.phone-field-wrapper .PhoneInput {
+  display: flex;
+  align-items: stretch;
+  height: 3rem; /* h-12 */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.05);
+  transition: border-color 0.15s;
+}
+
+html.light .phone-field-wrapper .PhoneInput {
+  border-color: rgba(0, 0, 0, 0.18);
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.phone-field-wrapper .PhoneInput:focus-within {
+  border-color: #d4af37;
+}
+
+/* Country selector section */
+.phone-field-wrapper .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+html.light .phone-field-wrapper .PhoneInputCountry {
+  border-right-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Number input */
+.phone-field-wrapper .PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 1rem;
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+html.light .phone-field-wrapper .PhoneInputInput {
+  color: #1a1a1a;
+}
+
+.phone-field-wrapper .PhoneInputInput::placeholder {
+  color: #6b7280;
+}
+
+/* ── Password strength meter ─────────────────────────────────────── */
+.strength-bar-track {
+  height: 3px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+html.light .strength-bar-track {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.strength-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* ── "Join WhatsApp" button (theme-aware) ────────────────────────── */
+/* Dark mode */
+.join-btn {
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Light mode */
+html.light .join-btn {
+  border-color: rgba(0, 0, 0, 0.5);
+  color: rgba(0, 0, 0, 0.85);
+  background-color: transparent;
+}
+
+/* ── ToS <dialog> backdrop (Tailwind v4 compat) ──────────────────── */
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+/* ── Light-mode logo filter ──────────────────────────────────────── */
+/* Dark mode: invert so it shows white on dark bg */
+.logo-filter {
+  filter: invert(1) drop-shadow(0 0 15px rgba(255,255,255,0.3));
+  mix-blend-mode: screen;
+}
+
+html.light .logo-filter {
+  filter: drop-shadow(0 0 15px rgba(212,175,55,0.4));
+  mix-blend-mode: normal;
+}
+
+
+/* ── Team / Org footer ───────────────────────────────────────────── */
+.team-footer {
+  background-color: rgba(0, 0, 0, 0.30);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+html.light .team-footer {
+  background-color: rgba(255, 255, 255, 0.45);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.team-org-link {
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.12em;
+}
+
+html.light .team-org-link {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.team-divider {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+html.light .team-divider {
+  background-color: rgba(0, 0, 0, 0.12);
+}
+
+.team-role {
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 0.6875rem; /* 11px */
+  letter-spacing: 0.06em;
+}
+
+html.light .team-role {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.team-handle {
+  color: rgba(212, 175, 55, 0.65);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+html.light .team-handle {
+  color: rgba(180, 140, 20, 0.75);
+}
+
+.team-dot {
+  color: rgba(255, 255, 255, 0.18);
+}
+
+html.light .team-dot {
+  color: rgba(0, 0, 0, 0.2);
+}
