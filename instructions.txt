@@ -1,0 +1,96 @@
+ASTRAL WEB — INSTRUCTIONS
+=============================
+org: xen-labs
+repos: astral-web (frontend) + astral-api (backend) 
+last updated by: Xenkaii, 6/7/2026, 8:42pm
+
+
+
+WHAT WE'RE BUILDING
+
+Web companion for the Astral WhatsApp bot. Players register here, log in, manage their card collection, trade, bid in live auctions, make friends...clans, customise or show off profile...inventory and obviously card collections, then eventually play live minigames in-browser.
+
+ Two pages first: REGISTRATION and LANDING, on the frontend, backed
+by real auth/register endpoints on astral-api. Everything else comes after.
+
+
+ON USING SHOOB/MAZOKU AS REFERENCE
+
+Copy them 😂 
+Take the best features/parts out of these two sites and merge them
+
+
+
+Brand name for now: ASTRAL. Celestial theme — moon, stars, constellation line motifs. Logo assets (SVG, both color modes) land in /public/brand once finalized — still iterating with AI-gen + manual touchups, so don't build anything assuming a specific logo file exists yet. Leave a placeholder slot in the navbar.
+
+Light mode = warm parchment/paper texture background, dark tone text.
+Dark mode = deep space void background, near-black navy, light text.
+These are NOT just inverted colors — two different background images entirely, same as mazoku does it. Both will be exported as webp before you need them for real.
+
+
+TECH STACK
+
+Frontend (astral-web):
+- Next.js (App Router), TypeScript, Tailwind
+- shadcn/ui is fine for primitives if you want them, keep it consistent
+
+Backend (astral-api):
+- Express or Fastify (your call, pick whichever you're faster in),
+  TypeScript, Mongoose
+- deploys separately from the frontend — Railway or Render free tier to start 
+
+Auth: JWT, httpOnly cookies, not localStorage. Our players are on phones clicking bot-generated links in random WhatsApp groups — XSS surface is higher than a normal SaaS signup, cookies are the safer default here.
+Short-lived access token + longer refresh token pair, since players will go days/weeks between visits. astral-api sets/clears the cookies; the frontend never manually touches raw tokens in JS.
+
+
+REGISTRATION PAGE
+
+Flow: player DMs the bot ".register" or ".link" on WhatsApp groups, bot replies with a link to this page carrying a short-lived token in the URL (query param, something like ?rt=xxxx) identifying which WhatsApp number is registering. Frontend just needs to carry that token through to the final submit — API will validate it.
+
+Fields:
+- phone number — country flag picker with search, this is the biggest ux detail to get right, most players won't know their country code. Use react-phone-number-input or similar, don't build this from scratch
+- password (with confirm; strength meter nice-to-have, not required)
+- age 
+- "remember me" checkbox
+- forgot password link → /forgot-password
+
+Forgot password flow:
+1. /forgot-password page, single button "Continue via WhatsApp"
+2. opens wa.me/<botnumber>?text=recover (prefilled message) — this leaves our app entirely
+3. bot sends either an OTP to enter on a page we host, or a magic link that auto-verifies — undecided which, build the OTP-entry page (/reset-password?token=xxx) first since it's the safer bet  architecturally, magic link can reuse most of the same UI later
+
+
+LANDING PAGE
+
+For anyone landing on the domain directly, or checking us 
+
+
+COPY EVERYTHING FROM THOSE THREE SITES 😂  especially mazoku as that looks sick tbh
+
+check rimuruslime.com too for their landing page details 
+
+Both light and dark mode need to look intentional from day one. Test both constantly, don't leave dark mode for "later."
+
+
+WHERE THIS RUNS
+
+astral-web: Vercel free tier, standard Next.js deploy, git push and done.
+
+astral-api: Railway or Render free tier to start or maybe termux or vps
+
+Main bot: currently on Termux via PM2, will move to a real VPS if the player base justifies it. 
+
+
+
+ALT-ACCOUNT 
+
+We need to prevent people from registering multiple accounts to abuse game mechanics (trading between their own alts, farming events twice, etc). This mostly lives on the API/DB side, not frontend, but it affects the registration flow's shape so flagging it now:
+
+- new accounts get a 7-day trade lock (can't trade cards/currency with other players until account age >= 7 days) — this is the main mechanism, simple and effective on its own
+- API will also capture device fingerprint + IP at registration time for correlation
+
+
+
+
+
+Just message me directly if you have any problem or queries....
