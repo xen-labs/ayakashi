@@ -243,6 +243,29 @@ html.light .logo-filter {
 }
 
 
+/* ── Theme toggle button ─────────────────────────────────────────── */
+.theme-toggle {
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: #d4af37;
+}
+
+.theme-toggle:hover {
+  border-color: #d4af37;
+  background-color: rgba(212, 175, 55, 0.1);
+}
+
+html.light .theme-toggle {
+  border-color: rgba(0, 0, 0, 0.2);
+  background-color: rgba(255, 255, 255, 0.6);
+  color: #92400e; /* amber-800 */
+}
+
+html.light .theme-toggle:hover {
+  border-color: #d97706;
+  background-color: rgba(255, 251, 235, 0.9);
+}
+
 /* ── Team / Org footer ───────────────────────────────────────────── */
 .team-footer {
   background-color: rgba(0, 0, 0, 0.30);

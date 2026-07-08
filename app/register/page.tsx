@@ -2,125 +2,220 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useState, FormEvent, Suspense } from "react";
 import { type Value as PhoneValue } from "react-phone-number-input";
 import { PhoneField } from "../components/PhoneField";
 import { PasswordField } from "../components/PasswordField";
 import { TosModal } from "../components/TosModal";
+import { BackToWhatsApp } from "../components/BackToWhatsApp";
+import { authRegister, ApiResponseError } from "../../lib/api";
 
-// ── Form state type ────────────────────────────────────────────────
+// ── Form state ─────────────────────────────────────────────────────
 interface FormData {
-  playerName: string;
-  email: string;
-  whatsapp: PhoneValue | undefined;
-  guild: string;
-  age: string;
+  phone: PhoneValue | undefined;
   password: string;
   confirmPassword: string;
-  rememberMe: boolean;
+  age: string;
 }
 
 const INITIAL: FormData = {
-  playerName: "",
-  email: "",
-  whatsapp: undefined,
-  guild: "",
-  age: "",
+  phone: undefined,
   password: "",
   confirmPassword: "",
-  rememberMe: false,
+  age: "",
 };
 
-// ── Page ───────────────────────────────────────────────────────────
-export default function Register() {
+// ── Field-level errors map ─────────────────────────────────────────
+interface FieldErrors {
+  phone?: string;
+  password?: string;
+  age?: string;
+}
+
+// ── Inner component (uses useSearchParams — must be inside Suspense) ─
+function RegisterInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") ?? "";
+
   const [form, setForm] = useState<FormData>(INITIAL);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [globalError, setGlobalError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [successHandle, setSuccessHandle] = useState<string | null>(null);
   const [tosOpen, setTosOpen] = useState(false);
 
-  const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
+  const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // Clear that field's error on change
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
+
+  // ── If there's no token at all, show dead-end immediately ─────────
+  if (!token) {
+    return (
+      <BackToWhatsApp
+        heading="Link Not Valid"
+        body="This registration link isn't valid. Go back to WhatsApp and run .register to get a fresh link."
+        prefill="register"
+      />
+    );
+  }
 
   // ── Client-side validation ─────────────────────────────────────
-  const validate = (): string | null => {
-    if (!form.playerName.trim()) return "Player name is required.";
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      return "A valid email is required.";
-    if (!form.whatsapp) return "WhatsApp number is required.";
-    if (!form.guild) return "Please choose a guild.";
+  const validate = (): FieldErrors | null => {
+    const errors: FieldErrors = {};
+    if (!form.phone) errors.phone = "Phone number is required.";
+    if (form.password.length < 8)
+      errors.password = "Password must be at least 8 characters.";
+    if (form.password !== form.confirmPassword)
+      errors.password = "Passwords do not match.";
     const age = parseInt(form.age, 10);
     if (!form.age || isNaN(age) || age < 13 || age > 120)
-      return "Age must be between 13 and 120.";
-    if (form.password.length < 8)
-      return "Password must be at least 8 characters.";
-    if (form.password !== form.confirmPassword)
-      return "Passwords do not match.";
-    return null;
+      errors.age = "Age must be between 13 and 120.";
+    return Object.keys(errors).length ? errors : null;
   };
 
   // ── Submit ─────────────────────────────────────────────────────
-  // Backend contract (not wired yet):
-  //   POST /api/auth/register
-  //   Body: { playerName, email, whatsapp, guild, age, password, rememberMe }
-  //   → 200 { userId, token? } or 400 { error: string }
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
-    const err = validate();
-    if (err) { setError(err); return; }
+    setGlobalError("");
+    setFieldErrors({});
+
+    const clientErrors = validate();
+    if (clientErrors) {
+      setFieldErrors(clientErrors);
+      return;
+    }
 
     setLoading(true);
     try {
-      // TODO: wire up to real endpoint
-      // const res = await fetch("/api/auth/register", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     playerName: form.playerName.trim(),
-      //     email: form.email.trim().toLowerCase(),
-      //     whatsapp: form.whatsapp,
-      //     guild: form.guild,
-      //     age: parseInt(form.age, 10),
-      //     password: form.password,
-      //     rememberMe: form.rememberMe,
-      //   }),
-      // });
-      // if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      await new Promise((r) => setTimeout(r, 700)); // simulated
-      setSuccess(true);
+      const data = await authRegister({
+        token,
+        phone: form.phone as string,
+        password: form.password,
+        age: parseInt(form.age, 10),
+      });
+      setSuccessHandle(data.handle);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      if (err instanceof ApiResponseError) {
+        const { code, message, issues } = err.error;
+
+        // Dead-end states — swap the whole page
+        if (
+          code === "invalid_token" ||
+          code === "token_expired" ||
+          code === "token_used"
+        ) {
+          // Render the dead-end via a state flag; we keep hooks above
+          setGlobalError(`__dead_end__:${code}`);
+          return;
+        }
+
+        // Field-level errors from validation_error
+        if (code === "validation_error" && issues?.length) {
+          const mapped: FieldErrors = {};
+          for (const issue of issues) {
+            const field = issue.path[0] as keyof FieldErrors;
+            if (field in INITIAL) mapped[field] = issue.message;
+          }
+          setFieldErrors(mapped);
+          return;
+        }
+
+        // Phone already in use — inline under phone field
+        if (code === "phone_in_use") {
+          setFieldErrors({ phone: "This phone number is already registered." });
+          return;
+        }
+
+        // Already registered — prompt to login
+        if (code === "already_registered") {
+          setGlobalError(
+            "You already have an account — try logging in instead."
+          );
+          return;
+        }
+
+        setGlobalError(message ?? "Something went wrong. Please try again.");
+      } else {
+        setGlobalError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Dead-end states triggered after submit ────────────────────
+  if (globalError === "__dead_end__:invalid_token") {
+    return (
+      <BackToWhatsApp
+        heading="Link Not Valid"
+        body="This registration link isn't valid. Go back to WhatsApp and run .register again."
+        prefill="register"
+      />
+    );
+  }
+  if (globalError === "__dead_end__:token_expired") {
+    return (
+      <BackToWhatsApp
+        heading="Link Expired"
+        body="This link expired. Run .register again in WhatsApp to get a new one."
+        prefill="register"
+      />
+    );
+  }
+  if (globalError === "__dead_end__:token_used") {
+    return (
+      <BackToWhatsApp
+        heading="Link Already Used"
+        body="This link was already used. If that wasn't you, run .register again for a new link."
+        prefill="register"
+      />
+    );
+  }
+
   // ── Success screen ─────────────────────────────────────────────
-  if (success) {
+  if (successHandle) {
     return (
       <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-theme-texture bg-cover bg-center px-4 py-8">
         <div className="absolute inset-0 overlay-theme-heavy" />
         <section className="relative z-10 flex w-full max-w-md flex-col items-center text-center gap-5">
           <div className="flex h-16 w-16 items-center justify-center rounded-full border border-astral-gold/40 bg-astral-gold/10">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className="h-8 w-8 text-astral-gold" aria-hidden="true">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-8 w-8 text-astral-gold"
+              aria-hidden="true"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
-          <h1 className="theme-heading text-2xl font-bold uppercase tracking-widest" style={{ fontFamily: "serif" }}>
-            Welcome, {form.playerName}!
+          <h1
+            className="theme-heading text-2xl font-bold uppercase tracking-widest"
+            style={{ fontFamily: "serif" }}
+          >
+            Welcome!
           </h1>
           <p className="theme-body text-sm leading-7">
-            Your account has been created. A confirmation will be sent to your WhatsApp shortly.
+            Your account has been created. Your handle is{" "}
+            <span className="font-bold text-astral-gold">{successHandle}</span>
+            . You can customise it later in your profile.
           </p>
-          <Link
-            href="/"
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
             className="flex h-12 w-full items-center justify-center border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white"
           >
-            Back to Home
-          </Link>
+            Go to Login
+          </button>
         </section>
       </main>
     );
@@ -173,95 +268,47 @@ export default function Register() {
         >
           <div className="grid gap-5">
 
-            {/* Player name */}
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                Player Name
-              </span>
-              <input
-                type="text"
-                name="playerName"
-                value={form.playerName}
-                onChange={(e) => set("playerName", e.target.value)}
-                required
-                placeholder="StarHunter99"
-                autoComplete="username"
-                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
-              />
-            </label>
-
-            {/* Email */}
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                Email
-              </span>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={(e) => set("email", e.target.value)}
-                required
-                placeholder="you@example.com"
-                autoComplete="email"
-                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
-              />
-            </label>
-
-            {/* WhatsApp — phone picker */}
+            {/* Phone number */}
             <div className="grid gap-2">
               <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                WhatsApp Number
+                Phone Number
               </span>
               <PhoneField
-                value={form.whatsapp}
-                onChange={(v) => set("whatsapp", v)}
-                name="whatsapp"
+                value={form.phone}
+                onChange={(v) => set("phone", v)}
+                name="phone"
                 required
               />
+              {fieldErrors.phone && (
+                <p className="text-xs text-red-400">{fieldErrors.phone}</p>
+              )}
               <p className="text-xs text-gray-500">
                 Select your country flag to change the dialling code.
               </p>
             </div>
 
-            {/* Guild + Age — two columns on wider screens */}
-            <div className="grid gap-5 sm:grid-cols-2">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                  Guild
-                </span>
-                <select
-                  name="guild"
-                  value={form.guild}
-                  onChange={(e) => set("guild", e.target.value)}
-                  required
-                  className="form-select h-12 border px-4 outline-none transition-colors focus:border-astral-gold"
-                >
-                  <option value="" disabled>Choose a guild</option>
-                  <option value="solaris">Solaris</option>
-                  <option value="nocturne">Nocturne</option>
-                  <option value="eclipse">Eclipse</option>
-                </select>
-              </label>
+            {/* Age */}
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
+                Age
+              </span>
+              <input
+                type="number"
+                name="age"
+                value={form.age}
+                onChange={(e) => set("age", e.target.value)}
+                required
+                min={13}
+                max={120}
+                placeholder="18"
+                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
+              />
+              {fieldErrors.age && (
+                <p className="text-xs text-red-400">{fieldErrors.age}</p>
+              )}
+            </label>
 
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                  Age
-                </span>
-                <input
-                  type="number"
-                  name="age"
-                  value={form.age}
-                  onChange={(e) => set("age", e.target.value)}
-                  required
-                  min={13}
-                  max={120}
-                  placeholder="18"
-                  className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
-                />
-              </label>
-            </div>
-
-            {/* Password fields */}
+            {/* Password */}
             <PasswordField
               label="Password"
               name="password"
@@ -270,7 +317,11 @@ export default function Register() {
               required
               showStrength
             />
+            {fieldErrors.password && (
+              <p className="-mt-3 text-xs text-red-400">{fieldErrors.password}</p>
+            )}
 
+            {/* Confirm password */}
             <PasswordField
               label="Confirm Password"
               name="confirmPassword"
@@ -282,32 +333,21 @@ export default function Register() {
 
           </div>
 
-          {/* Remember me + forgot password row */}
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                name="rememberMe"
-                checked={form.rememberMe}
-                onChange={(e) => set("rememberMe", e.target.checked)}
-                className="h-4 w-4 cursor-pointer accent-astral-gold"
-              />
-              <span className="text-sm text-gray-400">Remember me</span>
-            </label>
-
-            <Link
-              href="/forgot-password"
-              className="text-sm font-medium text-astral-gold transition-colors hover:text-white"
-            >
-              Forgot password?
-            </Link>
-          </div>
-
-          {/* Error message */}
-          {error && (
-            <p className="mt-4 rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
-              {error}
-            </p>
+          {/* Already registered nudge or generic error */}
+          {globalError && !globalError.startsWith("__dead_end__") && (
+            <div className="mt-5 flex items-start gap-3 rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <p className="text-sm text-red-400">
+                {globalError}{" "}
+                {globalError.includes("already have an account") && (
+                  <Link
+                    href="/login"
+                    className="font-semibold text-astral-gold hover:text-white transition-colors"
+                  >
+                    Log in →
+                  </Link>
+                )}
+              </p>
+            </div>
           )}
 
           {/* Submit */}
@@ -330,10 +370,29 @@ export default function Register() {
             </button>
             .
           </p>
+
+          <p className="mt-3 text-center text-sm text-gray-500">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-semibold text-astral-gold hover:text-white transition-colors"
+            >
+              Log in →
+            </Link>
+          </p>
         </form>
       </section>
 
       <TosModal open={tosOpen} onClose={() => setTosOpen(false)} />
     </main>
+  );
+}
+
+// ── Wrap in Suspense (required for useSearchParams in App Router) ──
+export default function Register() {
+  return (
+    <Suspense>
+      <RegisterInner />
+    </Suspense>
   );
 }

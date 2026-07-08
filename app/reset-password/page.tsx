@@ -2,135 +2,159 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { useRef, useState, KeyboardEvent, ClipboardEvent, Suspense } from "react";
+import { useState, FormEvent, Suspense } from "react";
 import { PasswordField } from "../components/PasswordField";
+import { BackToWhatsApp } from "../components/BackToWhatsApp";
+import { authResetPassword, ApiResponseError } from "../../lib/api";
 
-// ── OTP Config ─────────────────────────────────────────────────────
-const OTP_LENGTH = 6;
+// ── Field errors ───────────────────────────────────────────────────
+interface FieldErrors {
+  newPassword?: string;
+}
 
-// ── Types ──────────────────────────────────────────────────────────
-type Stage = "otp" | "newPassword" | "done";
-
-// ── Main inner component (needs useSearchParams) ───────────────────
+// ── Inner component (uses useSearchParams — must be inside Suspense) ─
 function ResetPasswordInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
-  // Stage state
-  const [stage, setStage] = useState<Stage>("otp");
-
-  // OTP state
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(""));
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [otpError, setOtpError] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-
-  // Password state
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [pwError, setPwError] = useState("");
-  const [pwLoading, setPwLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [globalError, setGlobalError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // ── OTP helpers ──────────────────────────────────────────────────
-  const handleOtpChange = (index: number, char: string) => {
-    const digit = char.replace(/\D/g, "").slice(-1);
-    const next = [...otp];
-    next[index] = digit;
-    setOtp(next);
-    if (digit && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
+  // ── Dead-end: no token in URL ──────────────────────────────────
+  if (!token) {
+    return (
+      <BackToWhatsApp
+        heading="Link Not Valid"
+        body="This reset link isn't valid. Open WhatsApp, message the bot, and request a new one."
+        prefill="recover"
+      />
+    );
+  }
+
+  // ── Client-side validation ─────────────────────────────────────
+  const validate = (): FieldErrors | null => {
+    const errors: FieldErrors = {};
+    if (password.length < 8)
+      errors.newPassword = "Password must be at least 8 characters.";
+    else if (password !== confirmPassword)
+      errors.newPassword = "Passwords do not match.";
+    return Object.keys(errors).length ? errors : null;
   };
 
-  const handleOtpKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: ClipboardEvent<HTMLInputElement>) => {
+  // ── Submit ─────────────────────────────────────────────────────
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
-    if (!pasted) return;
-    const next = [...otp];
-    for (let i = 0; i < pasted.length; i++) next[i] = pasted[i];
-    setOtp(next);
-    // Focus last filled or last box
-    const lastIdx = Math.min(pasted.length, OTP_LENGTH - 1);
-    inputRefs.current[lastIdx]?.focus();
-  };
+    setGlobalError("");
+    setFieldErrors({});
 
-  const otpFilled = otp.every(Boolean);
-
-  // ── OTP submit ───────────────────────────────────────────────────
-  // Backend contract (not wired yet):
-  //   POST /api/auth/verify-otp  { otp: "123456", token?: string }
-  //   → 200 { verified: true } or 400 { error: "Invalid OTP" }
-  const handleVerifyOtp = async () => {
-    if (!otpFilled) return;
-    setOtpError("");
-    setOtpLoading(true);
-    try {
-      // TODO: replace with real fetch
-      // const res = await fetch("/api/auth/verify-otp", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ otp: otp.join(""), token }),
-      // });
-      // if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      await new Promise((r) => setTimeout(r, 600)); // simulated delay
-      setStage("newPassword");
-    } catch (err) {
-      setOtpError(err instanceof Error ? err.message : "Invalid OTP. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // ── Password submit ──────────────────────────────────────────────
-  // Backend contract (not wired yet):
-  //   POST /api/auth/reset-password  { token, otp, newPassword }
-  //   → 200 { success: true } or 400 { error: "..." }
-  const handleResetPassword = async () => {
-    setPwError("");
-    if (password.length < 8) {
-      setPwError("Password must be at least 8 characters.");
+    const clientErrors = validate();
+    if (clientErrors) {
+      setFieldErrors(clientErrors);
       return;
     }
-    if (password !== confirmPassword) {
-      setPwError("Passwords do not match.");
-      return;
-    }
-    setPwLoading(true);
+
+    setLoading(true);
     try {
-      // TODO: replace with real fetch
-      // const res = await fetch("/api/auth/reset-password", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ token, otp: otp.join(""), newPassword: password }),
-      // });
-      // if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      await new Promise((r) => setTimeout(r, 600)); // simulated delay
-      setStage("done");
+      await authResetPassword({ token, newPassword: password });
+      // API logs the user out everywhere on success — redirect to login
+      // with a success message via search param
+      router.push("/login?reset=1");
     } catch (err) {
-      setPwError(err instanceof Error ? err.message : "Reset failed. Please try again.");
+      if (err instanceof ApiResponseError) {
+        const { code, message, issues } = err.error;
+
+        // Dead-end states — swap the whole page
+        if (code === "invalid_token") {
+          setGlobalError("__dead_end__:invalid_token");
+          return;
+        }
+        if (code === "token_used") {
+          setGlobalError("__dead_end__:token_used");
+          return;
+        }
+        if (code === "token_expired") {
+          setGlobalError("__dead_end__:token_expired");
+          return;
+        }
+        if (code === "account_not_found") {
+          setGlobalError("__dead_end__:account_not_found");
+          return;
+        }
+
+        if (code === "validation_error" && issues?.length) {
+          const mapped: FieldErrors = {};
+          for (const issue of issues) {
+            if (issue.path[0] === "newPassword")
+              mapped.newPassword = issue.message;
+          }
+          setFieldErrors(mapped);
+          return;
+        }
+
+        setGlobalError(message ?? "Something went wrong. Please try again.");
+      } else {
+        setGlobalError("Something went wrong. Please try again.");
+      }
     } finally {
-      setPwLoading(false);
+      setLoading(false);
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────
+  // ── Dead-end states triggered after submit ────────────────────
+  if (globalError === "__dead_end__:invalid_token") {
+    return (
+      <BackToWhatsApp
+        heading="Link Not Valid"
+        body="This reset link isn't valid — request a new one via WhatsApp."
+        prefill="recover"
+      />
+    );
+  }
+  if (globalError === "__dead_end__:token_used") {
+    return (
+      <BackToWhatsApp
+        heading="Link Already Used"
+        body="This link was already used. Request a new password reset via WhatsApp."
+        prefill="recover"
+      />
+    );
+  }
+  if (globalError === "__dead_end__:token_expired") {
+    return (
+      <BackToWhatsApp
+        heading="Link Expired"
+        body="This link has expired — request a new one via WhatsApp."
+        prefill="recover"
+      />
+    );
+  }
+  if (globalError === "__dead_end__:account_not_found") {
+    return (
+      <BackToWhatsApp
+        heading="Something Went Wrong"
+        body="We couldn't find your account. Please contact support via WhatsApp."
+        prefill="recover"
+      />
+    );
+  }
+
+  // ── Main form ──────────────────────────────────────────────────
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-theme-texture bg-cover bg-center px-4 py-8 sm:px-6">
       <div className="absolute inset-0 overlay-theme-heavy" />
 
       <section className="relative z-10 flex w-full max-w-md flex-col items-center text-center">
         <Link
-          href="/forgot-password"
+          href="/"
           className="mb-8 self-start text-sm font-semibold uppercase tracking-widest text-astral-gold transition-colors hover:text-white"
         >
-          ← Back
+          ← Back to home
         </Link>
 
         <Image
@@ -143,162 +167,76 @@ function ResetPasswordInner() {
           unoptimized
         />
 
-        {/* ── Stage: OTP entry ── */}
-        {stage === "otp" && (
-          <>
-            <h1
-              className="theme-heading mb-3 text-2xl font-bold uppercase tracking-widest sm:text-3xl"
-              style={{ fontFamily: "serif" }}
-            >
-              Enter Your Code
-            </h1>
-            <p className="theme-body mb-8 text-sm leading-7 sm:text-base">
-              Enter the {OTP_LENGTH}-digit code sent by our WhatsApp bot.
-              {token && (
-                <span className="block mt-1 text-xs text-gray-500">
-                  Session token detected ✓
-                </span>
-              )}
+        <h1
+          className="theme-heading mb-3 text-2xl font-bold uppercase tracking-widest sm:text-3xl"
+          style={{ fontFamily: "serif" }}
+        >
+          Set New Password
+        </h1>
+
+        <p className="theme-body mb-8 text-sm leading-7 sm:text-base">
+          Choose a strong new password for your account.
+        </p>
+
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="w-full grid gap-5 text-left"
+        >
+          <PasswordField
+            label="New Password"
+            name="newPassword"
+            value={password}
+            onChange={(v) => {
+              setPassword(v);
+              setFieldErrors({});
+            }}
+            required
+            showStrength
+          />
+
+          <PasswordField
+            label="Confirm Password"
+            name="confirmPassword"
+            value={confirmPassword}
+            onChange={(v) => {
+              setConfirmPassword(v);
+              setFieldErrors({});
+            }}
+            required
+            matchValue={password}
+          />
+
+          {fieldErrors.newPassword && (
+            <p className="-mt-3 text-xs text-red-400">
+              {fieldErrors.newPassword}
             </p>
+          )}
 
-            {/* OTP boxes */}
-            <div
-              className="mb-6 flex gap-2 sm:gap-3"
-              role="group"
-              aria-label="One-time password"
-            >
-              {otp.map((digit, i) => (
-                <input
-                  key={i}
-                  ref={(el) => { inputRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(i, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                  onPaste={i === 0 ? handleOtpPaste : undefined}
-                  aria-label={`Digit ${i + 1}`}
-                  className="
-                    form-input h-12 w-12 border text-center text-xl font-bold
-                    outline-none transition-all
-                    focus:border-astral-gold focus:scale-105
-                    sm:h-14 sm:w-14 sm:text-2xl
-                  "
-                />
-              ))}
-            </div>
-
-            {otpError && (
-              <p className="mb-4 text-sm text-red-400">{otpError}</p>
-            )}
-
-            <button
-              type="button"
-              disabled={!otpFilled || otpLoading}
-              onClick={handleVerifyOtp}
-              className="h-12 w-full border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {otpLoading ? "Verifying…" : "Verify Code"}
-            </button>
-
-            <p className="mt-6 text-sm text-gray-500">
-              Didn&apos;t receive a code?{" "}
-              <Link
-                href="/forgot-password"
-                className="font-semibold text-astral-gold hover:text-white transition-colors"
-              >
-                Resend via WhatsApp
-              </Link>
+          {globalError && !globalError.startsWith("__dead_end__") && (
+            <p className="rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+              {globalError}
             </p>
-          </>
-        )}
+          )}
 
-        {/* ── Stage: New password ── */}
-        {stage === "newPassword" && (
-          <>
-            <h1
-              className="theme-heading mb-3 text-2xl font-bold uppercase tracking-widest sm:text-3xl"
-              style={{ fontFamily: "serif" }}
-            >
-              New Password
-            </h1>
-            <p className="theme-body mb-8 text-sm leading-7 sm:text-base">
-              Code verified. Choose a strong new password.
-            </p>
+          <button
+            type="submit"
+            disabled={loading || !password || !confirmPassword}
+            className="h-12 w-full border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Saving…" : "Reset Password"}
+          </button>
+        </form>
 
-            <div className="w-full grid gap-5 text-left">
-              <PasswordField
-                label="New Password"
-                name="password"
-                value={password}
-                onChange={setPassword}
-                required
-                showStrength
-              />
-              <PasswordField
-                label="Confirm Password"
-                name="confirmPassword"
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                required
-                matchValue={password}
-              />
-            </div>
-
-            {pwError && (
-              <p className="mt-4 text-sm text-red-400">{pwError}</p>
-            )}
-
-            <button
-              type="button"
-              disabled={!password || !confirmPassword || pwLoading}
-              onClick={handleResetPassword}
-              className="mt-6 h-12 w-full border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {pwLoading ? "Saving…" : "Reset Password"}
-            </button>
-          </>
-        )}
-
-        {/* ── Stage: Done ── */}
-        {stage === "done" && (
-          <>
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-green-500/40 bg-green-500/10">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-8 w-8 text-green-400"
-                aria-hidden="true"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-
-            <h1
-              className="theme-heading mb-3 text-2xl font-bold uppercase tracking-widest sm:text-3xl"
-              style={{ fontFamily: "serif" }}
-            >
-              Password Reset
-            </h1>
-            <p className="theme-body mb-8 text-sm leading-7 sm:text-base">
-              Your password has been updated successfully. You can now log in.
-            </p>
-
-            <Link
-              href="/register"
-              className="flex h-12 w-full items-center justify-center border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white"
-            >
-              Back to Login
-            </Link>
-          </>
-        )}
+        <p className="mt-6 text-sm text-gray-500">
+          Remembered it?{" "}
+          <Link
+            href="/login"
+            className="font-semibold text-astral-gold hover:text-white transition-colors"
+          >
+            Back to Login
+          </Link>
+        </p>
       </section>
     </main>
   );
