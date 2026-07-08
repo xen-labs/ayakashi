@@ -4,8 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, FormEvent } from "react";
-import { type Value as PhoneValue } from "react-phone-number-input";
-import { PhoneField } from "../components/PhoneField";
 import { PasswordField } from "../components/PasswordField";
 import { authLogin, ApiResponseError } from "../../lib/api";
 
@@ -15,19 +13,19 @@ const FORGOT_WA_URL = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent("re
 
 // ── Form state ─────────────────────────────────────────────────────
 interface FormData {
-  phone: PhoneValue | undefined;
+  username: string;
   password: string;
   rememberMe: boolean;
 }
 
 const INITIAL: FormData = {
-  phone: undefined,
+  username: "",
   password: "",
   rememberMe: false,
 };
 
 interface FieldErrors {
-  phone?: string;
+  username?: string;
   password?: string;
 }
 
@@ -48,7 +46,7 @@ export default function Login() {
   // ── Client-side validation ─────────────────────────────────────
   const validate = (): FieldErrors | null => {
     const errors: FieldErrors = {};
-    if (!form.phone) errors.phone = "Phone number is required.";
+    if (!form.username.trim()) errors.username = "Username is required.";
     if (!form.password) errors.password = "Password is required.";
     return Object.keys(errors).length ? errors : null;
   };
@@ -68,7 +66,7 @@ export default function Login() {
     setLoading(true);
     try {
       await authLogin({
-        phone: form.phone as string,
+        username: form.username.trim().toLowerCase(),
         password: form.password,
         rememberMe: form.rememberMe,
       });
@@ -82,7 +80,7 @@ export default function Login() {
           const mapped: FieldErrors = {};
           for (const issue of issues) {
             const field = issue.path[0] as keyof FieldErrors;
-            if (field === "phone" || field === "password")
+            if (field === "username" || field === "password")
               mapped[field] = issue.message;
           }
           setFieldErrors(mapped);
@@ -91,13 +89,15 @@ export default function Login() {
 
         if (code === "invalid_credentials") {
           // Deliberately vague — matches API security intent
-          setGlobalError("Invalid phone number or password.");
+          setGlobalError("Invalid username or password.");
           return;
         }
 
         if (code === "account_locked") {
           // message from API includes the wait time
-          setGlobalError(message ?? "Too many failed attempts. Please try again later.");
+          setGlobalError(
+            message ?? "Too many failed attempts. Please try again later."
+          );
           return;
         }
 
@@ -157,21 +157,26 @@ export default function Login() {
         >
           <div className="grid gap-5">
 
-            {/* Phone number */}
-            <div className="grid gap-2">
+            {/* Username */}
+            <label className="grid gap-2">
               <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                Phone Number
+                Username
               </span>
-              <PhoneField
-                value={form.phone}
-                onChange={(v) => set("phone", v)}
-                name="phone"
+              <input
+                type="text"
+                name="username"
+                value={form.username}
+                onChange={(e) => set("username", e.target.value)}
                 required
+                autoComplete="username"
+                placeholder="xenkai"
+                maxLength={20}
+                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
               />
-              {fieldErrors.phone && (
-                <p className="text-xs text-red-400">{fieldErrors.phone}</p>
+              {fieldErrors.username && (
+                <p className="text-xs text-red-400">{fieldErrors.username}</p>
               )}
-            </div>
+            </label>
 
             {/* Password */}
             <div className="grid gap-2">

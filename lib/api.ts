@@ -83,13 +83,14 @@ async function apiFetch<T>(
 
 export interface RegisterPayload {
   token: string;
-  phone: string;
+  username: string;
   password: string;
   age: number;
   deviceFingerprint?: string;
 }
 export interface RegisterResponse {
-  handle: string;
+  username: string;
+  displayName: string;
   age: number;
 }
 export const authRegister = (body: RegisterPayload) =>
@@ -99,18 +100,36 @@ export const authRegister = (body: RegisterPayload) =>
   });
 
 export interface LoginPayload {
-  phone: string;
+  username: string;
   password: string;
   rememberMe: boolean;
 }
 export interface LoginResponse {
-  handle: string;
+  username: string;
+  displayName: string;
 }
 export const authLogin = (body: LoginPayload) =>
   apiFetch<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
   });
+
+// ── Username availability ──────────────────────────────────────────
+export interface UsernameAvailableResponse {
+  available: true;
+}
+export interface UsernameTakenResponse {
+  available: false;
+  suggestions: string[];
+}
+export type UsernameCheckResponse = UsernameAvailableResponse | UsernameTakenResponse;
+
+export const checkUsernameAvailable = (username: string) =>
+  apiFetch<UsernameCheckResponse>(
+    `/auth/username-available?username=${encodeURIComponent(username)}`
+  );
+
+// ── Password reset ─────────────────────────────────────────────────
 
 export interface ResetPasswordPayload {
   token: string;
@@ -122,10 +141,12 @@ export const authResetPassword = (body: ResetPasswordPayload) =>
     body: JSON.stringify(body),
   });
 
+// ── Current user ───────────────────────────────────────────────────
+
 export interface MeResponse {
-  handle: string;
+  username: string;
+  displayName: string;
   age: number;
-  phoneVerified: boolean;
 }
 export const getMe = () => apiFetch<MeResponse>("/me");
 

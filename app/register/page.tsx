@@ -4,32 +4,51 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { useState, FormEvent, Suspense } from "react";
-import { type Value as PhoneValue } from "react-phone-number-input";
-import { PhoneField } from "../components/PhoneField";
+import { useState, useEffect, useRef, FormEvent, Suspense } from "react";
 import { PasswordField } from "../components/PasswordField";
 import { TosModal } from "../components/TosModal";
 import { BackToWhatsApp } from "../components/BackToWhatsApp";
-import { authRegister, ApiResponseError } from "../../lib/api";
+import {
+  authRegister,
+  checkUsernameAvailable,
+  ApiResponseError,
+} from "../../lib/api";
+
+// ── Username validation (client-side, mirrors backend rules) ──────
+const USERNAME_RE = /^[a-z0-9_]+$/;
+function validateUsernameFormat(v: string): string | null {
+  if (v.length < 3) return "Username must be at least 3 characters.";
+  if (v.length > 20) return "Username must be at most 20 characters.";
+  if (!USERNAME_RE.test(v))
+    return "Only lowercase letters, numbers, and underscores allowed.";
+  return null;
+}
+
+// ── Availability state ─────────────────────────────────────────────
+type AvailState =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "available" }
+  | { status: "taken"; suggestions: string[] }
+  | { status: "error" };
 
 // ── Form state ─────────────────────────────────────────────────────
 interface FormData {
-  phone: PhoneValue | undefined;
+  username: string;
   password: string;
   confirmPassword: string;
   age: string;
 }
 
 const INITIAL: FormData = {
-  phone: undefined,
+  username: "",
   password: "",
   confirmPassword: "",
   age: "",
 };
 
-// ── Field-level errors map ─────────────────────────────────────────
 interface FieldErrors {
-  phone?: string;
+  username?: string;
   password?: string;
   age?: string;
 }
@@ -44,14 +63,52 @@ function RegisterInner() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [globalError, setGlobalError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [successHandle, setSuccessHandle] = useState<string | null>(null);
+  const [successData, setSuccessData] = useState<{
+    username: string;
+    displayName: string;
+  } | null>(null);
   const [tosOpen, setTosOpen] = useState(false);
+  const [avail, setAvail] = useState<AvailState>({ status: "idle" });
+
+  // Debounce ref for username availability check
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    // Clear that field's error on change
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
+
+  // ── Live username availability ─────────────────────────────────
+  useEffect(() => {
+    const raw = form.username.trim().toLowerCase();
+
+    // Reset to idle if empty or format is invalid
+    if (!raw || validateUsernameFormat(raw) !== null) {
+      setAvail({ status: "idle" });
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      return;
+    }
+
+    setAvail({ status: "checking" });
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await checkUsernameAvailable(raw);
+        if (res.available) {
+          setAvail({ status: "available" });
+        } else {
+          setAvail({ status: "taken", suggestions: res.suggestions });
+        }
+      } catch {
+        setAvail({ status: "error" });
+      }
+    }, 450);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [form.username]);
 
   // ── If there's no token at all, show dead-end immediately ─────────
   if (!token) {
@@ -67,7 +124,8 @@ function RegisterInner() {
   // ── Client-side validation ─────────────────────────────────────
   const validate = (): FieldErrors | null => {
     const errors: FieldErrors = {};
-    if (!form.phone) errors.phone = "Phone number is required.";
+    const usernameErr = validateUsernameFormat(form.username.trim().toLowerCase());
+    if (usernameErr) errors.username = usernameErr;
     if (form.password.length < 8)
       errors.password = "Password must be at least 8 characters.";
     if (form.password !== form.confirmPassword)
@@ -94,11 +152,11 @@ function RegisterInner() {
     try {
       const data = await authRegister({
         token,
-        phone: form.phone as string,
+        username: form.username.trim().toLowerCase(),
         password: form.password,
         age: parseInt(form.age, 10),
       });
-      setSuccessHandle(data.handle);
+      setSuccessData({ username: data.username, displayName: data.displayName });
     } catch (err) {
       if (err instanceof ApiResponseError) {
         const { code, message, issues } = err.error;
@@ -109,7 +167,6 @@ function RegisterInner() {
           code === "token_expired" ||
           code === "token_used"
         ) {
-          // Render the dead-end via a state flag; we keep hooks above
           setGlobalError(`__dead_end__:${code}`);
           return;
         }
@@ -125,9 +182,11 @@ function RegisterInner() {
           return;
         }
 
-        // Phone already in use — inline under phone field
-        if (code === "phone_in_use") {
-          setFieldErrors({ phone: "This phone number is already registered." });
+        // Username race condition
+        if (code === "username_taken") {
+          setFieldErrors({
+            username: "This username was just taken — try another.",
+          });
           return;
         }
 
@@ -178,7 +237,7 @@ function RegisterInner() {
   }
 
   // ── Success screen ─────────────────────────────────────────────
-  if (successHandle) {
+  if (successData) {
     return (
       <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-theme-texture bg-cover bg-center px-4 py-8">
         <div className="absolute inset-0 overlay-theme-heavy" />
@@ -202,19 +261,21 @@ function RegisterInner() {
             className="theme-heading text-2xl font-bold uppercase tracking-widest"
             style={{ fontFamily: "serif" }}
           >
-            Welcome!
+            Welcome, {successData.displayName}!
           </h1>
           <p className="theme-body text-sm leading-7">
-            Your account has been created. Your handle is{" "}
-            <span className="font-bold text-astral-gold">{successHandle}</span>
-            . You can customise it later in your profile.
+            Your account has been created. Your username is{" "}
+            <span className="font-bold text-astral-gold">
+              @{successData.username}
+            </span>
+            .
           </p>
           <button
             type="button"
-            onClick={() => router.push("/login")}
+            onClick={() => router.push("/dashboard")}
             className="flex h-12 w-full items-center justify-center border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white"
           >
-            Go to Login
+            Go to Dashboard
           </button>
         </section>
       </main>
@@ -268,22 +329,115 @@ function RegisterInner() {
         >
           <div className="grid gap-5">
 
-            {/* Phone number */}
+            {/* Username */}
             <div className="grid gap-2">
               <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
-                Phone Number
+                Username
               </span>
-              <PhoneField
-                value={form.phone}
-                onChange={(v) => set("phone", v)}
-                name="phone"
-                required
-              />
-              {fieldErrors.phone && (
-                <p className="text-xs text-red-400">{fieldErrors.phone}</p>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="username"
+                  value={form.username}
+                  onChange={(e) => set("username", e.target.value)}
+                  required
+                  autoComplete="username"
+                  placeholder="xenkai"
+                  maxLength={20}
+                  className="form-input h-12 w-full border px-4 pr-10 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
+                  aria-describedby="username-hint"
+                />
+                {/* Availability indicator */}
+                <span
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-hidden="true"
+                >
+                  {avail.status === "checking" && (
+                    <svg
+                      className="h-4 w-4 animate-spin text-astral-gold/60"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                  )}
+                  {avail.status === "available" && (
+                    <svg
+                      className="h-4 w-4 text-green-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                  {(avail.status === "taken" || avail.status === "error") && (
+                    <svg
+                      className="h-4 w-4 text-red-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  )}
+                </span>
+              </div>
+
+              {/* Availability text */}
+              {avail.status === "available" && (
+                <p className="text-xs text-green-400">Username is available.</p>
               )}
-              <p className="text-xs text-gray-500">
-                Select your country flag to change the dialling code.
+              {avail.status === "taken" && (
+                <p className="text-xs text-red-400">
+                  Username is taken.
+                </p>
+              )}
+              {avail.status === "error" && (
+                <p className="text-xs text-yellow-400">
+                  Couldn&apos;t check availability — try again.
+                </p>
+              )}
+              {fieldErrors.username && (
+                <p className="text-xs text-red-400">{fieldErrors.username}</p>
+              )}
+
+              {/* Suggestion chips */}
+              {avail.status === "taken" && avail.suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Username suggestions">
+                  {avail.suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        set("username", s);
+                        setFieldErrors((prev) => ({ ...prev, username: undefined }));
+                      }}
+                      className="rounded-sm border border-astral-gold/40 bg-astral-gold/10 px-2.5 py-1 text-xs font-mono text-astral-gold transition-colors hover:bg-astral-gold/20"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <p id="username-hint" className="text-xs text-gray-500">
+                3–20 characters. Lowercase letters, numbers, and underscores only.
               </p>
             </div>
 
@@ -296,13 +450,40 @@ function RegisterInner() {
                 type="number"
                 name="age"
                 value={form.age}
-                onChange={(e) => set("age", e.target.value)}
+                onChange={(e) => {
+                  // Strip anything that isn't a digit
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  set("age", raw);
+                }}
+                onKeyDown={(e) => {
+                  // Block letters and symbols at the keyboard level
+                  if (
+                    !/[0-9]/.test(e.key) &&
+                    !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
                 required
                 min={13}
                 max={120}
                 placeholder="18"
-                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
+                className={`form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold ${
+                  form.age && (parseInt(form.age, 10) < 13 || parseInt(form.age, 10) > 120)
+                    ? "border-red-500"
+                    : ""
+                }`}
               />
+              {form.age && parseInt(form.age, 10) < 13 && (
+                <p className="text-xs text-red-400">
+                  You must be at least 13 years old to register.
+                </p>
+              )}
+              {form.age && parseInt(form.age, 10) > 120 && (
+                <p className="text-xs text-red-400">
+                  Please enter a valid age.
+                </p>
+              )}
               {fieldErrors.age && (
                 <p className="text-xs text-red-400">{fieldErrors.age}</p>
               )}
@@ -353,7 +534,13 @@ function RegisterInner() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading ||
+              (() => {
+                const age = parseInt(form.age, 10);
+                return form.age !== "" && (isNaN(age) || age < 13 || age > 120);
+              })()
+            }
             className="mt-6 h-12 w-full border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Creating Account…" : "Create Account"}
