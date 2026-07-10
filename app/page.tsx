@@ -33,7 +33,7 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const BOT_URL = `https://wa.me/${process.env.NEXT_PUBLIC_BOT_NUMBER ?? "919999999999"}?text=.register`;
+  const BOT_URL = `https://wa.me/${process.env.NEXT_PUBLIC_BOT_NUMBER ?? "919999999999"}?text=register`;
 
   return (
     <>
