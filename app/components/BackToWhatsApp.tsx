@@ -33,7 +33,7 @@ export function BackToWhatsApp({
       <section className="relative z-10 flex w-full max-w-md flex-col items-center text-center gap-5">
         <Image
           src="/brand/logo.png?v=transparent-1"
-          alt="Astral Legacy"
+          alt="Ayakashi"
           width={80}
           height={80}
           className="logo-filter h-auto w-16"

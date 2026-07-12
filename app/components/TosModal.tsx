@@ -79,7 +79,7 @@ export function TosModal({ open, onClose }: TosModalProps) {
             1. Acceptance of Terms
           </h3>
           <p>
-            By creating an account on Astral Legacy (&ldquo;the Platform&rdquo;), you agree to
+            By creating an account on Ayakashi (&ldquo;the Platform&rdquo;), you agree to
             be bound by these Terms of Service and our Privacy Policy. If you do not agree,
             do not register or use the Platform.
           </p>
@@ -112,7 +112,7 @@ export function TosModal({ open, onClose }: TosModalProps) {
             4. WhatsApp Integration
           </h3>
           <p>
-            Astral Legacy operates via a WhatsApp bot. By providing your WhatsApp number you
+            Ayakashi operates via a WhatsApp bot. By providing your WhatsApp number you
             consent to receive automated messages from our bot account. You may opt out at
             any time by messaging <span className="text-astral-gold">STOP</span> to the bot.
             Standard carrier messaging rates may apply.
@@ -148,8 +148,8 @@ export function TosModal({ open, onClose }: TosModalProps) {
             7. Intellectual Property
           </h3>
           <p>
-            All content, artwork, and branding on the Platform are the property of Astral
-            Legacy or its licensors. You may not reproduce or distribute them without written
+            All content, artwork, and branding on the Platform are the property of Ayakashi
+            or its licensors. You may not reproduce or distribute them without written
             permission.
           </p>
         </section>
@@ -186,7 +186,7 @@ export function TosModal({ open, onClose }: TosModalProps) {
           </h3>
           <p>
             The Platform is provided &ldquo;as is&rdquo; without warranties of any kind. To the
-            maximum extent permitted by law, Astral Legacy shall not be liable for any
+            maximum extent permitted by law, Ayakashi shall not be liable for any
             indirect, incidental, or consequential damages arising from your use of the
             Platform.
           </p>
@@ -207,7 +207,7 @@ export function TosModal({ open, onClose }: TosModalProps) {
             12. Contact
           </h3>
           <p>
-            For questions about these Terms, reach us via the Astral Legacy WhatsApp bot or
+            For questions about these Terms, reach us via the Ayakashi WhatsApp bot or
             your guild support channel.
           </p>
         </section>

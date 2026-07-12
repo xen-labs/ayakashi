@@ -24,7 +24,7 @@ export default function ForgotPassword() {
 
         <Image
           src="/brand/logo.png?v=transparent-1"
-          alt="Astral Legacy"
+          alt="Ayakashi"
           width={80}
           height={80}
           className="logo-filter mb-6 h-auto w-16"

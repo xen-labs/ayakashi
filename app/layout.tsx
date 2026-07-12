@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Astral Legacy",
+  title: "Ayakashi",
   description: "The ultimate Web Companion for the Next-Gen WhatsApp AI.",
 };
 

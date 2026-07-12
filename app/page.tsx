@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import AnimatedCounter from "./components/AnimatedCounter";
 
-// Check for the access-token cookie the API sets (httpOnly — but astral_at
+// Check for the access-token cookie the API sets (httpOnly — but ayakashi_at
 // is readable here since we only need presence, not value).
 function hasSessionCookie(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((c) => c.trim().startsWith("astral_at="));
+  return document.cookie.split(";").some((c) => c.trim().startsWith("ayakashi_at="));
 }
 
 export default function Home() {
@@ -95,7 +95,7 @@ export default function Home() {
             >
               <Image
                 src="/brand/logo.png?v=transparent-1"
-                alt="Astral Legacy"
+                alt="Ayakashi"
                 width={180}
                 height={180}
                 className={`logo-filter mb-6 h-auto transition-all duration-500 ${
@@ -113,7 +113,7 @@ export default function Home() {
                 }`}
                 style={{ fontFamily: "serif" }}
               >
-                Astral <span className="text-astral-gold">Legacy</span>
+                Ayakashi
               </h1>
 
               <p

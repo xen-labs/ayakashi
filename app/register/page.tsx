@@ -300,7 +300,7 @@ function RegisterInner() {
 
           <Image
             src="/brand/logo.png?v=transparent-1"
-            alt="Astral Legacy"
+            alt="Ayakashi"
             width={104}
             height={104}
             className="logo-filter mb-6 h-auto w-24 self-center lg:self-start"
