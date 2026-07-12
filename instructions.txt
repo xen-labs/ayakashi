@@ -1,7 +1,7 @@
-ASTRAL WEB — INSTRUCTIONS
+AYAKASHI — INSTRUCTIONS
 =============================
 org: xen-labs
-repos: astral-web (frontend) + astral-api (backend) 
+repos: ayakashi (frontend) + astral-api (backend) 
 last updated by: Xenkaii, 6/7/2026, 8:42pm
 
 
@@ -30,7 +30,7 @@ These are NOT just inverted colors — two different background images entirely,
 
 TECH STACK
 
-Frontend (astral-web):
+Frontend (ayakashi):
 - Next.js (App Router), TypeScript, Tailwind
 - shadcn/ui is fine for primitives if you want them, keep it consistent
 
@@ -74,7 +74,7 @@ Both light and dark mode need to look intentional from day one. Test both consta
 
 WHERE THIS RUNS
 
-astral-web: Vercel free tier, standard Next.js deploy, git push and done.
+ayakashi: Vercel free tier, standard Next.js deploy, git push and done.
 
 astral-api: Railway or Render free tier to start or maybe termux or vps
 
