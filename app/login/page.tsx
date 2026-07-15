@@ -70,8 +70,8 @@ export default function Login() {
         password: form.password,
         rememberMe: form.rememberMe,
       });
-      // Cookies are set by the API — just redirect
-      router.push("/");
+      // Cookies are set by the API — redirect to the dashboard
+      router.push("/dashboard");
     } catch (err) {
       if (err instanceof ApiResponseError) {
         const { code, message, issues } = err.error;
@@ -96,7 +96,7 @@ export default function Login() {
         if (code === "account_locked") {
           // message from API includes the wait time
           setGlobalError(
-            message ?? "Too many failed attempts. Please try again later."
+            message ?? "Too many failed attempts. Please try again later.",
           );
           return;
         }
@@ -116,7 +116,6 @@ export default function Login() {
       <div className="absolute inset-0 overlay-theme-heavy" />
 
       <section className="relative z-10 grid w-full max-w-5xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-
         {/* ── Left: branding ── */}
         <div className="flex flex-col justify-center text-center lg:text-left">
           <Link
@@ -144,8 +143,8 @@ export default function Login() {
           </h1>
 
           <p className="theme-body mx-auto max-w-xl text-base leading-7 md:text-lg lg:mx-0">
-            Sign in to access your card collection, live auctions, guild
-            events, and WhatsApp-linked rewards.
+            Sign in to access your card collection, live auctions, guild events,
+            and WhatsApp-linked rewards.
           </p>
         </div>
 
@@ -156,7 +155,6 @@ export default function Login() {
           className="form-card w-full border p-5 shadow-[0_0_40px_rgba(0,0,0,0.35)] backdrop-blur-md sm:p-6 md:p-8"
         >
           <div className="grid gap-5">
-
             {/* Username */}
             <label className="grid gap-2">
               <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
@@ -191,7 +189,6 @@ export default function Login() {
                 <p className="text-xs text-red-400">{fieldErrors.password}</p>
               )}
             </div>
-
           </div>
 
           {/* Remember me + forgot password row */}

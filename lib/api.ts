@@ -14,7 +14,7 @@ export interface ApiError {
 export class ApiResponseError extends Error {
   constructor(
     public readonly status: number,
-    public readonly error: ApiError
+    public readonly error: ApiError,
   ) {
     super(error.message);
     this.name = "ApiResponseError";
@@ -29,7 +29,7 @@ export class ApiResponseError extends Error {
 async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
-  _isRetry = false
+  _isRetry = false,
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -122,11 +122,13 @@ export interface UsernameTakenResponse {
   available: false;
   suggestions: string[];
 }
-export type UsernameCheckResponse = UsernameAvailableResponse | UsernameTakenResponse;
+export type UsernameCheckResponse =
+  | UsernameAvailableResponse
+  | UsernameTakenResponse;
 
 export const checkUsernameAvailable = (username: string) =>
   apiFetch<UsernameCheckResponse>(
-    `/auth/username-available?username=${encodeURIComponent(username)}`
+    `/auth/username-available?username=${encodeURIComponent(username)}`,
   );
 
 // ── Password reset ─────────────────────────────────────────────────
@@ -152,3 +154,18 @@ export const getMe = () => apiFetch<MeResponse>("/me");
 
 export const authLogout = () =>
   apiFetch<void>("/auth/logout", { method: "POST" });
+
+export interface DashboardResponse {
+  username: string;
+  displayName: string;
+  ryo: number;
+  kitsu: number;
+  bank: number;
+  homeVaultRyo: number;
+  homeVaultKitsu: number;
+  pocketTier: number;
+  bankVaultTier: number;
+  dailyStreak: number;
+  memberSince: string;
+}
+export const getDashboard = () => apiFetch<DashboardResponse>("/dashboard");
