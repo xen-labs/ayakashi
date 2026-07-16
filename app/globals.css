@@ -7,13 +7,13 @@
 
 /* ── Background classes ───────────────────────────────────────────── */
 .bg-dark-texture {
-  background-image: url('/backgrounds/dark-bg.jpeg');
+  background-image: url("/backgrounds/dark-bg.jpeg");
   background-size: cover;
   background-position: center;
 }
 
 .bg-light-texture {
-  background-image: url('/backgrounds/light-bg.jpeg');
+  background-image: url("/backgrounds/light-bg.jpeg");
   background-size: cover;
   background-position: center;
 }
@@ -22,14 +22,14 @@
 /* Applied on <main> via .bg-theme-texture.
    The html element carries the "dark" or "light" class set by ThemeProvider. */
 .bg-theme-texture {
-  background-image: url('/backgrounds/dark-bg.jpeg');
+  background-image: url("/backgrounds/dark-bg.jpeg");
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
 }
 
 html.light .bg-theme-texture {
-  background-image: url('/backgrounds/light-bg.jpeg');
+  background-image: url("/backgrounds/light-bg.jpeg");
 }
 
 /* ── Light-mode overlay tint ─────────────────────────────────────── */
@@ -207,7 +207,9 @@ html.light .strength-bar-track {
 .strength-bar-fill {
   height: 100%;
   border-radius: 9999px;
-  transition: width 0.3s ease, background-color 0.3s ease;
+  transition:
+    width 0.3s ease,
+    background-color 0.3s ease;
 }
 
 /* ── "Join WhatsApp" button (theme-aware) ────────────────────────── */
@@ -234,15 +236,14 @@ dialog::backdrop {
 /* ── Light-mode logo filter ──────────────────────────────────────── */
 /* Dark mode: invert so it shows white on dark bg */
 .logo-filter {
-  filter: invert(1) drop-shadow(0 0 15px rgba(255,255,255,0.3));
+  filter: invert(1) drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
   mix-blend-mode: screen;
 }
 
 html.light .logo-filter {
-  filter: drop-shadow(0 0 15px rgba(212,175,55,0.4));
+  filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.4));
   mix-blend-mode: normal;
 }
-
 
 /* ── Theme toggle button ─────────────────────────────────────────── */
 .theme-toggle {
@@ -324,4 +325,54 @@ html.light .team-handle {
 
 html.light .team-dot {
   color: rgba(0, 0, 0, 0.2);
+}
+
+/* ── Welcome bonus reveal card (register success screen) ─────────── */
+.welcome-bonus-card {
+  animation: welcome-bonus-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.welcome-bonus-shimmer {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(212, 175, 55, 0.25) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(212, 175, 55, 0.25) 55%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: welcome-bonus-shimmer-sweep 1.8s ease-out 0.3s both;
+}
+
+@keyframes welcome-bonus-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes welcome-bonus-shimmer-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* ── Shop purchase toast ─────────────────────────────────────────── */
+@keyframes shop-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }

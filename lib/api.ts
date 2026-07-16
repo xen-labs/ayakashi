@@ -1,6 +1,4 @@
-// ── Base URL ───────────────────────────────────────────────────────
-// In dev, proxy to localhost:4000. In prod, set NEXT_PUBLIC_API_URL in your
-// Vercel env vars to your Railway URL (e.g. https://astral-api-production.up.railway.app)
+// ── Base URL ──────────────────────────────────────
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -92,6 +90,7 @@ export interface RegisterResponse {
   username: string;
   displayName: string;
   age: number;
+  welcomeBonus: { ryo: number; kitsu: number } | null;
 }
 export const authRegister = (body: RegisterPayload) =>
   apiFetch<RegisterResponse>("/auth/register", {
@@ -169,3 +168,98 @@ export interface DashboardResponse {
   memberSince: string;
 }
 export const getDashboard = () => apiFetch<DashboardResponse>("/dashboard");
+
+// ── Material Shop ──────────────────────────────────────────────────
+export interface MaterialShopItem {
+  materialId: string;
+  name: string;
+  emoji: string;
+  sellPrice: number;
+  buyPriceRyo: number;
+  buyPriceKitsu: number;
+  remaining: number;
+  globalDailyStock: number;
+  perPlayerDailyCap: number;
+}
+export interface MaterialShopResponse {
+  day: string;
+  items: MaterialShopItem[];
+}
+export const getMaterialShop = () =>
+  apiFetch<MaterialShopResponse>("/shop/materials");
+
+export interface MyMaterialPurchasesResponse {
+  day: string;
+  purchases: Record<string, number>;
+}
+export const getMyMaterialPurchases = () =>
+  apiFetch<MyMaterialPurchasesResponse>("/shop/materials/my-purchases");
+
+export interface BuyMaterialPayload {
+  materialId: string;
+  quantity: number;
+  currency: "ryo" | "kitsu";
+}
+export interface BuyMaterialResponse {
+  materialId: string;
+  quantity: number;
+  currency: "ryo" | "kitsu";
+  totalCost: number;
+  newBalance: number;
+}
+export const buyMaterial = (body: BuyMaterialPayload) =>
+  apiFetch<BuyMaterialResponse>("/shop/materials/buy", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+// ── Rob Item Shop ──────────────────────────────────────────────────
+export interface RobShopItem {
+  itemId: string;
+  name: string;
+  emoji: string;
+  category: string;
+  price: number;
+  currency: "ryo" | "kitsu";
+  durability: "permanent" | "charges" | "consumable" | string;
+  maxCharges?: number;
+  description: string;
+}
+export interface RobShopResponse {
+  items: RobShopItem[];
+}
+export const getRobItemShop = () =>
+  apiFetch<RobShopResponse>("/shop/rob-items");
+
+export interface BuyRobItemPayload {
+  itemId: string;
+  quantity: number;
+}
+export interface BuyRobItemResponse {
+  itemId: string;
+  quantity: number;
+  unitsCredited: number;
+  currency: "ryo" | "kitsu";
+  totalCost: number;
+  newBalance: number;
+}
+export const buyRobItem = (body: BuyRobItemPayload) =>
+  apiFetch<BuyRobItemResponse>("/shop/rob-items/buy", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+// ── Inventory ─────────────────────────────────────────────────────
+export interface InventoryItem {
+  itemId: string;
+  quantity: number;
+  kind: "material" | "rob-item" | "unknown";
+  name: string;
+  emoji: string;
+  durability?: string;
+}
+export interface InventoryResponse {
+  items: InventoryItem[];
+  ownedItemIds: string[];
+}
+export const getInventory = () => apiFetch<InventoryResponse>("/inventory");

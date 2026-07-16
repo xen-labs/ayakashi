@@ -66,6 +66,7 @@ function RegisterInner() {
   const [successData, setSuccessData] = useState<{
     username: string;
     displayName: string;
+    welcomeBonus: { ryo: number; kitsu: number } | null;
   } | null>(null);
   const [tosOpen, setTosOpen] = useState(false);
   const [avail, setAvail] = useState<AvailState>({ status: "idle" });
@@ -124,7 +125,9 @@ function RegisterInner() {
   // ── Client-side validation ─────────────────────────────────────
   const validate = (): FieldErrors | null => {
     const errors: FieldErrors = {};
-    const usernameErr = validateUsernameFormat(form.username.trim().toLowerCase());
+    const usernameErr = validateUsernameFormat(
+      form.username.trim().toLowerCase(),
+    );
     if (usernameErr) errors.username = usernameErr;
     if (form.password.length < 8)
       errors.password = "Password must be at least 8 characters.";
@@ -156,7 +159,11 @@ function RegisterInner() {
         password: form.password,
         age: parseInt(form.age, 10),
       });
-      setSuccessData({ username: data.username, displayName: data.displayName });
+      setSuccessData({
+        username: data.username,
+        displayName: data.displayName,
+        welcomeBonus: data.welcomeBonus,
+      });
     } catch (err) {
       if (err instanceof ApiResponseError) {
         const { code, message, issues } = err.error;
@@ -193,7 +200,7 @@ function RegisterInner() {
         // Already registered — prompt to login
         if (code === "already_registered") {
           setGlobalError(
-            "You already have an account — try logging in instead."
+            "You already have an account — try logging in instead.",
           );
           return;
         }
@@ -270,6 +277,40 @@ function RegisterInner() {
             </span>
             .
           </p>
+
+          {successData.welcomeBonus && (
+            <div className="welcome-bonus-card relative w-full overflow-hidden border border-astral-gold/50 bg-black/40 px-6 py-5 shadow-[0_0_30px_rgba(212,175,55,0.2)]">
+              <div className="welcome-bonus-shimmer pointer-events-none absolute inset-0" />
+              <p className="relative z-10 text-xs font-bold uppercase tracking-[0.2em] text-astral-gold">
+                ✦ Welcome Bonus ✦
+              </p>
+              <div className="relative z-10 mt-3 flex items-center justify-center gap-8">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-3xl">🪙</span>
+                  <span className="theme-heading text-2xl font-bold text-astral-gold">
+                    +{successData.welcomeBonus.ryo.toLocaleString("en-US")}
+                  </span>
+                  <span className="text-xs uppercase tracking-widest text-gray-400">
+                    Ryo
+                  </span>
+                </div>
+                <div className="h-10 w-px bg-astral-gold/20" />
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-3xl">🦊</span>
+                  <span className="theme-heading text-2xl font-bold text-astral-gold">
+                    +{successData.welcomeBonus.kitsu.toLocaleString("en-US")}
+                  </span>
+                  <span className="text-xs uppercase tracking-widest text-gray-400">
+                    Kitsu
+                  </span>
+                </div>
+              </div>
+              <p className="relative z-10 mt-3 text-xs text-gray-400">
+                Already added to your balance — check your dashboard.
+              </p>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => router.push("/dashboard")}
@@ -288,7 +329,6 @@ function RegisterInner() {
       <div className="absolute inset-0 overlay-theme-heavy" />
 
       <section className="relative z-10 grid w-full max-w-5xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-
         {/* ── Left: branding ── */}
         <div className="flex flex-col justify-center text-center lg:text-left">
           <Link
@@ -328,7 +368,6 @@ function RegisterInner() {
           className="form-card w-full border p-5 shadow-[0_0_40px_rgba(0,0,0,0.35)] backdrop-blur-md sm:p-6 md:p-8"
         >
           <div className="grid gap-5">
-
             {/* Username */}
             <div className="grid gap-2">
               <span className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
@@ -404,9 +443,7 @@ function RegisterInner() {
                 <p className="text-xs text-green-400">Username is available.</p>
               )}
               {avail.status === "taken" && (
-                <p className="text-xs text-red-400">
-                  Username is taken.
-                </p>
+                <p className="text-xs text-red-400">Username is taken.</p>
               )}
               {avail.status === "error" && (
                 <p className="text-xs text-yellow-400">
@@ -419,14 +456,21 @@ function RegisterInner() {
 
               {/* Suggestion chips */}
               {avail.status === "taken" && avail.suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Username suggestions">
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="group"
+                  aria-label="Username suggestions"
+                >
                   {avail.suggestions.map((s) => (
                     <button
                       key={s}
                       type="button"
                       onClick={() => {
                         set("username", s);
-                        setFieldErrors((prev) => ({ ...prev, username: undefined }));
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          username: undefined,
+                        }));
                       }}
                       className="rounded-sm border border-astral-gold/40 bg-astral-gold/10 px-2.5 py-1 text-xs font-mono text-astral-gold transition-colors hover:bg-astral-gold/20"
                     >
@@ -437,7 +481,8 @@ function RegisterInner() {
               )}
 
               <p id="username-hint" className="text-xs text-gray-500">
-                3–20 characters. Lowercase letters, numbers, and underscores only.
+                3–20 characters. Lowercase letters, numbers, and underscores
+                only.
               </p>
             </div>
 
@@ -459,7 +504,13 @@ function RegisterInner() {
                   // Block letters and symbols at the keyboard level
                   if (
                     !/[0-9]/.test(e.key) &&
-                    !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)
+                    ![
+                      "Backspace",
+                      "Delete",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "Tab",
+                    ].includes(e.key)
                   ) {
                     e.preventDefault();
                   }
@@ -469,7 +520,8 @@ function RegisterInner() {
                 max={120}
                 placeholder="18"
                 className={`form-input h-12 border px-4 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold ${
-                  form.age && (parseInt(form.age, 10) < 13 || parseInt(form.age, 10) > 120)
+                  form.age &&
+                  (parseInt(form.age, 10) < 13 || parseInt(form.age, 10) > 120)
                     ? "border-red-500"
                     : ""
                 }`}
@@ -499,7 +551,9 @@ function RegisterInner() {
               showStrength
             />
             {fieldErrors.password && (
-              <p className="-mt-3 text-xs text-red-400">{fieldErrors.password}</p>
+              <p className="-mt-3 text-xs text-red-400">
+                {fieldErrors.password}
+              </p>
             )}
 
             {/* Confirm password */}
@@ -511,7 +565,6 @@ function RegisterInner() {
               required
               matchValue={form.password}
             />
-
           </div>
 
           {/* Already registered nudge or generic error */}
