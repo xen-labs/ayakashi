@@ -9,7 +9,9 @@ import AnimatedCounter from "./components/AnimatedCounter";
 // is readable here since we only need presence, not value).
 function hasSessionCookie(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((c) => c.trim().startsWith("ayakashi_at="));
+  return document.cookie
+    .split(";")
+    .some((c) => c.trim().startsWith("ayakashi_at="));
 }
 
 export default function Home() {
@@ -46,7 +48,13 @@ export default function Home() {
             rel="noopener noreferrer"
             className="team-org-link flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest transition-opacity hover:opacity-70"
           >
-            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <svg
+              aria-hidden="true"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z" />
             </svg>
             Xen Labs
@@ -85,7 +93,6 @@ export default function Home() {
         {/* ── Screen 1: hero + stats in one viewport ──────────────── */}
         {/* pb-10 accounts for the fixed footer height so stats aren't hidden */}
         <section className="relative z-10 flex min-h-dvh flex-col items-center justify-between px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-
           {/* Hero content — centered in remaining space */}
           <div className="flex flex-1 items-center justify-center w-full">
             <div
@@ -121,8 +128,9 @@ export default function Home() {
                   loggedIn ? "text-sm md:text-base" : "text-base md:text-xl"
                 }`}
               >
-                Experience the ultimate Web Companion for the Next-Gen WhatsApp AI.
-                Collect cards, trade in live auctions, and summon your destiny.
+                Experience the ultimate Web Companion for the Next-Gen WhatsApp
+                AI. Collect cards, trade in live auctions, and summon your
+                destiny.
               </p>
 
               <div className="grid w-full max-w-xl gap-4 sm:grid-cols-2">
@@ -162,13 +170,28 @@ export default function Home() {
                   </>
                 )}
               </div>
+
+              {!loggedIn && (
+                <p className="mt-5 text-sm text-gray-500">
+                  Already have an account?{" "}
+                  <Link
+                    href="/login"
+                    className="font-semibold text-astral-gold transition-colors hover:text-white"
+                  >
+                    Log in →
+                  </Link>
+                </p>
+              )}
             </div>
           </div>
 
           {/* Stats bar — sits at bottom of first viewport, fades on scroll */}
           <div
             className="w-full border-t footer-bar rounded-sm px-4 py-4 backdrop-blur-sm"
-            style={{ opacity: statsOpacity, transition: "opacity 0.05s linear" }}
+            style={{
+              opacity: statsOpacity,
+              transition: "opacity 0.05s linear",
+            }}
             aria-hidden={statsOpacity === 0}
           >
             <div className="mx-auto grid max-w-6xl grid-cols-3 gap-3 text-center">
@@ -216,7 +239,9 @@ export default function Home() {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 {
-                  icon: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
+                  icon: (
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  ),
                   title: "Card Collection",
                   body: "Claim, collect, and showcase hundreds of unique cards earned through the bot.",
                 },
@@ -226,33 +251,63 @@ export default function Home() {
                   body: "Bid on rare cards in real-time auctions with players across the world.",
                 },
                 {
-                  icon: <><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></>,
+                  icon: (
+                    <>
+                      <circle cx="9" cy="21" r="1" />
+                      <circle cx="20" cy="21" r="1" />
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </>
+                  ),
                   title: "Marketplace",
                   body: "Trade cards and currency with other players in the open marketplace.",
                 },
                 {
-                  icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+                  icon: (
+                    <>
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </>
+                  ),
                   title: "Guilds",
                   body: "Form or join guilds, compete in events, and climb the leaderboard together.",
                 },
                 {
-                  icon: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>,
+                  icon: (
+                    <>
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </>
+                  ),
                   title: "Player Profiles",
                   body: "Customise your profile, show off your rarest cards, and track your stats.",
                 },
                 {
-                  icon: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
+                  icon: (
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  ),
                   title: "Mini-games",
                   body: "Play browser-based mini-games for bonus rewards, linked to your WhatsApp progress.",
                 },
               ].map((feat) => (
-                <div key={feat.title} className="form-card rounded-sm border p-6 backdrop-blur-md">
+                <div
+                  key={feat.title}
+                  className="form-card rounded-sm border p-6 backdrop-blur-md"
+                >
                   <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-sm border border-astral-gold/20 bg-astral-gold/10">
                     <svg
-                      width="18" height="18" viewBox="0 0 24 24"
-                      fill="none" stroke="currentColor"
-                      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
-                      className="text-astral-gold" aria-hidden="true"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-astral-gold"
+                      aria-hidden="true"
                     >
                       {feat.icon}
                     </svg>
@@ -263,7 +318,9 @@ export default function Home() {
                   >
                     {feat.title}
                   </h3>
-                  <p className="theme-body text-xs leading-6 opacity-70">{feat.body}</p>
+                  <p className="theme-body text-xs leading-6 opacity-70">
+                    {feat.body}
+                  </p>
                 </div>
               ))}
             </div>
