@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import AnimatedCounter from "./components/AnimatedCounter";
 import { TopBar } from "./components/TopBar";
 import { BottomNav } from "./components/BottomNav";
-import { getMe } from "../lib/api";
-import type { MeResponse } from "../lib/api";
+import { getMe } from "./lib/api";
+import type { MeResponse } from "./lib/api";
 
 function GithubCredits() {
   return (
@@ -140,16 +140,10 @@ function FeatureGrid({ loggedIn }: { loggedIn: boolean }) {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feat) => {
-            const clickable = loggedIn && feat.href;
-            const Wrapper = clickable ? Link : "div";
-            return (
-              <Wrapper
-                key={feat.title}
-                {...(clickable ? { href: feat.href as string } : {})}
-                className={`form-card relative rounded-sm border p-6 backdrop-blur-md ${
-                  clickable ? "transition-transform hover:-translate-y-0.5" : ""
-                }`}
-              >
+            const clickable = loggedIn && Boolean(feat.href);
+
+            const inner = (
+              <>
                 {loggedIn && feat.comingSoon && (
                   <span className="absolute right-3 top-3 rounded-sm border border-astral-gold/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-astral-gold opacity-70">
                     Soon
@@ -180,7 +174,28 @@ function FeatureGrid({ loggedIn }: { loggedIn: boolean }) {
                 <p className="theme-body text-xs leading-6 opacity-70">
                   {feat.body}
                 </p>
-              </Wrapper>
+              </>
+            );
+
+            if (clickable) {
+              return (
+                <Link
+                  key={feat.title}
+                  href={feat.href as string}
+                  className="form-card relative rounded-sm border p-6 backdrop-blur-md transition-transform hover:-translate-y-0.5"
+                >
+                  {inner}
+                </Link>
+              );
+            }
+
+            return (
+              <div
+                key={feat.title}
+                className="form-card relative rounded-sm border p-6 backdrop-blur-md"
+              >
+                {inner}
+              </div>
             );
           })}
         </div>
