@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { X, Settings, LogOut, HelpCircle, MessageCircle } from "lucide-react";
-import { authLogout } from "../lib/api";
-import type { MeResponse } from "../lib/api";
+import { authLogout } from "../../lib/api";
+import type { MeResponse } from "../../lib/api";
 
 const SECONDARY_LINKS = [
   { href: "/settings", label: "Settings", icon: Settings },

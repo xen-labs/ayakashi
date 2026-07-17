@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { NavDrawer } from "./NavDrawer";
-import type { MeResponse } from "../lib/api";
+import type { MeResponse } from "../../lib/api";
 
 export function TopBar({ user }: { user: MeResponse | null }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
