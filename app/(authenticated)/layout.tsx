@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "../../lib/useAuth";
-import { TopBar } from "../../components/TopBar";
-import { BottomNav } from "../../components/BottomNav";
+import { TopBar } from "../components/TopBar";
+import { BottomNav } from "../components/BottomNav";
 
 export default function AuthenticatedLayout({
   children,
