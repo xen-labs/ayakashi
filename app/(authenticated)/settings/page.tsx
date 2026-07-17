@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Moon, Sun, User } from "lucide-react";
-import { useTheme } from "../../../components/ThemeProvider";
+import { useTheme } from "../../components/ThemeProvider";
 import { useAuth } from "../../../lib/useAuth";
 
 export default function Settings() {
