@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import AnimatedCounter from "./components/AnimatedCounter";
 import { TopBar } from "./components/TopBar";
 import { BottomNav } from "./components/BottomNav";
-import { getMe } from "./lib/api";
-import type { MeResponse } from "./lib/api";
+import { getMe } from "../lib/api";
+import type { MeResponse } from "../lib/api";
 
 function GithubCredits() {
   return (
