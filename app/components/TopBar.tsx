@@ -13,7 +13,7 @@ export function TopBar({ user }: { user: MeResponse | null }) {
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-black/80 px-4 py-3 backdrop-blur-md sm:px-6">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
           <Image
             src="/brand/logo.png?v=transparent-1"
             alt="Ayakashi"

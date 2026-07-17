@@ -7,13 +7,13 @@
 
 /* ── Background classes ───────────────────────────────────────────── */
 .bg-dark-texture {
-  background-image: url("/backgrounds/dark-bg.jpeg");
+  background-image: url("/backgrounds/dark-bg.webp");
   background-size: cover;
   background-position: center;
 }
 
 .bg-light-texture {
-  background-image: url("/backgrounds/light-bg.jpeg");
+  background-image: url("/backgrounds/light-bg.webp");
   background-size: cover;
   background-position: center;
 }
