@@ -60,8 +60,21 @@ async function apiFetch<T>(
     message: "Something went wrong.",
   };
 
-  // Token refresh — one retry only, no loop
-  if (res.status === 401 && apiErr.code === "invalid_token" && !_isRetry) {
+  // Token refresh — one retry only, no loop.
+  // Both codes mean "no usable access token right now, but a valid
+  // refresh token might still fix it": invalid_token fires when a
+  // present-but-expired/corrupt token fails verification; unauthenticated
+  // fires when the access cookie is simply gone (the common case, since
+  // its own Max-Age is just 15 minutes — it's usually deleted by the
+  // browser long before the refresh token is). Previously only
+  // invalid_token triggered a refresh attempt, so unauthenticated always
+  // fell straight through to a redirect-to-login, even with a fully valid
+  // refresh token still active for up to a day.
+  const isRecoverable =
+    res.status === 401 &&
+    (apiErr.code === "invalid_token" || apiErr.code === "unauthenticated");
+
+  if (isRecoverable && !_isRetry) {
     try {
       await apiFetch("/auth/refresh", { method: "POST" }, true);
       return apiFetch<T>(path, init, true);
