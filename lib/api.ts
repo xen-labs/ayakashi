@@ -33,7 +33,12 @@ async function apiFetch<T>(
     ...init,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      // Only send Content-Type: application/json when there's an actual
+      // body — sending it on a bodyless request (like /auth/refresh,
+      // which is a POST with no payload) makes Fastify's default JSON
+      // parser throw FST_ERR_CTP_EMPTY_JSON_BODY, which surfaces to the
+      // client as a bare 500 with no useful indication of the real cause.
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...(init.headers ?? {}),
     },
   });
@@ -78,10 +83,7 @@ async function apiFetch<T>(
     try {
       await apiFetch("/auth/refresh", { method: "POST" }, true);
       return apiFetch<T>(path, init, true);
-    } catch (refreshErr) {
-      // TEMP DEBUG — remove once the 10-15min logout cause is confirmed.
-      // eslint-disable-next-line no-console
-      console.error("[apiFetch] refresh attempt failed:", refreshErr);
+    } catch {
       // Refresh failed → caller should redirect to /login
       throw new ApiResponseError(401, {
         code: "session_expired",
