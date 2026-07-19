@@ -22,14 +22,14 @@
 /* Applied on <main> via .bg-theme-texture.
    The html element carries the "dark" or "light" class set by ThemeProvider. */
 .bg-theme-texture {
-  background-image: url("/backgrounds/dark-bg.jpeg");
+  background-image: url("/backgrounds/dark-bg.webp");
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
 }
 
 html.light .bg-theme-texture {
-  background-image: url("/backgrounds/light-bg.jpeg");
+  background-image: url("/backgrounds/light-bg.webp");
 }
 
 /* ── Light-mode overlay tint ─────────────────────────────────────── */
