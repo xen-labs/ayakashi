@@ -1,0 +1,440 @@
+@import "tailwindcss";
+
+/* ── Google Fonts via CSS variables ──────────────────────────────── */
+/* --font-kaisei  → decorative headings, section titles, card names  */
+/* --font-inter   → all UI text, body, buttons, labels, nav          */
+
+@theme {
+  /* ── Gold MMORPG palette ── */
+  --color-astral-gold:    #c8a84b;
+  --color-astral-crimson: #c8a84b;
+  --color-astral-violet:  #c8a84b;
+  --color-astral-rose:    #e6c96a;
+  --color-astral-navy:    #0a0a0a;
+}
+
+/* ── Base font assignment ─────────────────────────────────────────── */
+body {
+  font-family: var(--font-inter), sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Utility classes for font switching */
+.font-display {
+  font-family: var(--font-kaisei), serif;
+}
+
+.font-ui {
+  font-family: var(--font-inter), sans-serif;
+}
+
+/* ── Page background — pure black ────────────────────────────────── */
+.bg-dark-texture {
+  background-color: #0a0a0a;
+  background-image: url("/backgrounds/dark-bg.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+.bg-theme-texture {
+  background-color: #0a0a0a;
+  background-image: url("/backgrounds/dark-bg.webp");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* ── Overlay tints ───────────────────────────────────────────────── */
+.overlay-theme {
+  background-color: rgba(0, 0, 0, 0.60);
+}
+
+.overlay-theme-heavy {
+  background-color: rgba(0, 0, 0, 0.82);
+}
+
+/* ── Text ────────────────────────────────────────────────────────── */
+.theme-heading {
+  font-family: var(--font-kaisei), serif;
+  color: #f0e6c8;
+}
+
+.theme-body {
+  font-family: var(--font-inter), sans-serif;
+  color: #a89880;
+}
+
+.theme-stat-heading {
+  font-family: var(--font-kaisei), serif;
+  color: #f0e6c8;
+}
+
+/* ── Brush-stroke section header ─────────────────────────────────── */
+/*
+ * Usage:
+ *   <div class="section-header">
+ *     <span class="section-header-text">SHOP</span>
+ *   </div>
+ *
+ * The gold brush stroke PNG sits behind the text via background-image.
+ * The image is already colored/textured gold so we use contain.
+ */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  height: 72px;
+  background-image: url("/backgrounds/brush-stroke.png");
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  margin: 0 auto;
+}
+
+.section-header-text {
+  position: relative;
+  z-index: 1;
+  color: #1a1000;
+  font-family: var(--font-kaisei), serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.20);
+}
+
+/* ── Brush-stroke button ─────────────────────────────────────────── */
+.brush-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-width: 200px;
+  height: 60px;
+  background-image: url("/backgrounds/brush-stroke.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-kaisei), serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #1a1000;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.20);
+  transition: filter 0.15s, transform 0.15s;
+}
+
+.brush-btn:hover {
+  filter: brightness(1.12);
+  transform: scale(1.03);
+}
+
+/* ── Coin medallion stat card ────────────────────────────────────── */
+/*
+ * Usage:
+ *   <div class="coin-medallion">
+ *     <span class="coin-medallion-value">1,654</span>
+ *     <span class="coin-medallion-label">RYO</span>
+ *   </div>
+ */
+.coin-medallion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2a2000 0%, #0d0d00 60%, #000 100%);
+  border: 2px solid #c8a84b;
+  box-shadow:
+    0 0 0 4px rgba(200, 168, 75, 0.12),
+    0 0 0 8px rgba(200, 168, 75, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(200, 168, 75, 0.25);
+  position: relative;
+}
+
+.coin-medallion::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(200, 168, 75, 0.30);
+  pointer-events: none;
+}
+
+.coin-medallion-value {
+  color: #e6c96a;
+  font-family: var(--font-kaisei), serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(200, 168, 75, 0.6);
+}
+
+.coin-medallion-label {
+  color: rgba(200, 168, 75, 0.70);
+  font-family: var(--font-inter), sans-serif;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ── Dark card (replaces form-card) ─────────────────────────────── */
+.form-card {
+  background-color: rgba(10, 8, 0, 0.75);
+  border-color: rgba(200, 168, 75, 0.25);
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(200, 168, 75, 0.08);
+}
+
+/* ── Footer / stats bar ──────────────────────────────────────────── */
+.footer-bar {
+  background-color: rgba(0, 0, 0, 0.80);
+  border-color: rgba(200, 168, 75, 0.12);
+}
+
+/* ── Form inputs ─────────────────────────────────────────────────── */
+.form-input {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: rgba(200, 168, 75, 0.25);
+  color: #f0e6c8;
+}
+
+.form-select {
+  background-color: #0d0d00;
+  border-color: rgba(200, 168, 75, 0.25);
+  color: #f0e6c8;
+}
+
+/* ── PhoneInput ──────────────────────────────────────────────────── */
+.phone-field-wrapper {
+  --PhoneInput-color--focus: #c8a84b;
+  --PhoneInputCountrySelectArrow-color: rgba(200, 168, 75, 0.7);
+  --PhoneInputCountryFlag-height: 1.1em;
+  --PhoneInputCountryFlag-borderColor: rgba(200, 168, 75, 0.25);
+  --PhoneInputCountryFlag-borderColor--focus: #c8a84b;
+}
+
+.phone-field-wrapper .PhoneInput {
+  display: flex;
+  align-items: stretch;
+  height: 3rem;
+  border: 1px solid rgba(200, 168, 75, 0.25);
+  background-color: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.15s;
+}
+
+.phone-field-wrapper .PhoneInput:focus-within {
+  border-color: #c8a84b;
+}
+
+.phone-field-wrapper .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border-right: 1px solid rgba(200, 168, 75, 0.15);
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.phone-field-wrapper .PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 1rem;
+  color: #f0e6c8;
+  font-size: 1rem;
+}
+
+.phone-field-wrapper .PhoneInputInput::placeholder {
+  color: #5a4e30;
+}
+
+/* ── Password strength meter ─────────────────────────────────────── */
+.strength-bar-track {
+  height: 3px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.strength-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* ── Join WhatsApp button ────────────────────────────────────────── */
+.join-btn {
+  background-color: transparent;
+  border-color: rgba(200, 168, 75, 0.50);
+  color: #f0e6c8;
+}
+
+/* ── ToS dialog backdrop ─────────────────────────────────────────── */
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+/* ── Logo filter — white/bright ──────────────────────────────────── */
+.logo-filter {
+  filter: brightness(0) invert(1) drop-shadow(0 0 8px rgba(200, 168, 75, 0.4));
+}
+
+/* ── TopBar — solid black ────────────────────────────────────────── */
+.topbar {
+  background-color: rgba(0, 0, 0, 0.95);
+  border-bottom: 1px solid rgba(200, 168, 75, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+/* ── TopBar nav links ────────────────────────────────────────────── */
+.topbar-nav-link {
+  color: rgba(200, 168, 75, 0.45);
+  letter-spacing: 0.14em;
+  transition: color 0.15s;
+}
+
+.topbar-nav-link:hover {
+  color: rgba(200, 168, 75, 0.90);
+}
+
+.topbar-nav-link-active {
+  color: #c8a84b !important;
+  text-shadow: 0 0 10px rgba(200, 168, 75, 0.50);
+}
+
+/* ── Coin pills ──────────────────────────────────────────────────── */
+.topbar-coin {
+  background-color: rgba(200, 168, 75, 0.07);
+  border: 1px solid rgba(200, 168, 75, 0.18);
+}
+
+.topbar-coin-amount {
+  color: #c8a84b;
+}
+
+.topbar-coin-ryo {
+  color: #d0ccc0;
+}
+
+/* Divider */
+.topbar-divider {
+  background-color: rgba(200, 168, 75, 0.20);
+}
+
+/* Icon buttons */
+.topbar-icon-btn {
+  color: rgba(200, 168, 75, 0.50);
+}
+
+.topbar-icon-btn:hover {
+  color: #c8a84b;
+  background-color: rgba(200, 168, 75, 0.10);
+}
+
+/* Profile dropdown */
+.topbar-dropdown {
+  background-color: #0d0c00;
+  border-color: rgba(200, 168, 75, 0.20);
+}
+
+.topbar-dropdown-header {
+  border-color: rgba(200, 168, 75, 0.12);
+}
+
+.topbar-dropdown-sub {
+  color: rgba(200, 168, 75, 0.40);
+}
+
+.topbar-dropdown-item {
+  color: rgba(240, 230, 200, 0.75);
+}
+
+.topbar-dropdown-item:hover {
+  background-color: rgba(200, 168, 75, 0.08);
+  color: #c8a84b;
+}
+
+/* ── Theme toggle ────────────────────────────────────────────────── */
+.theme-toggle {
+  border-color: rgba(200, 168, 75, 0.25);
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #c8a84b;
+}
+
+.theme-toggle:hover {
+  border-color: #c8a84b;
+  background-color: rgba(200, 168, 75, 0.10);
+}
+
+/* ── GithubCredits footer ────────────────────────────────────────── */
+.github-credits-root {
+  color: rgba(200, 168, 75, 0.35);
+  border-color: rgba(200, 168, 75, 0.10);
+}
+
+.github-credits-handle {
+  color: rgba(200, 168, 75, 0.60);
+}
+
+.github-credits-dot {
+  color: rgba(200, 168, 75, 0.25);
+}
+
+/* ── Welcome bonus card ──────────────────────────────────────────── */
+.welcome-bonus-card {
+  animation: welcome-bonus-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.welcome-bonus-shimmer {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(200, 168, 75, 0.15) 45%,
+    rgba(230, 201, 106, 0.30) 50%,
+    rgba(200, 168, 75, 0.15) 55%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: welcome-bonus-shimmer-sweep 1.8s ease-out 0.3s both;
+}
+
+@keyframes welcome-bonus-pop {
+  from { opacity: 0; transform: scale(0.92) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes welcome-bonus-shimmer-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -50% 0; }
+}
+
+/* ── Horizontal gold divider rule ────────────────────────────────── */
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(200,168,75,0.5), transparent);
+  border: none;
+}
+
+/* ── Shop toast ──────────────────────────────────────────────────── */
+@keyframes shop-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
