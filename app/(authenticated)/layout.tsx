@@ -34,7 +34,8 @@ export default function AuthenticatedLayout({
     <CurrencyProvider>
       <div className="min-h-dvh bg-[#0a0a0a]">
         <TopBar user={user} />
-        <div className="flex min-h-[calc(100dvh-56px)] flex-col">
+        {/* pb-16 reserves space so content clears the fixed bottom nav */}
+        <div className="flex min-h-[calc(100dvh-56px)] flex-col pb-16">
           <main className="flex-1">{children}</main>
           <GithubCredits />
         </div>

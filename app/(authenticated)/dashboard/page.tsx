@@ -82,7 +82,7 @@ export default function Dashboard() {
   const { identity, currency, vault, progression, dailyClaim, cardsOwned, recentTransactions, pendingFriendRequests } = data;
 
   return (
-    <section className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 pb-24 sm:px-6 lg:px-8 lg:pb-8">
+    <section className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       {/* ambient glow */}
       <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-96 -translate-x-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[80px]" />
 

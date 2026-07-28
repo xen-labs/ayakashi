@@ -16,30 +16,33 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.15)] bg-black/95 backdrop-blur-sm lg:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.18)] bg-black/98 backdrop-blur-md"
       aria-label="Main navigation"
     >
-      <div className="flex items-stretch">
+      <div className="mx-auto flex max-w-lg items-stretch">
         {NAV_ITEMS.map(({ href, label, Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + "/");
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors ${
                 active
                   ? "text-[#c8a84b]"
-                  : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
+                  : "text-[rgba(200,168,75,0.38)] hover:text-[rgba(200,168,75,0.75)]"
               }`}
             >
+              {/* active top indicator line */}
+              {active && (
+                <span className="absolute top-0 left-1/2 h-0.5 w-10 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
+              )}
               <Icon
-                className={`h-5 w-5 ${active ? "drop-shadow-[0_0_6px_rgba(200,168,75,0.7)]" : ""}`}
+                className="h-[22px] w-[22px]"
                 strokeWidth={active ? 2.2 : 1.6}
               />
-              <span>{label}</span>
-              {active && (
-                <span className="absolute bottom-0 h-0.5 w-10 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
-              )}
+              <span className={`text-[10px] font-bold uppercase tracking-[0.1em] ${active ? "text-[#c8a84b]" : ""}`}>
+                {label}
+              </span>
             </Link>
           );
         })}
