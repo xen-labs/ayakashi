@@ -4,6 +4,7 @@ import { useAuth } from "../../lib/useAuth";
 import { TopBar } from "../components/TopBar";
 import { CurrencyProvider } from "../components/CurrencyContext";
 import { GithubCredits } from "../components/GithubCredits";
+import { BottomNav } from "../components/BottomNav";
 
 export default function AuthenticatedLayout({
   children,
@@ -37,6 +38,7 @@ export default function AuthenticatedLayout({
           <main className="flex-1">{children}</main>
           <GithubCredits />
         </div>
+        <BottomNav />
       </div>
     </CurrencyProvider>
   );

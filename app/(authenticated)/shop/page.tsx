@@ -2,24 +2,26 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { X, Coins } from "lucide-react";
+import { X } from "lucide-react";
 import {
-  getMaterialShop,
-  getMyMaterialPurchases,
-  buyMaterial,
-  getRobItemShop,
-  buyRobItem,
-  getDashboard,
+  getShopListings,
+  buyItem,
   getInventory,
+  getDashboard,
   ApiResponseError,
 } from "../../../lib/api";
-import type {
-  MaterialShopItem,
-  RobShopItem,
-  DashboardResponse,
-} from "../../../lib/api";
+import type { ShopListing, ShopSection } from "../../../lib/api";
+import { useCurrency } from "../../components/CurrencyContext";
 
-type Tab = "materials" | "rob-items";
+// ── Tabs ───────────────────────────────────────────────────────────
+const TABS: { id: ShopSection; label: string }[] = [
+  { id: "items",        label: "Items"        },
+  { id: "rob_gear",     label: "Rob Gear"     },
+  { id: "defence_gear", label: "Defence Gear" },
+];
+
+// ── One-of-a-kind permanent items ──────────────────────────────────
+const ONE_OF_A_KIND = new Set(["crafting_table", "home_vault", "debit_card"]);
 
 function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
@@ -27,8 +29,7 @@ function formatNumber(n: number): string {
 
 // ── Buy Modal ──────────────────────────────────────────────────────
 interface BuyModalState {
-  kind: "material" | "rob-item";
-  item: MaterialShopItem | RobShopItem;
+  item: ShopListing;
   maxQty: number;
 }
 
@@ -47,9 +48,8 @@ function BuyModal({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [qty, setQty] = useState(1);
-  const [currency, setCurrency] = useState<"ryo" | "kitsu">(
-    state.kind === "material" ? "ryo" : (state.item as RobShopItem).currency,
-  );
+  // Default currency is the listing's listed currency
+  const [currency, setCurrency] = useState<"ryo" | "kitsu">(state.item.currency);
 
   useEffect(() => {
     const el = dialogRef.current;
@@ -65,12 +65,14 @@ function BuyModal({
     if (e.target === dialogRef.current) onClose();
   };
 
+  // Kitsu-to-ryo rate mirrors backend: 100 ryo = 1 kitsu
+  const KITSU_TO_RYO = 100;
   const unitPrice =
-    state.kind === "material"
-      ? currency === "ryo"
-        ? (state.item as MaterialShopItem).buyPriceRyo
-        : (state.item as MaterialShopItem).buyPriceKitsu
-      : (state.item as RobShopItem).price;
+    currency === state.item.currency
+      ? state.item.price
+      : currency === "kitsu"
+      ? Math.ceil(state.item.price / KITSU_TO_RYO)
+      : state.item.price * KITSU_TO_RYO;
 
   const total = unitPrice * qty;
 
@@ -83,7 +85,7 @@ function BuyModal({
     >
       {/* header */}
       <div className="flex items-center justify-between border-b border-[rgba(200,168,75,0.15)] px-5 py-4">
-        <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-[#c8a84b]">
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#c8a84b]">
           {state.item.emoji} {state.item.name}
         </h2>
         <button type="button" onClick={onClose} aria-label="Close"
@@ -93,8 +95,13 @@ function BuyModal({
       </div>
 
       <div className="flex flex-col gap-4 px-5 py-5">
-        {/* currency toggle — materials only */}
-        {state.kind === "material" && (
+        {/* flavor text */}
+        {state.item.flavor && (
+          <p className="text-xs italic leading-5 text-[rgba(200,168,75,0.50)]">{state.item.flavor}</p>
+        )}
+
+        {/* currency toggle — show both if item isn't a gambling item */}
+        {state.item.itemId !== "lottery_ticket" && (
           <div className="flex gap-2">
             {(["ryo", "kitsu"] as const).map((c) => (
               <button
@@ -113,37 +120,35 @@ function BuyModal({
           </div>
         )}
 
-        {/* qty */}
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">
-            Quantity
-          </span>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))}
-              className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b]">
-              −
-            </button>
-            <input
-              type="number"
-              value={qty}
-              min={1}
-              max={state.maxQty}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                if (!isNaN(v)) setQty(Math.min(state.maxQty, Math.max(1, v)));
-              }}
-              className="form-input h-8 w-16 border text-center outline-none"
-            />
-            <button type="button" onClick={() => setQty((q) => Math.min(state.maxQty, q + 1))}
-              className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b]">
-              +
-            </button>
+        {/* qty — only if not one-of-a-kind */}
+        {state.maxQty > 1 && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">
+              Quantity
+            </span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))}
+                className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b]">
+                −
+              </button>
+              <input
+                type="number"
+                value={qty}
+                min={1}
+                max={state.maxQty}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (!isNaN(v)) setQty(Math.min(state.maxQty, Math.max(1, v)));
+                }}
+                className="form-input h-8 w-16 border text-center outline-none"
+              />
+              <button type="button" onClick={() => setQty((q) => Math.min(state.maxQty, q + 1))}
+                className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b]">
+                +
+              </button>
+            </div>
           </div>
-        </div>
-
-        <p className="text-center text-xs text-[rgba(200,168,75,0.40)]">
-          Max {state.maxQty} for this purchase
-        </p>
+        )}
 
         {/* total */}
         <div className="flex items-center justify-between border-t border-[rgba(200,168,75,0.12)] pt-4">
@@ -174,33 +179,28 @@ function BuyModal({
   );
 }
 
-// ── Stock bar ──────────────────────────────────────────────────────
-function StockBar({ remaining, total }: { remaining: number; total: number }) {
-  const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
-  const low = pct < 20;
+// ── Durability badge ───────────────────────────────────────────────
+function DurabilityBadge({ item }: { item: ShopListing }) {
+  if (!item.durability) return null;
+  const labels: Record<string, string> = {
+    permanent: "Permanent",
+    "single-use": "Single Use",
+    "shatter-on-fail": "Shatters on Fail",
+    charges: item.maxCharges ? `${item.maxCharges} Charges` : "Charges",
+  };
   return (
-    <div className="flex flex-col gap-1">
-      <div className="h-1 w-full overflow-hidden bg-[rgba(200,168,75,0.10)]">
-        <div
-          className={`h-full transition-all ${low ? "bg-red-600" : "bg-[#c8a84b]"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className={`text-[10px] uppercase tracking-widest ${low ? "text-red-500" : "text-[rgba(200,168,75,0.55)]"}`}>
-        {remaining} / {total} left today
-      </span>
-    </div>
+    <span className="border border-[rgba(200,168,75,0.25)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
+      {labels[item.durability] ?? item.durability}
+    </span>
   );
 }
 
 // ── Main page ──────────────────────────────────────────────────────
 export default function Shop() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("materials");
-  const [materials, setMaterials] = useState<MaterialShopItem[] | null>(null);
-  const [myPurchases, setMyPurchases] = useState<Record<string, number>>({});
-  const [robItems, setRobItems] = useState<RobShopItem[] | null>(null);
-  const [balances, setBalances] = useState<Pick<DashboardResponse, "ryo" | "kitsu"> | null>(null);
+  const { refresh: refreshCurrency } = useCurrency();
+  const [tab, setTab] = useState<ShopSection>("items");
+  const [listings, setListings] = useState<ShopListing[]>([]);
   const [ownedItemIds, setOwnedItemIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -209,106 +209,87 @@ export default function Shop() {
   const [modalError, setModalError] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
+  // Load all listings + owned item ids once
   const loadAll = useCallback(async () => {
+    setLoading(true); setLoadError("");
     try {
-      const [shopRes, purchasesRes, robRes, dashRes, invRes] = await Promise.all([
-        getMaterialShop(),
-        getMyMaterialPurchases(),
-        getRobItemShop(),
-        getDashboard(),
+      const [shopRes, invRes] = await Promise.all([
+        getShopListings(),
         getInventory(),
       ]);
-      setMaterials(shopRes.items);
-      setMyPurchases(purchasesRes.purchases);
-      setRobItems(robRes.items);
-      setBalances({ ryo: dashRes.ryo, kitsu: dashRes.kitsu });
+      setListings(shopRes.listings);
       setOwnedItemIds(new Set(invRes.ownedItemIds));
     } catch (err) {
       if (err instanceof ApiResponseError && err.status === 401) { router.push("/login"); return; }
       setLoadError("Couldn't load the shop. Try refreshing.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Toast auto-dismiss
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const openMaterialModal = (item: MaterialShopItem) => {
-    const alreadyBought = myPurchases[item.materialId] ?? 0;
-    const remainingCap = item.perPlayerDailyCap - alreadyBought;
-    const maxQty = Math.max(1, Math.min(remainingCap, item.remaining));
-    if (remainingCap <= 0) return;
-    setModalError("");
-    setModalState({ kind: "material", item, maxQty });
-  };
+  const visibleListings = listings.filter((l) => l.section === tab);
 
-  const openRobModal = (item: RobShopItem) => {
-    if (item.durability === "permanent" && ownedItemIds.has(item.itemId)) return;
-    const maxQty = item.durability === "permanent" ? 1 : 99;
+  const openModal = (item: ShopListing) => {
+    const isOneOfAKind = ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
+    if (isOneOfAKind && ownedItemIds.has(item.itemId)) return;
+    const maxQty = isOneOfAKind ? 1 : 99;
     setModalError("");
-    setModalState({ kind: "rob-item", item, maxQty });
+    setModalState({ item, maxQty });
   };
 
   const handleConfirm = async (quantity: number, currency: "ryo" | "kitsu") => {
     if (!modalState) return;
-    setSubmitting(true);
-    setModalError("");
+    setSubmitting(true); setModalError("");
     try {
-      if (modalState.kind === "material") {
-        const item = modalState.item as MaterialShopItem;
-        const res = await buyMaterial({ materialId: item.materialId, quantity, currency });
-        setBalances((b) => (b ? { ...b, [currency]: res.newBalance } : b));
-        setMyPurchases((p) => ({ ...p, [item.materialId]: (p[item.materialId] ?? 0) + quantity }));
-        setMaterials((items) => items?.map((i) =>
-          i.materialId === item.materialId ? { ...i, remaining: i.remaining - quantity } : i
-        ) ?? null);
-        setToast(`+${quantity} ${item.emoji} ${item.name}`);
-      } else {
-        const item = modalState.item as RobShopItem;
-        const res = await buyRobItem({ itemId: item.itemId, quantity });
-        setBalances((b) => (b ? { ...b, [res.currency]: res.newBalance } : b));
-        if (item.durability === "permanent") setOwnedItemIds((prev) => new Set(prev).add(item.itemId));
-        setToast(`+${res.unitsCredited} ${item.emoji} ${item.name}`);
+      const res = await buyItem({ itemId: modalState.item.itemId, currency, quantity });
+      // Mark permanent/one-of-a-kind as owned locally
+      if (ONE_OF_A_KIND.has(modalState.item.itemId) || modalState.item.durability === "permanent") {
+        setOwnedItemIds((prev) => new Set(prev).add(modalState.item.itemId));
       }
+      // Refresh topbar coin balances
+      refreshCurrency();
+      setToast(`+${res.quantity} ${modalState.item.emoji} ${modalState.item.name}`);
       setModalState(null);
     } catch (err) {
       if (err instanceof ApiResponseError) setModalError(err.error.message ?? "Purchase failed.");
       else setModalError("Purchase failed. Try again.");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+    </div>
+  );
 
-  if (loadError) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
-        <p className="theme-body text-sm">{loadError}</p>
-        <button type="button" onClick={() => window.location.reload()}
-          className="h-11 border border-[#c8a84b] px-8 text-sm font-bold uppercase tracking-widest text-[#c8a84b] transition-all hover:bg-[#c8a84b] hover:text-black">
-          Retry
-        </button>
-      </div>
-    );
-  }
+  if (loadError) return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
+      <p className="theme-body text-sm">{loadError}</p>
+      <button type="button" onClick={() => window.location.reload()}
+        className="h-11 border border-[#c8a84b] px-8 text-sm font-bold uppercase tracking-widest text-[#c8a84b] transition-all hover:bg-[#c8a84b] hover:text-black">
+        Retry
+      </button>
+    </div>
+  );
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 pb-24 sm:px-6 lg:px-8 lg:pb-8">
 
-        {/* ── Brush-stroke header ── */}
         <div className="section-header">
           <span className="section-header-text">Shop</span>
         </div>
@@ -317,15 +298,12 @@ export default function Shop() {
 
         {/* ── Tabs ── */}
         <div className="flex gap-0 border-b border-[rgba(200,168,75,0.15)]">
-          {[
-            { id: "materials" as const,  label: "Materials" },
-            { id: "rob-items" as const,  label: "Rob Gear"  },
-          ].map((t) => (
+          {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`relative px-6 py-3 text-xs font-bold uppercase tracking-[0.16em] transition-colors ${
+              className={`relative px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
                 tab === t.id
                   ? "text-[#c8a84b]"
                   : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
@@ -339,96 +317,61 @@ export default function Shop() {
           ))}
         </div>
 
-        {/* ── Materials tab ── */}
-        {tab === "materials" && materials && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {materials.map((item) => {
-              const bought      = myPurchases[item.materialId] ?? 0;
-              const capReached  = bought >= item.perPlayerDailyCap;
-              const outOfStock  = item.remaining <= 0;
-              const disabled    = capReached || outOfStock;
+        {/* ── Item grid ── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleListings.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+              Nothing here yet.
+            </p>
+          )}
+          {visibleListings.map((item) => {
+            const isOneOfAKind = ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
+            const alreadyOwned = isOneOfAKind && ownedItemIds.has(item.itemId);
 
-              return (
-                <div
-                  key={item.materialId}
-                  className={`form-card flex flex-col gap-3 border p-4 transition-opacity ${disabled ? "opacity-40" : ""}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{item.emoji}</span>
-                    <span className="text-sm font-bold text-[#c8a84b]">
-                      {item.name}
+            return (
+              <div
+                key={item.itemId}
+                className={`form-card flex flex-col gap-3 border p-4 transition-all hover:border-[rgba(200,168,75,0.45)] ${alreadyOwned ? "opacity-40" : ""}`}
+              >
+                {/* header row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-2xl shrink-0">{item.emoji}</span>
+                    <span className="font-display text-sm font-bold text-[#f0e6c8] leading-tight">{item.name}</span>
+                  </div>
+                  {item.robCategory && (
+                    <span className="shrink-0 border border-[rgba(200,168,75,0.30)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a84b]">
+                      {item.robCategory}
                     </span>
-                  </div>
-
-                  <StockBar remaining={item.remaining} total={item.globalDailyStock} />
-
-                  <div className="flex items-center justify-between text-xs text-[rgba(200,168,75,0.50)]">
-                    <span>🪙 {formatNumber(item.buyPriceRyo)} · 🦊 {formatNumber(item.buyPriceKitsu)}</span>
-                    <span>{bought}/{item.perPlayerDailyCap} bought</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => openMaterialModal(item)}
-                    className="mt-1 h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent"
-                  >
-                    {capReached ? "Daily Cap Reached" : outOfStock ? "Out of Stock" : "Buy"}
-                  </button>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
 
-        {/* ── Rob items tab ── */}
-        {tab === "rob-items" && robItems && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {robItems.map((item) => {
-              const alreadyOwned = item.durability === "permanent" && ownedItemIds.has(item.itemId);
+                {/* flavor */}
+                {item.flavor && (
+                  <p className="text-[11px] italic leading-5 text-[rgba(200,168,75,0.45)] line-clamp-3">{item.flavor}</p>
+                )}
 
-              return (
-                <div
-                  key={item.itemId}
-                  className={`form-card flex flex-col gap-3 border p-4 transition-opacity ${alreadyOwned ? "opacity-40" : ""}`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{item.emoji}</span>
-                      <span className="text-sm font-bold text-[#f0e6c8]">
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className="border border-[rgba(200,168,75,0.30)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#c8a84b]">
-                      {item.category}
-                    </span>
-                  </div>
-
-                  <p className="text-xs leading-5 text-[rgba(200,168,75,0.55)]">{item.description}</p>
-
-                  <div className="flex items-center justify-between text-xs text-[rgba(200,168,75,0.45)]">
-                    <span className="uppercase tracking-widest">
-                      {item.durability === "charges" ? `${item.maxCharges ?? 1} charges` : item.durability}
-                    </span>
-                    <span className="flex items-center gap-1 font-bold text-[#c8a84b]">
-                      {item.currency === "ryo" ? <Coins className="h-3.5 w-3.5" /> : "🦊"}
-                      {formatNumber(item.price)}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={alreadyOwned}
-                    onClick={() => openRobModal(item)}
-                    className="mt-1 h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent"
-                  >
-                    {alreadyOwned ? "Already Owned" : "Buy"}
-                  </button>
+                {/* durability + price row */}
+                <div className="flex items-center justify-between gap-2 mt-auto">
+                  <DurabilityBadge item={item} />
+                  <span className="text-sm font-bold text-[#e6c96a]">
+                    {item.currency === "ryo" ? "🪙" : "🦊"} {formatNumber(item.price)}
+                    {item.priceIsPlaceholder && <span className="ml-1 text-[10px] text-[rgba(200,168,75,0.35)]">est.</span>}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                <button
+                  type="button"
+                  disabled={alreadyOwned}
+                  onClick={() => openModal(item)}
+                  className="mt-1 h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent"
+                >
+                  {alreadyOwned ? "Already Owned" : "Buy"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {modalState && (
@@ -442,7 +385,7 @@ export default function Shop() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 border border-[#c8a84b] bg-black/95 px-5 py-3 text-sm font-bold text-[#c8a84b] shadow-[0_0_25px_rgba(200,168,75,0.35)] animate-[shop-toast-in_0.3s_ease-out]">
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 border border-[#c8a84b] bg-black/95 px-5 py-3 text-sm font-bold text-[#c8a84b] shadow-[0_0_25px_rgba(200,168,75,0.35)] animate-[shop-toast-in_0.3s_ease-out] lg:bottom-6">
           ✦ {toast}
         </div>
       )}

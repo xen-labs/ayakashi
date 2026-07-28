@@ -2,54 +2,48 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Store,
-  Backpack,
-  CircleUserRound,
-} from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Backpack, CircleUserRound } from "lucide-react";
 
-const TABS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/shop", label: "Shop", icon: Store },
-  { href: "/inventory", label: "Inventory", icon: Backpack },
-  { href: "/profile", label: "Profile", icon: CircleUserRound },
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/shop",      label: "Shop",      Icon: ShoppingBag     },
+  { href: "/inventory", label: "Inventory", Icon: Backpack         },
+  { href: "/profile",   label: "Profile",   Icon: CircleUserRound  },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-white/10 bg-black/90 backdrop-blur-md">
-      {TABS.map((tab) => {
-        const active =
-          pathname === tab.href || pathname?.startsWith(tab.href + "/");
-        const Icon = tab.icon;
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className="flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors"
-          >
-            <Icon
-              className={`h-5 w-5 ${
-                active ? "text-astral-gold" : "text-gray-500"
-              }`}
-              strokeWidth={active ? 2.4 : 1.8}
-            />
-            <span
-              className={`text-[10px] font-semibold uppercase tracking-wider ${
-                active ? "text-astral-gold" : "text-gray-500"
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.15)] bg-black/95 backdrop-blur-sm lg:hidden"
+      aria-label="Main navigation"
+    >
+      <div className="flex items-stretch">
+        {NAV_ITEMS.map(({ href, label, Icon }) => {
+          const active = pathname === href || pathname?.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                active
+                  ? "text-[#c8a84b]"
+                  : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
               }`}
             >
-              {tab.label}
-            </span>
-            {active && (
-              <span className="absolute bottom-0 h-0.5 w-10 rounded-t-full bg-astral-gold shadow-[0_0_8px_rgba(212,175,55,0.7)]" />
-            )}
-          </Link>
-        );
-      })}
+              <Icon
+                className={`h-5 w-5 ${active ? "drop-shadow-[0_0_6px_rgba(200,168,75,0.7)]" : ""}`}
+                strokeWidth={active ? 2.2 : 1.6}
+              />
+              <span>{label}</span>
+              {active && (
+                <span className="absolute bottom-0 h-0.5 w-10 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
+              )}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }
