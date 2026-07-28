@@ -30,12 +30,11 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const data = await getDashboard();
-      setRyo(data.ryo);
-      setKitsu(data.kitsu);
+      // Dashboard response is nested: currency.ryo / currency.kitsu
+      setRyo(data.currency.ryo);
+      setKitsu(data.currency.kitsu);
     } catch (err) {
-      // 401 means not logged in — leave null, layout will redirect
       if (err instanceof ApiResponseError && err.status === 401) return;
-      // Any other transient error: keep stale values
     }
   }, []);
 

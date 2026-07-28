@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 import { getDashboard, ApiResponseError } from "../../../lib/api";
 import type { DashboardResponse, DashboardTransaction } from "../../../lib/api";
@@ -106,13 +107,20 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-6">
           {[
-            { label: "Ryo",   value: formatNumber(currency.ryo),   icon: "🪙" },
-            { label: "Kitsu", value: formatNumber(currency.kitsu), icon: "🦊" },
-            { label: "Bank",  value: formatNumber(currency.bank),  icon: "🏦" },
+            { label: "Ryo",   value: formatNumber(currency.ryo),   img: "/currency/ryo.webp",   size: 40 },
+            { label: "Kitsu", value: formatNumber(currency.kitsu), img: "/currency/kitsu.webp", size: 48 },
+            { label: "Bank",  value: formatNumber(currency.bank),  img: "/currency/ryo.webp",   size: 40 },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col items-center gap-2">
               <div className="coin-medallion">
-                <span className="text-2xl">{stat.icon}</span>
+                <Image
+                  src={stat.img}
+                  alt={stat.label}
+                  width={stat.size}
+                  height={stat.size}
+                  className="object-contain"
+                  unoptimized
+                />
                 <span className="coin-medallion-value text-base">{stat.value}</span>
               </div>
               <span className="coin-medallion-label">{stat.label}</span>
