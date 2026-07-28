@@ -7,6 +7,26 @@ import { getInventory, sellItem, ApiResponseError } from "../../../lib/api";
 import type { InventoryItem, ItemCategory } from "../../../lib/api";
 import { useCurrency } from "../../components/CurrencyContext";
 
+// ── Local image map — maps itemId to the uploaded webp in /public ──
+// Backend sends webappImage as /assets/webapp/items/... which doesn't
+// resolve in this repo. We serve our own images instead.
+const LOCAL_ITEM_IMAGES: Record<string, string> = {
+  mat_abyssal_pearl:    "/loot-materials/loot-materials/abyssal-pearl.webp",
+  mat_ancient_relic:    "/loot-materials/loot-materials/ancient-relic.webp",
+  mat_astral_magatama:  "/loot-materials/loot-materials/astral-magatama.webp",
+  mat_cursed_fox_skull: "/loot-materials/loot-materials/cursed-skull.webp",
+  mat_sea_dragon_scale: "/loot-materials/loot-materials/dragon-scale.webp",
+  mat_prize_fish:       "/loot-materials/loot-materials/gather_fish_big_catch.webp",
+  mat_kitsu_core:       "/loot-materials/loot-materials/kitsu-core.webp",
+  mat_starborn_meteorite:"/loot-materials/loot-materials/meteorite.webp",
+  mat_mystic_crystal:   "/loot-materials/loot-materials/mystic-crystal.webp",
+  item_soul_ticket:     "/loot-materials/loot-materials/soul-ticket.webp",
+};
+
+function getItemImage(item: InventoryItem): string | null {
+  return LOCAL_ITEM_IMAGES[item.itemId] ?? null;
+}
+
 // ── Category tab config ────────────────────────────────────────────
 const CATEGORY_TABS: { id: ItemCategory | "all"; label: string }[] = [
   { id: "all",           label: "All"        },
@@ -52,6 +72,7 @@ function ItemCard({
 }) {
   const dur = durabilityLabel(item);
   const isMaterial = item.category === "material";
+  const localImg = getItemImage(item);
 
   return (
     <div className="form-card flex flex-col gap-3 border p-4 transition-all hover:border-[rgba(200,168,75,0.45)]">
@@ -59,9 +80,9 @@ function ItemCard({
       <div className="flex items-start gap-3">
         {/* image or emoji fallback */}
         <div className="relative h-12 w-12 shrink-0 overflow-hidden border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.05)]">
-          {item.webappImage ? (
+          {localImg ? (
             <Image
-              src={item.webappImage}
+              src={localImg}
               alt={item.name}
               fill
               className="object-contain p-1"
