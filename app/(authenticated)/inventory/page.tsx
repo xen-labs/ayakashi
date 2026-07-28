@@ -6,6 +6,7 @@ import Image from "next/image";
 import { getInventory, sellItem, ApiResponseError } from "../../../lib/api";
 import type { InventoryItem, ItemCategory } from "../../../lib/api";
 import { useCurrency } from "../../components/CurrencyContext";
+import { CurrencyIcon } from "../../components/CurrencyIcon";
 
 // ── Local image map — maps itemId to the uploaded webp in /public ──
 // Backend sends webappImage as /assets/webapp/items/... which doesn't
@@ -127,8 +128,8 @@ function ItemCard({
           </span>
         )}
         {item.sellPrice != null && (
-          <span className="ml-auto text-xs font-bold text-[rgba(200,168,75,0.55)]">
-            🪙 {formatNumber(item.sellPrice)} / ea
+          <span className="ml-auto flex items-center gap-1 text-xs font-bold text-[rgba(200,168,75,0.55)]">
+            <CurrencyIcon type="ryo" size={12} /> {formatNumber(item.sellPrice)} / ea
           </span>
         )}
       </div>

@@ -13,6 +13,7 @@ import {
 } from "../../../lib/api";
 import type { ToolStatus, UpgradeToolsResponse, DashboardResponse } from "../../../lib/api";
 import { useCurrency } from "../../components/CurrencyContext";
+import { CurrencyIcon } from "../../components/CurrencyIcon";
 
 function formatNumber(n: number | undefined | null): string {
   if (n == null) return "—";
@@ -77,7 +78,7 @@ function ToolCard({
             Cost to reach Lv {tool.level + 1}
           </p>
           <div className="flex items-center gap-4 text-xs text-[rgba(200,168,75,0.65)]">
-            <span>🪙 {formatNumber(tool.nextLevelCost.ryo)}</span>
+            <span className="flex items-center gap-1"><CurrencyIcon type="ryo" size={14} /> {formatNumber(tool.nextLevelCost.ryo)}</span>
             <span>+</span>
             <span>×{tool.nextLevelCost.materialQty} {tool.nextLevelCost.material}</span>
           </div>
@@ -260,8 +261,8 @@ export default function Upgrade() {
 
           {/* Bank */}
           <div className="form-card flex flex-col gap-4 border p-5">
-            <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#c8a84b]">
-              🏦 Bank
+            <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#c8a84b] flex items-center gap-2">
+              <CurrencyIcon type="bank" size={20} /> Bank
             </h2>
             {dashData && (
               <div className="flex flex-col">
@@ -283,7 +284,7 @@ export default function Upgrade() {
           {/* Vault */}
           <div className={`form-card flex flex-col gap-4 border p-5 ${!vault ? "opacity-50" : ""}`}>
             <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#c8a84b]">
-              🏠 Home Vault
+              Home Vault
             </h2>
             {vault ? (
               <div className="flex flex-col">

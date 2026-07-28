@@ -7,11 +7,12 @@ import { useRouter } from "next/navigation";
 import { getLeaderboard, ApiResponseError } from "../../../lib/api";
 import type { LeaderboardMetric, LeaderboardResponse } from "../../../lib/api";
 import { AvatarWithFrame } from "../../components/AvatarWithFrame";
+import { CurrencyIcon } from "../../components/CurrencyIcon";
 
-const TABS: { id: LeaderboardMetric; label: string; icon: string }[] = [
+const TABS: { id: LeaderboardMetric; label: string; icon: React.ReactNode }[] = [
   { id: "xp",    label: "XP",    icon: "⭐" },
-  { id: "ryo",   label: "Ryo",   icon: "🪙" },
-  { id: "kitsu", label: "Kitsu", icon: "🦊" },
+  { id: "ryo",   label: "Ryo",   icon: <CurrencyIcon type="ryo"   size={16} /> },
+  { id: "kitsu", label: "Kitsu", icon: <CurrencyIcon type="kitsu" size={16} /> },
   { id: "cards", label: "Cards", icon: "🃏" },
 ];
 
@@ -169,7 +170,10 @@ export default function Leaderboard() {
                   </div>
 
                   {/* Value */}
-                  <span className={`shrink-0 text-sm font-bold tabular-nums ${isTop3 ? RANK_COLORS[row.rank] ?? "text-[#e6c96a]" : "text-[#e6c96a]"}`}>
+                  <span className={`shrink-0 flex items-center gap-1 text-sm font-bold tabular-nums ${isTop3 ? RANK_COLORS[row.rank] ?? "text-[#e6c96a]" : "text-[#e6c96a]"}`}>
+                    {(metric === "ryo" || metric === "kitsu") && (
+                      <CurrencyIcon type={metric} size={14} />
+                    )}
                     {formatValue(row.value, metric)}
                   </span>
                 </div>

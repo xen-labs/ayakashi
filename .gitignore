@@ -146,3 +146,6 @@ vite.config.ts.timestamp-*
 # Vercel
 .vercel
 .env*
+
+# Custom ignored folders
+/ayakashi-core/

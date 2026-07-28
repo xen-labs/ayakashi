@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 import { getDashboard, ApiResponseError } from "../../../lib/api";
 import type { DashboardResponse, DashboardTransaction } from "../../../lib/api";
 import { useRouter } from "next/navigation";
+import { CurrencyIcon } from "../../components/CurrencyIcon";
 
 function formatNumber(n: number | undefined | null): string {
   if (n == null) return "—";
@@ -36,8 +36,9 @@ function TxRow({ tx }: { tx: DashboardTransaction }) {
           {tx.location} · {new Date(tx.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         </span>
       </div>
-      <span className={`text-sm font-bold tabular-nums shrink-0 ${positive ? "text-green-400" : "text-red-400"}`}>
-        {positive ? "+" : ""}{formatNumber(tx.amount)} {tx.currency === "ryo" ? "🪙" : "🦊"}
+      <span className={`text-sm font-bold tabular-nums shrink-0 flex items-center gap-1 ${positive ? "text-green-400" : "text-red-400"}`}>
+        {positive ? "+" : ""}{formatNumber(tx.amount)}
+        <CurrencyIcon type={tx.currency === "ryo" ? "ryo" : "kitsu"} size={14} />
       </span>
     </div>
   );
@@ -107,23 +108,14 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
           {[
-            { label: "Ryo",   value: formatNumber(currency.ryo),   img: "/currency/ryo.webp"   },
-            { label: "Kitsu", value: formatNumber(currency.kitsu), img: "/currency/kitsu.webp" },
-            { label: "Bank",  value: formatNumber(currency.bank),  img: "/currency/bank.webp"  },
+            { label: "Ryo",   value: formatNumber(currency.ryo),   type: "ryo"   as const },
+            { label: "Kitsu", value: formatNumber(currency.kitsu), type: "kitsu" as const },
+            { label: "Bank",  value: formatNumber(currency.bank),  type: "bank"  as const },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col items-center gap-2">
-              {/* circle — logo fills it, overflow clipped */}
               <div className="coin-medallion overflow-hidden">
-                <Image
-                  src={stat.img}
-                  alt={stat.label}
-                  width={72}
-                  height={72}
-                  className="h-full w-full object-cover"
-                  unoptimized
-                />
+                <CurrencyIcon type={stat.type} size={72} className="h-full w-full object-cover" />
               </div>
-              {/* value + label below the circle */}
               <span className="font-display text-lg font-bold tabular-nums text-[#e6c96a]">{stat.value}</span>
               <span className="coin-medallion-label">{stat.label}</span>
             </div>

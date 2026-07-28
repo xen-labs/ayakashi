@@ -12,6 +12,7 @@ import {
 } from "../../../lib/api";
 import type { ShopListing, ShopSection } from "../../../lib/api";
 import { useCurrency } from "../../components/CurrencyContext";
+import { CurrencyIcon } from "../../components/CurrencyIcon";
 
 // ── Local image map — itemId → public path ─────────────────────────
 // We only have loot-material images locally. Everything else falls
@@ -139,12 +140,12 @@ function BuyModal({
           <div className="flex gap-2">
             {(["ryo", "kitsu"] as const).map((c) => (
               <button key={c} type="button" onClick={() => setCurrency(c)}
-                className={`flex-1 border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
+                className={`flex-1 flex items-center justify-center gap-1.5 border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
                   currency === c
                     ? "border-[#c8a84b] bg-[rgba(200,168,75,0.12)] text-[#c8a84b]"
                     : "border-[rgba(200,168,75,0.15)] text-[rgba(200,168,75,0.45)] hover:border-[rgba(200,168,75,0.35)]"
                 }`}>
-                {c === "ryo" ? "🪙 Ryo" : "🦊 Kitsu"}
+                <CurrencyIcon type={c} size={14} />{c === "ryo" ? "Ryo" : "Kitsu"}
               </button>
             ))}
           </div>
@@ -167,8 +168,8 @@ function BuyModal({
 
         <div className="flex items-center justify-between border-t border-[rgba(200,168,75,0.12)] pt-4">
           <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">Total</span>
-          <span className="text-lg font-bold text-[#e6c96a]">
-            {currency === "ryo" ? "🪙" : "🦊"} {formatNumber(total)}
+          <span className="text-lg font-bold text-[#e6c96a] flex items-center gap-1.5">
+            <CurrencyIcon type={currency} size={18} /> {formatNumber(total)}
           </span>
         </div>
 
@@ -352,11 +353,10 @@ export default function Shop() {
                     </p>
                   )}
 
-                  {/* durability + price */}
                   <div className="mt-auto flex items-center justify-between gap-2">
                     <DurabilityBadge item={item} />
-                    <span className="text-sm font-bold text-[#e6c96a]">
-                      {item.currency === "ryo" ? "🪙" : "🦊"} {formatNumber(item.price)}
+                    <span className="text-sm font-bold text-[#e6c96a] flex items-center gap-1">
+                      <CurrencyIcon type={item.currency} size={14} /> {formatNumber(item.price)}
                       {item.priceIsPlaceholder && (
                         <span className="ml-1 text-[10px] text-[rgba(200,168,75,0.35)]">est.</span>
                       )}
