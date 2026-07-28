@@ -17,8 +17,8 @@ const NAV_LINKS = [
   { href: "/inventory", label: "Inventory" },
 ];
 
-function formatCoin(n: number | null): string {
-  if (n === null) return "—";
+function formatCoin(n: number | null | undefined): string {
+  if (n == null) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString("en-US");
