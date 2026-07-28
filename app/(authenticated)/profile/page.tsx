@@ -8,10 +8,12 @@ export default function Profile() {
         <span className="section-header-text">Profile</span>
       </div>
 
+      {/* Avatar + frame are same size — frame ring sits exactly on avatar edge */}
       <AvatarWithFrame
         avatarSrc="/user-profile/user-profile/default-avatar.webp"
         frameSrc="/user-profile/user-profile/default-avatar-frame.webp"
-        innerSize={120}
+        innerSize={160}
+        frameSize={160}
       />
 
       <p className="max-w-sm text-sm leading-7 text-[#a89880]">

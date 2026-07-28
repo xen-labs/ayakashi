@@ -37,37 +37,34 @@ export function AvatarWithFrame({
   frameSize,
   alt = "Player avatar",
 }: AvatarWithFrameProps) {
-  const frame = frameSize ?? innerSize + 28;
+  // The frame IS the size reference — avatar sits behind it at the same size.
+  // The frame's transparent hole naturally reveals the avatar.
+  // innerSize is ignored in favor of making both images the same size.
+  const size = frameSize ?? innerSize;
 
   return (
-    // Outer wrapper is frame-sized so the frame never gets clipped
     <div
-      className="relative flex items-center justify-center shrink-0"
-      style={{ width: frame, height: frame }}
+      className="relative shrink-0"
+      style={{ width: size, height: size }}
     >
-      {/* Inner circle — avatar is clipped here */}
-      <div
-        className="overflow-hidden rounded-full"
-        style={{ width: innerSize, height: innerSize }}
-      >
-        <Image
-          src={avatarSrc}
-          alt={alt}
-          width={innerSize}
-          height={innerSize}
-          className="h-full w-full object-cover"
-          unoptimized
-        />
-      </div>
+      {/* Avatar — behind the frame, fills the full container */}
+      <Image
+        src={avatarSrc}
+        alt={alt}
+        width={size}
+        height={size}
+        className="absolute inset-0 h-full w-full rounded-full object-cover"
+        unoptimized
+      />
 
-      {/* Frame overlay — fills the outer wrapper, sits on top */}
+      {/* Frame — on top, same size, transparent hole reveals avatar */}
       <Image
         src={frameSrc}
         alt=""
         aria-hidden="true"
-        width={frame}
-        height={frame}
-        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        width={size}
+        height={size}
+        className="relative z-10 h-full w-full object-contain"
         unoptimized
       />
     </div>
