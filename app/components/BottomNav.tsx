@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Backpack, CircleUserRound } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Backpack, CircleUserRound, ArrowUpCircle, Trophy } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { href: "/shop",      label: "Shop",      Icon: ShoppingBag     },
-  { href: "/inventory", label: "Inventory", Icon: Backpack         },
-  { href: "/profile",   label: "Profile",   Icon: CircleUserRound  },
+  { href: "/dashboard",   label: "Dashboard", Icon: LayoutDashboard  },
+  { href: "/shop",        label: "Shop",       Icon: ShoppingBag      },
+  { href: "/inventory",   label: "Inventory",  Icon: Backpack          },
+  { href: "/upgrade",     label: "Upgrade",    Icon: ArrowUpCircle     },
+  { href: "/leaderboard", label: "Ranks",      Icon: Trophy            },
 ];
 
 export function BottomNav() {

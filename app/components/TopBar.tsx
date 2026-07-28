@@ -13,9 +13,11 @@ import type { MeResponse } from "../../lib/api";
 const HIDDEN_ON = ["/profile", "/login", "/register"];
 
 const NAV_LINKS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/shop",      label: "Shop"      },
-  { href: "/inventory", label: "Inventory" },
+  { href: "/dashboard",   label: "Dashboard"   },
+  { href: "/shop",        label: "Shop"        },
+  { href: "/inventory",   label: "Inventory"   },
+  { href: "/upgrade",     label: "Upgrade"     },
+  { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 function formatCoin(n: number | null | undefined): string {

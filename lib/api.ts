@@ -362,3 +362,83 @@ export const getInventoryCards = (params?: {
     `/inventory/cards${query ? `?${query}` : ""}`,
   );
 };
+
+// ── Upgrades ──────────────────────────────────────────────────────
+
+export interface ToolStatus {
+  tool: "gear_shovel" | "gear_fishing_rod" | "gear_pickaxe";
+  name: string;
+  emoji: string;
+  level: 0 | 1 | 2 | 3;
+  atMax: boolean;
+  nextLevelCost: {
+    ryo: number;
+    materialQty: number;
+    material: string;
+  } | null;
+}
+
+export interface UpgradeToolsResponse {
+  hasCraftingTable: boolean;
+  tools: ToolStatus[];
+}
+
+export const getUpgradeTools = () =>
+  apiFetch<UpgradeToolsResponse>("/upgrade/tools");
+
+export interface UpgradeBankResponse {
+  tier: number;
+  cap: number;
+}
+export const upgradeBank = () =>
+  apiFetch<UpgradeBankResponse>("/upgrade/bank", { method: "POST" });
+
+export interface UpgradeVaultResponse {
+  tier: number;
+  caps: { ryo: number; kitsu: number };
+}
+export const upgradeVault = () =>
+  apiFetch<UpgradeVaultResponse>("/upgrade/vault", { method: "POST" });
+
+export interface RepairVaultResponse {
+  pointsRepaired: number;
+}
+export const repairVault = () =>
+  apiFetch<RepairVaultResponse>("/upgrade/vault/repair", { method: "POST" });
+
+export interface UpgradeToolResponse {
+  tool: string;
+  newLevel: number;
+}
+export const upgradeTool = (tool: string) =>
+  apiFetch<UpgradeToolResponse>("/upgrade/tool", {
+    method: "POST",
+    body: JSON.stringify({ tool }),
+  });
+
+// ── Leaderboard ───────────────────────────────────────────────────
+
+export type LeaderboardMetric = "xp" | "ryo" | "kitsu" | "cards";
+
+export interface LeaderboardRow {
+  rank: number;
+  jid: string;
+  username: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  value: number;
+  level?: number;
+}
+
+export interface LeaderboardResponse {
+  metric: LeaderboardMetric;
+  page: number;
+  totalPages: number;
+  total: number;
+  items: LeaderboardRow[];
+}
+
+export const getLeaderboard = (metric: LeaderboardMetric, page = 1) =>
+  apiFetch<LeaderboardResponse>(
+    `/leaderboard?metric=${metric}&page=${page}`,
+  );
