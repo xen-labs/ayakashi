@@ -158,8 +158,7 @@ export function TopBar({ user }: { user: MeResponse | null }) {
               <AvatarWithFrame
                 avatarSrc="/user-profile/user-profile/default-avatar.webp"
                 frameSrc="/user-profile/user-profile/default-avatar-frame.webp"
-                innerSize={34}
-                frameSize={34}
+                innerSize={26}
               />
             </button>
 

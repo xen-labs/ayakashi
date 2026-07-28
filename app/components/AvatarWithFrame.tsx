@@ -37,34 +37,40 @@ export function AvatarWithFrame({
   frameSize,
   alt = "Player avatar",
 }: AvatarWithFrameProps) {
-  // The frame IS the size reference — avatar sits behind it at the same size.
-  // The frame's transparent hole naturally reveals the avatar.
-  // innerSize is ignored in favor of making both images the same size.
-  const size = frameSize ?? innerSize;
+  const avatarSize = innerSize;
+  // Frame image has ~10% transparent padding on each side around the ring,
+  // so render it larger than the avatar so the ring sits on the avatar edge.
+  // frameSize prop overrides this if you need to fine-tune.
+  const frame = frameSize ?? Math.round(avatarSize * 1.35);
 
   return (
     <div
-      className="relative shrink-0"
-      style={{ width: size, height: size }}
+      className="relative shrink-0 flex items-center justify-center"
+      style={{ width: frame, height: frame }}
     >
-      {/* Avatar — behind the frame, fills the full container */}
-      <Image
-        src={avatarSrc}
-        alt={alt}
-        width={size}
-        height={size}
-        className="absolute inset-0 h-full w-full rounded-full object-cover"
-        unoptimized
-      />
+      {/* Avatar — centered, clipped to circle */}
+      <div
+        className="absolute rounded-full overflow-hidden"
+        style={{ width: avatarSize, height: avatarSize }}
+      >
+        <Image
+          src={avatarSrc}
+          alt={alt}
+          width={avatarSize}
+          height={avatarSize}
+          className="h-full w-full object-cover"
+          unoptimized
+        />
+      </div>
 
-      {/* Frame — on top, same size, transparent hole reveals avatar */}
+      {/* Frame — larger than avatar so the ring aligns with the avatar edge */}
       <Image
         src={frameSrc}
         alt=""
         aria-hidden="true"
-        width={size}
-        height={size}
-        className="relative z-10 h-full w-full object-contain"
+        width={frame}
+        height={frame}
+        className="relative z-10 h-full w-full object-contain pointer-events-none"
         unoptimized
       />
     </div>
