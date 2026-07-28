@@ -152,14 +152,27 @@ export function TopBar({ user }: { user: MeResponse | null }) {
               onClick={() => setProfileOpen((o) => !o)}
               aria-label="Open profile menu"
               aria-expanded={profileOpen}
-              className="topbar-icon-btn flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-colors"
+              className="topbar-icon-btn relative flex items-center justify-center transition-colors"
+              style={{ width: 36, height: 36 }}
             >
+              {/* avatar */}
               <Image
                 src="/user-profile/user-profile/default-avatar.webp"
                 alt="Profile"
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-full object-cover"
+                width={28}
+                height={28}
+                className="rounded-full object-cover"
+                style={{ width: 28, height: 28 }}
+                unoptimized
+              />
+              {/* frame overlay — slightly larger than avatar */}
+              <Image
+                src="/user-profile/user-profile/default-avatar-frame.webp"
+                alt=""
+                aria-hidden="true"
+                width={36}
+                height={36}
+                className="pointer-events-none absolute inset-0 h-full w-full object-contain"
                 unoptimized
               />
             </button>
