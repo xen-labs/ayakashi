@@ -105,24 +105,26 @@ export default function Dashboard() {
         <div className="section-header mb-6">
           <span className="section-header-text">Wallet</span>
         </div>
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-6">
+        <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
           {[
-            { label: "Ryo",   value: formatNumber(currency.ryo),   img: "/currency/ryo.webp",   size: 40 },
-            { label: "Kitsu", value: formatNumber(currency.kitsu), img: "/currency/kitsu.webp", size: 48 },
-            { label: "Bank",  value: formatNumber(currency.bank),  img: "/currency/ryo.webp",   size: 40 },
+            { label: "Ryo",   value: formatNumber(currency.ryo),   img: "/currency/ryo.webp"   },
+            { label: "Kitsu", value: formatNumber(currency.kitsu), img: "/currency/kitsu.webp" },
+            { label: "Bank",  value: formatNumber(currency.bank),  img: "/currency/bank.webp"  },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col items-center gap-2">
-              <div className="coin-medallion">
+              {/* circle — logo fills it, overflow clipped */}
+              <div className="coin-medallion overflow-hidden">
                 <Image
                   src={stat.img}
                   alt={stat.label}
-                  width={stat.size}
-                  height={stat.size}
-                  className="object-contain"
+                  width={72}
+                  height={72}
+                  className="h-full w-full object-cover"
                   unoptimized
                 />
-                <span className="coin-medallion-value text-base">{stat.value}</span>
               </div>
+              {/* value + label below the circle */}
+              <span className="font-display text-lg font-bold tabular-nums text-[#e6c96a]">{stat.value}</span>
               <span className="coin-medallion-label">{stat.label}</span>
             </div>
           ))}

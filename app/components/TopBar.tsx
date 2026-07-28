@@ -6,6 +6,7 @@ import { useRef, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { CircleUserRound, LogOut, Settings, HelpCircle } from "lucide-react";
 import { useCurrency } from "./CurrencyContext";
+import { AvatarWithFrame } from "./AvatarWithFrame";
 import { authLogout } from "../../lib/api";
 import type { MeResponse } from "../../lib/api";
 
@@ -152,28 +153,13 @@ export function TopBar({ user }: { user: MeResponse | null }) {
               onClick={() => setProfileOpen((o) => !o)}
               aria-label="Open profile menu"
               aria-expanded={profileOpen}
-              className="topbar-icon-btn relative flex items-center justify-center transition-colors"
-              style={{ width: 36, height: 36 }}
+              className="topbar-icon-btn flex items-center justify-center transition-colors"
             >
-              {/* avatar */}
-              <Image
-                src="/user-profile/user-profile/default-avatar.webp"
-                alt="Profile"
-                width={28}
-                height={28}
-                className="rounded-full object-cover"
-                style={{ width: 28, height: 28 }}
-                unoptimized
-              />
-              {/* frame overlay — slightly larger than avatar */}
-              <Image
-                src="/user-profile/user-profile/default-avatar-frame.webp"
-                alt=""
-                aria-hidden="true"
-                width={36}
-                height={36}
-                className="pointer-events-none absolute inset-0 h-full w-full object-contain"
-                unoptimized
+              <AvatarWithFrame
+                avatarSrc="/user-profile/user-profile/default-avatar.webp"
+                frameSrc="/user-profile/user-profile/default-avatar-frame.webp"
+                innerSize={26}
+                frameSize={36}
               />
             </button>
 
