@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { getDashboard, ApiResponseError } from "../../../lib/api";
-import type { DashboardResponse, DashboardTransaction } from "../../../lib/api";
+import { getDashboard, getLotteryRecentWinners, ApiResponseError } from "../../../lib/api";
+import type { DashboardResponse, DashboardTransaction, LotteryPool } from "../../../lib/api";
 import { useRouter } from "next/navigation";
 import { CurrencyIcon } from "../../components/CurrencyIcon";
 
@@ -49,15 +49,21 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [lotteryPools, setLotteryPools] = useState<LotteryPool[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const res = await getDashboard();
-      setData(res);
-    } catch (err) {
-      if (err instanceof ApiResponseError && err.status === 401) { router.push("/login"); return; }
-      setError("Couldn't load your dashboard. Try refreshing.");
+      const [res, lottery] = await Promise.allSettled([
+        getDashboard(),
+        getLotteryRecentWinners(),
+      ]);
+      if (res.status === "fulfilled") setData(res.value);
+      else {
+        if (res.reason instanceof ApiResponseError && res.reason.status === 401) { router.push("/login"); return; }
+        setError("Couldn't load your dashboard. Try refreshing.");
+      }
+      if (lottery.status === "fulfilled") setLotteryPools(lottery.value.pools);
     } finally {
       setLoading(false);
     }
@@ -238,6 +244,46 @@ export default function Dashboard() {
             <div className="form-card border p-4">
               {recentTransactions.map((tx, i) => (
                 <TxRow key={i} tx={tx} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Lottery recent winners ── */}
+      {lotteryPools.length > 0 && (
+        <>
+          <hr className="gold-rule" />
+          <div>
+            <div className="section-header mb-4">
+              <span className="section-header-text">Lottery</span>
+            </div>
+            <div className="flex flex-col gap-4">
+              {lotteryPools.map((pool, pi) => (
+                <div key={pi} className="form-card border p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
+                      {new Date(pool.resolvedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs font-bold text-[#e6c96a]">
+                      <CurrencyIcon type="ryo" size={13} /> {formatNumber(pool.prizePool)} prize pool
+                    </span>
+                  </div>
+                  {pool.winners.map((w) => (
+                    <div key={w.placement} className="flex items-center justify-between border-b border-[rgba(200,168,75,0.08)] py-2 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{w.placement === 1 ? "🥇" : w.placement === 2 ? "🥈" : "🥉"}</span>
+                        <div>
+                          <span className="text-sm font-bold text-[#f0e6c8]">{w.displayName}</span>
+                          {w.username && <span className="ml-1.5 text-xs text-[rgba(200,168,75,0.40)]">@{w.username}</span>}
+                        </div>
+                      </div>
+                      <span className="flex items-center gap-1 text-sm font-bold text-green-400">
+                        +{formatNumber(w.amount)} <CurrencyIcon type="ryo" size={13} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
               ))}
             </div>
           </div>

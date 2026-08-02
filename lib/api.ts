@@ -442,3 +442,517 @@ export const getLeaderboard = (metric: LeaderboardMetric, page = 1) =>
   apiFetch<LeaderboardResponse>(
     `/leaderboard?metric=${metric}&page=${page}`,
   );
+
+// ── Settings ──────────────────────────────────────────────────────
+// GET  /settings/profile
+// PATCH /settings/profile { displayName?, bio? }
+
+export interface SettingsProfileResponse {
+  displayName: string;
+  bio: string | null;
+  displayNameCooldown: {
+    canChangeNow: boolean;
+    daysRemaining: number;
+    cooldownDays: number;
+  };
+  limits: {
+    displayName: { min: number; max: number };
+    bio: { max: number };
+  };
+}
+
+export const getSettingsProfile = () =>
+  apiFetch<SettingsProfileResponse>("/settings/profile");
+
+export interface PatchSettingsPayload {
+  displayName?: string;
+  bio?: string;
+}
+export interface PatchSettingsResponse {
+  displayName?: string;
+  bio?: string;
+}
+export const patchSettingsProfile = (body: PatchSettingsPayload) =>
+  apiFetch<PatchSettingsResponse>("/settings/profile", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+
+// ── Profile ───────────────────────────────────────────────────────
+// GET  /profile/:username?cardsPage=&cardsSort=
+// POST /profile/:username/like
+
+export type CardRarity = "C" | "R" | "SR" | "SSR" | "UR";
+
+export interface ProfileCardItem {
+  instanceId: string;
+  issueNumber: number;
+  listing: unknown | null;
+  isLocked: boolean;
+  card: {
+    name: string;
+    rarity: CardRarity;
+    seriesName: string | null;
+    mediaUrl: string;
+  } | null;
+}
+
+export type DeckSlotState = "active" | "empty" | "locked";
+
+export interface DeckSlot {
+  slotIndex: number;
+  state: DeckSlotState;
+  deckName?: string;
+  backgroundUrl?: string | null;
+  filledSlotCount?: number;
+  slots?: (string | null)[];
+}
+
+export interface ProfileResponse {
+  identity: {
+    username: string;
+    displayName: string;
+    age: number;
+    bio: string | null;
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+    frameUrl: string | null;
+    level: number;
+    xp: number;
+    joinedAt: string;
+    likeCount: number;
+    isLikedByViewer: boolean;
+    isOwnProfile: boolean;
+  };
+  deck: {
+    slots: DeckSlot[];
+    unlockedCount: number;
+    maxDecks: number;
+    deckSize: number;
+    deckPassItemId?: "deck_pass";
+  };
+  cards:
+    | { hidden: true }
+    | {
+        hidden: false;
+        page: number;
+        totalPages: number;
+        total: number;
+        items: ProfileCardItem[];
+      };
+  friends: { hidden: true } | { hidden: false; jids: string[] };
+}
+
+export const getProfile = (
+  username: string,
+  params?: { cardsPage?: number; cardsSort?: "newest" | "rarity" | "name" },
+) => {
+  const qs = new URLSearchParams();
+  if (params?.cardsPage) qs.set("cardsPage", String(params.cardsPage));
+  if (params?.cardsSort) qs.set("cardsSort", params.cardsSort);
+  const q = qs.toString();
+  return apiFetch<ProfileResponse>(`/profile/${encodeURIComponent(username)}${q ? `?${q}` : ""}`);
+};
+
+export interface LikeProfileResponse {
+  liked: boolean;
+  likeCount: number;
+}
+export const likeProfile = (username: string) =>
+  apiFetch<LikeProfileResponse>(`/profile/${encodeURIComponent(username)}/like`, {
+    method: "POST",
+  });
+
+// ── Craft ─────────────────────────────────────────────────────────
+// GET  /craft/recipes
+// POST /craft { recipeId }
+
+export interface CraftInput {
+  itemId: string;
+  qty: number;
+  have: number;
+}
+
+export interface CraftRecipe {
+  recipeId: string;
+  label: string;
+  inputs: CraftInput[];
+  output: { itemId: string; amount: number };
+  successRate: number;
+  ryoCost: number;
+  alreadyOwnsTool: boolean;
+  canAfford: boolean;
+}
+
+export interface CraftRecipesResponse {
+  hasCraftingTable: boolean;
+  recipes: CraftRecipe[];
+}
+
+export const getCraftRecipes = () =>
+  apiFetch<CraftRecipesResponse>("/craft/recipes");
+
+export interface CraftResponse {
+  success: boolean;
+  output?: { itemId: string; amount: number };
+  message?: string;
+}
+export const executeCraft = (recipeId: string) =>
+  apiFetch<CraftResponse>("/craft", {
+    method: "POST",
+    body: JSON.stringify({ recipeId }),
+  });
+
+// ── Bank & Vault ──────────────────────────────────────────────────
+// GET /bank-vault?page=N
+
+export interface BankVaultTransaction {
+  currency: "ryo" | "kitsu";
+  location: string;
+  action: string;
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface BankVaultResponse {
+  balances: {
+    pocket: { ryo: number; kitsu: number };
+    bank: { ryo: number; cap: number; tier: number };
+    homeVault: { ryo: number; kitsu: number; ryoCap: number; kitsuCap: number } | null;
+  };
+  bank: {
+    tier: number;
+    cap: number;
+    upgradeCost: { ryo: number } | null;
+    atMaxTier: boolean;
+  };
+  homeVault: {
+    tier: number;
+    caps: { ryo: number; kitsu: number };
+    health: number;
+    maxHealth: number;
+    vulnerabilityBonus: number;
+    repairCost: {
+      pointsToRepair: number;
+      ryo: number;
+      material: string;
+      materialQty: number;
+    } | null;
+    upgradeCost: { ryo: number } | null;
+    atMaxTier: boolean;
+  } | null;
+  transactions: {
+    page: number;
+    totalPages: number;
+    total: number;
+    items: BankVaultTransaction[];
+  };
+}
+
+export const getBankVault = (page = 1) =>
+  apiFetch<BankVaultResponse>(`/bank-vault?page=${page}`);
+
+// ── Decks ─────────────────────────────────────────────────────────
+// GET    /decks
+// POST   /decks/:slotIndex              { deckName? }
+// POST   /decks/:slotIndex/cards        { position, cardInstanceId }
+// DELETE /decks/:slotIndex
+// DELETE /decks/:slotIndex/cards/:position
+
+export interface DeckManageSlot {
+  slotIndex: number;
+  state: "active" | "empty" | "locked";
+  deckName?: string;
+  backgroundUrl?: string | null;
+  slots?: (string | null)[];
+}
+
+export interface DecksResponse {
+  slots: DeckManageSlot[];
+  unlockedCount: number;
+  maxDecks: number;
+  deckSize: number;
+}
+
+export const getDecks = () => apiFetch<DecksResponse>("/decks");
+
+export const upsertDeck = (slotIndex: number, body: { deckName?: string }) =>
+  apiFetch<DeckManageSlot>(`/decks/${slotIndex}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const assignCardToDeck = (
+  slotIndex: number,
+  body: { position: number; cardInstanceId: string },
+) =>
+  apiFetch<DeckManageSlot>(`/decks/${slotIndex}/cards`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const deleteDeck = (slotIndex: number) =>
+  apiFetch<{ deleted: boolean }>(`/decks/${slotIndex}`, { method: "DELETE" });
+
+export const removeCardFromDeck = (slotIndex: number, position: number) =>
+  apiFetch<DeckManageSlot>(`/decks/${slotIndex}/cards/${position}`, {
+    method: "DELETE",
+  });
+
+// ── Trade ─────────────────────────────────────────────────────────
+
+export type TradeCurrency = "ryo" | "kitsu";
+export type TradeStatus = "pending" | "countered" | "accepted" | "declined" | "cancelled" | "expired";
+
+export interface TradeOffer {
+  cardInstanceIds: string[];
+  materials: { itemId: string; quantity: number }[];
+  currency: { type: TradeCurrency; amount: number } | null;
+}
+
+export interface TradeSide {
+  jid: string;
+  username: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  offer: TradeOffer;
+}
+
+export interface Trade {
+  _id: string;
+  status: TradeStatus;
+  initiator: TradeSide;
+  recipient: TradeSide;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+}
+
+export interface TradeListResponse {
+  trades: Trade[];
+  total: number;
+}
+
+export const getTrades = (status?: TradeStatus) =>
+  apiFetch<TradeListResponse>(
+    status ? `/trade?status=${status}` : "/trade",
+  );
+
+export const getTradeById = (id: string) =>
+  apiFetch<Trade>(`/trade/${id}`);
+
+export interface ProposeTradePayload {
+  recipientUsername: string;
+  initiatorOffer: Partial<TradeOffer>;
+  recipientOffer?: Partial<TradeOffer>;
+}
+export const proposeTrade = (body: ProposeTradePayload) =>
+  apiFetch<Trade>("/trade", { method: "POST", body: JSON.stringify(body) });
+
+export const counterTrade = (id: string, body: { initiatorOffer?: Partial<TradeOffer>; recipientOffer?: Partial<TradeOffer> }) =>
+  apiFetch<Trade>(`/trade/${id}/counter`, { method: "POST", body: JSON.stringify(body) });
+
+export const acceptTrade = (id: string) =>
+  apiFetch<Trade>(`/trade/${id}/accept`, { method: "POST" });
+
+export const declineTrade = (id: string) =>
+  apiFetch<Trade>(`/trade/${id}/decline`, { method: "POST" });
+
+export const cancelTrade = (id: string) =>
+  apiFetch<Trade>(`/trade/${id}/cancel`, { method: "POST" });
+
+// ── Loadout ───────────────────────────────────────────────────────
+// GET    /loadout
+// POST   /loadout  { tier, slotNumber, toolIds, label? }
+// DELETE /loadout  { tier, slotNumber }
+
+export type LoadoutTier = "pocket" | "vault";
+
+export interface LoadoutTool {
+  itemId: string;
+  name: string;
+  emoji: string;
+  owned: boolean;
+  ownedQuantity: number;
+}
+
+export interface LoadoutKit {
+  slotNumber: number;
+  label: string;
+  tools: LoadoutTool[];
+}
+
+export interface LoadoutResponse {
+  maxKitsPerTier: number;
+  pocketToolIds: string[];
+  vaultToolIds: string[];
+  loadouts: {
+    pocket: LoadoutKit[];
+    vault: LoadoutKit[];
+  };
+}
+
+export const getLoadout = () => apiFetch<LoadoutResponse>("/loadout");
+
+export interface SaveLoadoutPayload {
+  tier: LoadoutTier;
+  slotNumber: number;
+  toolIds: string[];
+  label?: string | null;
+}
+export const saveLoadout = (body: SaveLoadoutPayload) =>
+  apiFetch<LoadoutKit>("/loadout", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const deleteLoadout = (tier: LoadoutTier, slotNumber: number) =>
+  apiFetch<{ deleted: boolean }>("/loadout", {
+    method: "DELETE",
+    body: JSON.stringify({ tier, slotNumber }),
+  });
+
+// ── Cosmetics ─────────────────────────────────────────────────────
+// POST   /cosmetics/upload            (multipart/form-data)
+// GET    /cosmetics/uploads?slot=&slotIndex=
+// POST   /cosmetics/equip             { slot, uploadId?, slotIndex?, frameId? }
+// DELETE /cosmetics/upload/:id
+
+export type CosmeticSlot = "avatar" | "banner" | "deckBackground";
+export type EquipSlot = "avatar" | "banner" | "deckBackground" | "frame";
+
+export interface CosmeticUpload {
+  id: string;
+  kind: "static" | "animated";
+  url: string;
+  createdAt: string;
+  isEquipped: boolean;
+}
+
+export interface CosmeticsUploadsResponse {
+  uploads: CosmeticUpload[];
+}
+
+export const getCosmeticUploads = (slot: CosmeticSlot, slotIndex?: number) => {
+  const qs = new URLSearchParams({ slot });
+  if (slot === "deckBackground" && slotIndex !== undefined)
+    qs.set("slotIndex", String(slotIndex));
+  return apiFetch<CosmeticsUploadsResponse>(`/cosmetics/uploads?${qs}`);
+};
+
+export const uploadCosmetic = async (
+  slot: CosmeticSlot,
+  file: File,
+  slotIndex?: number,
+): Promise<{ uploadId: string; url: string; kind: string; slot: string; slotIndex: number | null }> => {
+  const form = new FormData();
+  // Text fields MUST come before the file so @fastify/multipart's req.file()
+  // has them in data.fields when it resolves the stream.
+  form.append("slot", slot);
+  if (slot === "deckBackground" && slotIndex !== undefined)
+    form.append("slotIndex", String(slotIndex));
+  // File last — backend reads non-file fields from the stream before the file.
+  form.append("file", file);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/cosmetics/upload`, {
+      method: "POST",
+      credentials: "include",
+      // Do NOT set Content-Type — the browser must set it with the boundary.
+      body: form,
+    });
+  } catch (networkErr) {
+    throw new ApiResponseError(0, {
+      code: "network_error",
+      message: "Could not reach the server. Check your connection and try again.",
+    });
+  }
+
+  if (res.ok) return res.json();
+
+  // Try to parse server error body
+  let errorBody: { error?: ApiError } = {};
+  try { errorBody = await res.json(); } catch { /* ignore parse failure */ }
+
+  throw new ApiResponseError(
+    res.status,
+    errorBody?.error ?? { code: "upload_failed", message: `Upload failed (HTTP ${res.status})` },
+  );
+};
+
+export interface EquipCosmeticPayload {
+  slot: EquipSlot;
+  uploadId?: string;
+  slotIndex?: number;
+  frameId?: string | null;
+}
+export const equipCosmetic = (body: EquipCosmeticPayload) =>
+  apiFetch<{ slot: string; url?: string; frameId?: string | null }>("/cosmetics/equip", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const deleteCosmeticUpload = (id: string) =>
+  apiFetch<{ removed: boolean }>(`/cosmetics/upload/${id}`, {
+    method: "DELETE",
+  });
+
+// ── Player Search ─────────────────────────────────────────────────
+// GET /players/search?q=&page=
+
+export interface PlayerSearchResult {
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface PlayerSearchResponse {
+  query: string;
+  page: number;
+  totalPages: number;
+  total: number;
+  results: PlayerSearchResult[];
+}
+
+export const searchPlayers = (q: string, page = 1) =>
+  apiFetch<PlayerSearchResponse>(
+    `/players/search?q=${encodeURIComponent(q)}&page=${page}`,
+  );
+
+// ── Lottery ───────────────────────────────────────────────────────
+// GET /lottery/recent-winners
+
+export interface LotteryWinner {
+  placement: number;
+  amount: number;
+  displayName: string;
+  username: string | null;
+}
+
+export interface LotteryPool {
+  resolvedAt: string;
+  prizePool: number;
+  winners: LotteryWinner[];
+}
+
+export interface LotteryRecentWinnersResponse {
+  pools: LotteryPool[];
+}
+
+export const getLotteryRecentWinners = () =>
+  apiFetch<LotteryRecentWinnersResponse>("/lottery/recent-winners");
+
+// ── Home stats ────────────────────────────────────────────────────
+// GET /home/stats  (public, no auth required)
+
+export interface HomeStatsResponse {
+  totalPlayers: number;
+  totalCardsClaimed: number;
+  totalCardsInCatalog: number;
+}
+
+export const getHomeStats = () =>
+  apiFetch<HomeStatsResponse>("/home/stats");

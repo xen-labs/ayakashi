@@ -7,8 +7,9 @@ import AnimatedCounter from "./components/AnimatedCounter";
 import { TopBar } from "./components/TopBar";
 import { GithubCredits } from "./components/GithubCredits";
 import { CurrencyProvider } from "./components/CurrencyContext";
-import { getMe } from "../lib/api";
-import type { MeResponse } from "../lib/api";
+import { BottomNav } from "./components/BottomNav";
+import { getMe, getHomeStats } from "../lib/api";
+import type { MeResponse, HomeStatsResponse } from "../lib/api";
 
 const FEATURES = [
   { icon: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />, title: "Card Collection", body: "Claim, collect, and showcase hundreds of unique cards earned through the bot.", href: null },
@@ -69,10 +70,12 @@ export default function Home() {
   const [statsOpacity, setStatsOpacity] = useState(1);
   const [user, setUser] = useState<MeResponse | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [homeStats, setHomeStats] = useState<HomeStatsResponse | null>(null);
   const loggedIn = Boolean(user);
 
   useEffect(() => {
     getMe().then((res) => setUser(res)).catch(() => setUser(null)).finally(() => setAuthChecked(true));
+    getHomeStats().then(setHomeStats).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -101,7 +104,7 @@ export default function Home() {
     <CurrencyProvider>
       <div className="min-h-dvh bg-[#0a0a0a]">
         <TopBar user={user} />
-        <main className="relative z-10">
+        <main className="relative z-10 pb-16">
           <section className="px-4 pt-10 sm:px-6 lg:px-8">
             <div className="mx-auto w-full max-w-5xl flex flex-col gap-2">
               <h1 className="font-display text-xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-2xl">
@@ -116,6 +119,7 @@ export default function Home() {
           <FeatureGrid loggedIn />
         </main>
         <GithubCredits />
+        <BottomNav />
       </div>
     </CurrencyProvider>
   );
@@ -162,25 +166,49 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats bar */}
+        {/* Stats bar — live from /home/stats */}
         <div
           className="w-full border-t footer-bar px-4 py-5"
           style={{ opacity: statsOpacity, transition: "opacity 0.05s linear" }}
           aria-hidden={statsOpacity === 0}
         >
           <div className="mx-auto grid max-w-xl grid-cols-3 gap-3 text-center">
-            {[
-              { target: 10, suffix: "K+", label: "Users", duration: 1200 },
-              { target: 2,  suffix: "K+", label: "Guilds", duration: 900 },
-              { target: 10, suffix: "M+", label: "Cards Claimed", duration: 1400 },
-            ].map(({ target, suffix, label, duration }) => (
-              <div key={label}>
-                <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
-                  <AnimatedCounter target={target} suffix={suffix} duration={duration} />
-                </h3>
-                <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">{label}</p>
-              </div>
-            ))}
+            {homeStats ? (
+              <>
+                {[
+                  { value: homeStats.totalPlayers,     label: "Players"      },
+                  { value: homeStats.totalCardsClaimed, label: "Cards Claimed" },
+                  { value: homeStats.totalCardsInCatalog, label: "In Catalog" },
+                ].map(({ value, label }) => (
+                  <div key={label}>
+                    <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
+                      {value >= 1_000_000
+                        ? `${(value / 1_000_000).toFixed(1)}M`
+                        : value >= 1_000
+                        ? `${(value / 1_000).toFixed(1)}K`
+                        : value.toLocaleString("en-US")}
+                    </h3>
+                    <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">{label}</p>
+                  </div>
+                ))}
+              </>
+            ) : (
+              /* Fallback animated counters while loading */
+              <>
+                {[
+                  { target: 10, suffix: "K+", label: "Players",      duration: 1200 },
+                  { target: 10, suffix: "M+", label: "Cards Claimed", duration: 1400 },
+                  { target: 500, suffix: "+", label: "In Catalog",    duration: 1000 },
+                ].map(({ target, suffix, label, duration }) => (
+                  <div key={label}>
+                    <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
+                      <AnimatedCounter target={target} suffix={suffix} duration={duration} />
+                    </h3>
+                    <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">{label}</p>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </section>

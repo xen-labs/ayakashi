@@ -3,13 +3,23 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { X, Settings, LogOut, HelpCircle, MessageCircle } from "lucide-react";
+import {
+  X, Settings, LogOut, HelpCircle, MessageCircle,
+  Sparkles, ArrowLeftRight, Layers, Swords, Landmark, Search, User,
+} from "lucide-react";
 import { authLogout } from "../../lib/api";
 import type { MeResponse } from "../../lib/api";
 
 const SECONDARY_LINKS = [
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/help", label: "Help & Support", icon: HelpCircle },
+  { href: "/profile",    label: "My Profile",   icon: User            },
+  { href: "/cosmetics",  label: "Cosmetics",    icon: Sparkles        },
+  { href: "/decks",      label: "Decks",        icon: Layers          },
+  { href: "/trade",      label: "Trade",        icon: ArrowLeftRight  },
+  { href: "/loadout",    label: "Loadout",      icon: Swords          },
+  { href: "/bank-vault", label: "Bank & Vault", icon: Landmark        },
+  { href: "/players",    label: "Find Players", icon: Search          },
+  { href: "/settings",   label: "Settings",     icon: Settings        },
+  { href: "/help",       label: "Help",         icon: HelpCircle      },
 ];
 
 export function NavDrawer({
