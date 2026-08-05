@@ -142,10 +142,23 @@ function DeckEditor({
   const [pickerPos, setPickerPos] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // instanceId → card data for filled slots
+  const [cardMap, setCardMap] = useState<Record<string, CardInstance>>({});
 
   const slots12 = Array.from({ length: 12 }, (_, i) =>
     slot.slots ? (slot.slots[i] ?? null) : null,
   );
+
+  // Fetch card details whenever the slot composition changes
+  useEffect(() => {
+    const filledIds = (slot.slots ?? []).filter(Boolean) as string[];
+    if (filledIds.length === 0) { setCardMap({}); return; }
+    getInventoryCards({ sort: "rarity" }).then((res) => {
+      const map: Record<string, CardInstance> = {};
+      for (const c of res.items) map[c.instanceId] = c;
+      setCardMap(map);
+    }).catch(() => { /* noop */ });
+  }, [slot.slots]);
 
   const saveName = async () => {
     setSavingName(true);
@@ -162,7 +175,7 @@ function DeckEditor({
     setBusy(true);
     setPickerPos(null);
     try {
-      await assignCardToDeck(slot.slotIndex, { position: pickerPos, cardInstanceId: instanceId });
+      await assignCardToDeck(slot.slotIndex, { position: pickerPos, instanceId });
       onRefresh();
     } catch { /* noop */ }
     finally { setBusy(false); }
@@ -179,10 +192,16 @@ function DeckEditor({
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete deck "${slot.deckName ?? `Deck ${slot.slotIndex + 1}`}"?`)) return;
+    if (!confirm(`Clear all cards from "${slot.deckName ?? `Deck ${slot.slotIndex + 1}`}"?`)) return;
     setDeleting(true);
     try {
-      await deleteDeck(slot.slotIndex);
+      // No DELETE /decks/:slotIndex endpoint — clear each filled slot individually
+      const filled = slots12
+        .map((id, i) => ({ id, i }))
+        .filter(({ id }) => id !== null);
+      await Promise.all(
+        filled.map(({ i }) => removeCardFromDeck(slot.slotIndex, i))
+      );
       onRefresh();
     } catch { /* noop */ }
     finally { setDeleting(false); }
@@ -232,34 +251,53 @@ function DeckEditor({
 
       {/* 12-slot grid */}
       <div className="grid grid-cols-6 gap-1.5">
-        {slots12.map((instanceId, pos) => (
-          <div key={pos} className="relative">
-            {instanceId ? (
-              <button
-                type="button"
-                title="Click to remove"
-                disabled={busy}
-                onClick={() => handleRemove(pos)}
-                className={`group relative h-12 w-full overflow-hidden border border-[rgba(200,168,75,0.30)] bg-[rgba(200,168,75,0.06)] hover:border-red-500/50 disabled:opacity-50`}
-              >
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/60">
-                  <X className="h-4 w-4 text-red-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
-                <span className="text-[9px] font-bold text-[rgba(200,168,75,0.60)]">#{pos + 1}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                title="Assign card"
-                disabled={busy}
-                onClick={() => setPickerPos(pos)}
-                className="flex h-12 w-full items-center justify-center border border-dashed border-[rgba(200,168,75,0.20)] bg-transparent text-[rgba(200,168,75,0.25)] transition-all hover:border-[rgba(200,168,75,0.50)] hover:text-[rgba(200,168,75,0.60)] disabled:opacity-50"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        ))}
+        {slots12.map((instanceId, pos) => {
+          const cardData = instanceId ? cardMap[instanceId] : null;
+          return (
+            <div key={pos} className="relative">
+              {instanceId ? (
+                <button
+                  type="button"
+                  title="Click to remove"
+                  disabled={busy}
+                  onClick={() => handleRemove(pos)}
+                  className={`group relative h-16 w-full overflow-hidden border ${RARITY_COLORS[cardData?.card?.rarity ?? "C"]} bg-[rgba(200,168,75,0.06)] hover:border-red-500/50 disabled:opacity-50`}
+                >
+                  {cardData?.card?.mediaUrl ? (
+                    <Image
+                      src={cardData.card.mediaUrl}
+                      alt={cardData.card.name ?? "card"}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-lg">🃏</div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/70">
+                    <X className="h-4 w-4 text-red-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </div>
+                  {cardData?.card?.rarity && (
+                    <span className="absolute bottom-0.5 right-0.5 text-[7px] font-bold text-white/80 drop-shadow">
+                      {cardData.card.rarity}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  title="Assign card"
+                  disabled={busy}
+                  onClick={() => setPickerPos(pos)}
+                  className="flex h-16 w-full items-center justify-center border border-dashed border-[rgba(200,168,75,0.20)] bg-transparent text-[rgba(200,168,75,0.25)] transition-all hover:border-[rgba(200,168,75,0.50)] hover:text-[rgba(200,168,75,0.60)] disabled:opacity-50"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
@@ -338,7 +376,7 @@ export default function DecksPage() {
               <div key={slot.slotIndex} className="flex items-center gap-3 border border-dashed border-[rgba(200,168,75,0.15)] p-5 opacity-40">
                 <Lock className="h-4 w-4 text-[rgba(200,168,75,0.40)]" />
                 <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-                  Slot {slot.slotIndex + 1} — Locked (buy a deck_pass to unlock)
+                  Slot {slot.slotIndex + 1} — Locked (buy a Deck Pass to unlock)
                 </span>
               </div>
             );

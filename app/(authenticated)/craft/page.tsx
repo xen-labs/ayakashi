@@ -31,6 +31,14 @@ function RecipeCard({
   const locked = !hasCraftingTable;
   const unavailable = locked || recipe.alreadyOwnsTool || !recipe.canAfford;
 
+  // Output label: use displayName for items, or "kitsu" for kitsu outputs
+  const outputLabel =
+    recipe.output.type === "kitsu"
+      ? "Kitsu"
+      : (recipe.outputDisplayName ?? recipe.output.itemId ?? "item");
+  const outputEmoji =
+    recipe.output.type === "kitsu" ? "🔷" : (recipe.outputEmoji ?? "");
+
   return (
     <div className={`form-card flex flex-col gap-4 border p-5 ${locked ? "opacity-40" : ""}`}>
       {/* Header */}
@@ -38,7 +46,7 @@ function RecipeCard({
         <div>
           <p className="font-display text-sm font-bold text-[#f0e6c8]">{recipe.label}</p>
           <p className="mt-0.5 text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-            Output: {recipe.output.amount}× {recipe.output.itemId}
+            Output: {recipe.output.amount}× {outputEmoji} {outputLabel}
           </p>
         </div>
         {recipe.successRate < 100 && (
@@ -55,7 +63,9 @@ function RecipeCard({
           const enough = input.have >= input.qty;
           return (
             <div key={input.itemId} className="flex items-center justify-between text-xs">
-              <span className="text-[#f0e6c8]">{input.itemId}</span>
+              <span className="text-[#f0e6c8]">
+                {input.emoji} {input.displayName}
+              </span>
               <span className={`font-bold tabular-nums ${enough ? "text-green-400" : "text-red-400"}`}>
                 {input.have} / {input.qty}
               </span>
@@ -131,7 +141,11 @@ export default function CraftPage() {
     try {
       const res = await executeCraft(recipeId);
       if (res.success) {
-        setToast({ msg: `✦ Craft succeeded! Got ${res.output?.amount ?? 1}× ${res.output?.itemId ?? "item"}`, ok: true });
+        const outputLabel =
+          res.output?.type === "kitsu"
+            ? `${res.output.amount} Kitsu`
+            : `${res.output?.amount ?? 1}× ${res.output?.displayName ?? res.output?.itemId ?? "item"}`;
+        setToast({ msg: `✦ Craft succeeded! Got ${outputLabel}`, ok: true });
       } else {
         setToast({ msg: res.message ?? "Craft failed — better luck next time!", ok: false });
       }

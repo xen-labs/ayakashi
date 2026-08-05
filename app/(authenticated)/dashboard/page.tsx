@@ -31,7 +31,7 @@ function TxRow({ tx }: { tx: DashboardTransaction }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5 border-b border-[rgba(200,168,75,0.08)] last:border-0">
       <div className="flex flex-col gap-0.5 min-w-0">
-        <span className="text-xs text-[#f0e6c8] truncate">{tx.reason}</span>
+        <span className="text-xs text-[#f0e6c8] truncate">{tx.description}</span>
         <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
           {tx.location} · {new Date(tx.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         </span>
