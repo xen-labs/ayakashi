@@ -25,8 +25,8 @@ import type {
 import { useCurrency } from "../../components/CurrencyContext";
 import { CurrencyIcon } from "../../components/CurrencyIcon";
 
-function fmt(n: number) {
-  return n.toLocaleString("en-US");
+function fmt(n: number | undefined | null) {
+  return (n ?? 0).toLocaleString("en-US");
 }
 
 type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | undefined;

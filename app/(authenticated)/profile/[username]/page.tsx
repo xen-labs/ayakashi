@@ -39,8 +39,8 @@ import type {
 import { AvatarWithFrame } from "../../../components/AvatarWithFrame";
 
 // ── helpers ───────────────────────────────────────────────────────
-function fmt(n: number) {
-  return n.toLocaleString("en-US");
+function fmt(n: number | undefined | null) {
+  return (n ?? 0).toLocaleString("en-US");
 }
 
 const RARITY_COLORS: Record<string, string> = {
@@ -150,15 +150,15 @@ function FriendButton({
 
 // ── Card thumb ────────────────────────────────────────────────────
 function CardThumb({ item }: { item: ProfileCardItem }) {
-  const rarity = item.card?.rarity ?? "C";
+  const rarity = item.rarity ?? "C";
   return (
     <div
       className={`relative overflow-hidden rounded-md border transition-transform hover:-translate-y-0.5 ${RARITY_COLORS[rarity] ?? "border-[rgba(200,168,75,0.20)]"} bg-[rgba(200,168,75,0.03)]`}
     >
-      {item.card?.mediaUrl ? (
+      {item.thumbUrl ? (
         <Image
-          src={item.card.mediaUrl}
-          alt={item.card.name}
+          src={item.thumbUrl}
+          alt={item.name}
           width={120}
           height={160}
           className="h-full w-full object-cover"
@@ -169,7 +169,7 @@ function CardThumb({ item }: { item: ProfileCardItem }) {
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1.5 py-1">
         <p className="truncate text-[9px] font-bold leading-tight text-[#f0e6c8]">
-          {item.card?.name ?? "Unknown"}
+          {item.name ?? "Unknown"}
         </p>
         <div className="mt-0.5 flex items-center gap-1">
           <span
@@ -177,9 +177,6 @@ function CardThumb({ item }: { item: ProfileCardItem }) {
           >
             {rarity}
           </span>
-          {item.isLocked && (
-            <Lock className="h-2.5 w-2.5 text-[rgba(200,168,75,0.50)]" />
-          )}
         </div>
       </div>
     </div>
@@ -773,7 +770,8 @@ export default function ProfilePage() {
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <span className="text-xs text-[rgba(200,168,75,0.45)]">
-                  {fmt(cards.total)} card{cards.total !== 1 ? "s" : ""}
+                  {fmt(cards.totalCount)} card
+                  {cards.totalCount !== 1 ? "s" : ""}
                 </span>
                 <div className="flex gap-0 rounded-md border border-[rgba(200,168,75,0.20)] overflow-hidden">
                   {SORT_OPTIONS.map((opt) => (
@@ -815,13 +813,13 @@ export default function ProfilePage() {
                     />
                   </svg>
                 </div>
-              ) : cards.items.length === 0 ? (
+              ) : cards.results.length === 0 ? (
                 <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
                   No cards yet.
                 </p>
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-                  {cards.items.map((item) => (
+                  {cards.results.map((item) => (
                     <CardThumb key={item.instanceId} item={item} />
                   ))}
                 </div>

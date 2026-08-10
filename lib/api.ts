@@ -512,14 +512,17 @@ export type CardRarity = "C" | "R" | "SR" | "SSR" | "UR";
 export interface ProfileCardItem {
   instanceId: string;
   issueNumber: number;
-  listing: unknown | null;
-  isLocked: boolean;
-  card: {
-    name: string;
-    rarity: CardRarity;
-    seriesName: string | null;
-    mediaUrl: string;
-  } | null;
+  shortId: string;
+  name: string;
+  seriesName: string | null;
+  rarity: CardRarity;
+  isEvent: boolean;
+  eventName: string | null;
+  thumbUrl: string;
+  mediaType: string;
+  ownerCount: number;
+  wishlistCount: number;
+  totalIssued: number;
 }
 
 export type DeckSlotState = "active" | "empty" | "locked";
@@ -573,9 +576,10 @@ export interface ProfileResponse {
     | {
         hidden: false;
         page: number;
+        pageSize: number;
         totalPages: number;
-        total: number;
-        items: ProfileCardItem[];
+        totalCount: number;
+        results: ProfileCardItem[];
       };
   friends:
     | { hidden: true }
