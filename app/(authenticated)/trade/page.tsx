@@ -367,11 +367,7 @@ function ProposeModal({
         getInventory(),
       ]);
       setMyCards(cards.items);
-      setMyMaterials(
-        inv.items.filter(
-          (i) => i.category === "material" && (i.sellPrice ?? 0) > 0,
-        ),
-      );
+      setMyMaterials(inv.items.filter((i) => i.category === "material"));
     } catch {
       /* noop */
     }
