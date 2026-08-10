@@ -918,6 +918,7 @@ export const cancelTrade = (id: string) =>
 // DELETE /loadout  { tier, slotNumber }
 
 export type LoadoutTier = "pocket" | "vault";
+export type VaultPath = "stealth" | "aggressive";
 
 export interface LoadoutTool {
   itemId: string;
@@ -927,41 +928,90 @@ export interface LoadoutTool {
   ownedQuantity: number;
 }
 
-export interface LoadoutKit {
+export interface PocketKit {
   slotNumber: number;
   label: string;
-  tools: LoadoutTool[];
+  weapon: LoadoutTool | null;
+}
+
+export interface VaultKit {
+  slotNumber: number;
+  label: string;
+  path: VaultPath;
+  entryTool: LoadoutTool | null;
+  breachTool: LoadoutTool | null;
+  escapeTool: LoadoutTool | null;
+  bag: LoadoutTool | null;
 }
 
 export interface LoadoutResponse {
   maxKitsPerTier: number;
-  pocketToolIds: string[];
-  vaultToolIds: string[];
+  pocketWeaponIds: string[];
+  vaultEntryStealthIds: string[];
+  vaultEntryAggressiveIds: string[];
+  vaultBreachIds: string[];
+  vaultEscapeIds: string[];
+  vaultBagIds: string[];
   loadouts: {
-    pocket: LoadoutKit[];
-    vault: LoadoutKit[];
+    pocket: PocketKit[];
+    vault: VaultKit[];
   };
 }
 
 export const getLoadout = () => apiFetch<LoadoutResponse>("/loadout");
 
-export interface SaveLoadoutPayload {
-  tier: LoadoutTier;
+export interface SavePocketLoadoutPayload {
+  tier: "pocket";
   slotNumber: number;
-  toolIds: string[];
+  weaponId: string;
+  /** Omit to leave an existing kit's label unchanged; "" or null to clear it */
   label?: string | null;
 }
+export interface SaveVaultLoadoutPayload {
+  tier: "vault";
+  slotNumber: number;
+  path: VaultPath;
+  entryToolId: string;
+  breachToolId?: string | null;
+  escapeToolId?: string | null;
+  bagId?: string | null;
+  label?: string | null;
+}
+export type SaveLoadoutPayload =
+  | SavePocketLoadoutPayload
+  | SaveVaultLoadoutPayload;
+
+export interface SavePocketResponse {
+  tier: "pocket";
+  slotNumber: number;
+  label: string;
+  weapon: LoadoutTool | null;
+}
+export interface SaveVaultResponse {
+  tier: "vault";
+  slotNumber: number;
+  label: string;
+  path: VaultPath;
+  entryTool: LoadoutTool | null;
+  breachTool: LoadoutTool | null;
+  escapeTool: LoadoutTool | null;
+  bag: LoadoutTool | null;
+}
+
 export const saveLoadout = (body: SaveLoadoutPayload) =>
-  apiFetch<LoadoutKit>("/loadout", {
+  apiFetch<SavePocketResponse | SaveVaultResponse>("/loadout", {
     method: "POST",
     body: JSON.stringify(body),
   });
 
 export const deleteLoadout = (tier: LoadoutTier, slotNumber: number) =>
-  apiFetch<{ deleted: boolean }>("/loadout", {
-    method: "DELETE",
-    body: JSON.stringify({ tier, slotNumber }),
-  });
+  apiFetch<{ tier: LoadoutTier; slotNumber: number; deleted: boolean }>(
+    "/loadout",
+    {
+      method: "DELETE",
+      body: JSON.stringify({ tier, slotNumber }),
+    },
+  );
 
 // ── Cosmetics ─────────────────────────────────────────────────────
 // POST   /cosmetics/upload            (multipart/form-data)

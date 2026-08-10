@@ -456,6 +456,9 @@ export default function CraftPage() {
   const [data, setData] = useState<CraftRecipesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [activeRecipe, setActiveRecipe] = useState<CraftRecipe | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -506,10 +509,8 @@ export default function CraftPage() {
     setBusyId(null);
   };
 
-  const handleSettled = async (res: CraftResponse | null) => {
-    setActiveRecipe(null);
-    setBusyId(null);
-    await load();
+  const handleSettled = async () => {
+    await load(true);
     refreshCurrency();
   };
 
@@ -542,7 +543,7 @@ export default function CraftPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
         <p className="text-sm text-[rgba(200,168,75,0.60)]">{error}</p>
-        <button type="button" onClick={load} className="brush-btn w-40">
+        <button type="button" onClick={() => load()} className="brush-btn w-40">
           Retry
         </button>
       </div>
