@@ -455,26 +455,29 @@ export default function CraftPage() {
 
   const [data, setData] = useState<CraftRecipesResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [activeRecipe, setActiveRecipe] = useState<CraftRecipe | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await getCraftRecipes();
-      setData(res);
-    } catch (err) {
-      if (err instanceof ApiResponseError && err.status === 401) {
-        router.push("/login");
-        return;
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError("");
+      try {
+        const res = await getCraftRecipes();
+        setData(res);
+      } catch (err) {
+        if (err instanceof ApiResponseError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError("Couldn't load craft recipes. Try refreshing.");
+      } finally {
+        if (isRefresh) setRefreshing(false);
+        else setLoading(false);
       }
-      setError("Couldn't load craft recipes. Try refreshing.");
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+    },
+    [router],
+  );
 
   useEffect(() => {
     load();
@@ -503,7 +506,9 @@ export default function CraftPage() {
     setBusyId(null);
   };
 
-  const handleSettled = async () => {
+  const handleSettled = async (res: CraftResponse | null) => {
+    setActiveRecipe(null);
+    setBusyId(null);
     await load();
     refreshCurrency();
   };
