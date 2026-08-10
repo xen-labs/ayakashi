@@ -18,8 +18,20 @@ const kaiseiDecol = Kaisei_Decol({
 });
 
 export const metadata: Metadata = {
-  title: "Ayakashi",
-  description: "The ultimate Web Companion for the Next-Gen WhatsApp AI.",
+  title: {
+    default: "Ayakashi",
+    template: "%s | Ayakashi",
+  },
+  description:
+    "Enter the spirit realm. Claim anime cards, manage your inventory, grind RPG stats, and climb the leaderboards across the Ayakashi network.",
+  keywords: [
+    "WhatsApp bot",
+    "anime cards",
+    "RPG bot",
+    "gacha",
+    "Ayakashi",
+    "leaderboard",
+  ],
 };
 
 export default function RootLayout({

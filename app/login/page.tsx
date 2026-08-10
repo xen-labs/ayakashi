@@ -3,16 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { PasswordField } from "../components/PasswordField";
-import { authLogin, ApiResponseError } from "../../lib/api";
+import { authLogin, getHomeStats, ApiResponseError } from "../../lib/api";
 
 const BOT_NUMBER = process.env.NEXT_PUBLIC_BOT_NUMBER ?? "919999999999";
 const FORGOT_WA_URL = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent("recover")}`;
 
-interface FormData { username: string; password: string; rememberMe: boolean; }
+interface FormData {
+  username: string;
+  password: string;
+  rememberMe: boolean;
+}
 const INITIAL: FormData = { username: "", password: "", rememberMe: false };
-interface FieldErrors { username?: string; password?: string; }
+interface FieldErrors {
+  username?: string;
+  password?: string;
+}
 
 export default function Login() {
   const router = useRouter();
@@ -20,6 +27,13 @@ export default function Login() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [globalError, setGlobalError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [playerCount, setPlayerCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    getHomeStats()
+      .then((res) => setPlayerCount(res.totalPlayers))
+      .catch(() => null);
+  }, []);
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -39,10 +53,17 @@ export default function Login() {
     setGlobalError("");
     setFieldErrors({});
     const clientErrors = validate();
-    if (clientErrors) { setFieldErrors(clientErrors); return; }
+    if (clientErrors) {
+      setFieldErrors(clientErrors);
+      return;
+    }
     setLoading(true);
     try {
-      await authLogin({ username: form.username.trim().toLowerCase(), password: form.password, rememberMe: form.rememberMe });
+      await authLogin({
+        username: form.username.trim().toLowerCase(),
+        password: form.password,
+        rememberMe: form.rememberMe,
+      });
       router.push("/dashboard");
     } catch (err) {
       if (err instanceof ApiResponseError) {
@@ -51,15 +72,29 @@ export default function Login() {
           const mapped: FieldErrors = {};
           for (const issue of issues) {
             const field = issue.path[0] as keyof FieldErrors;
-            if (field === "username" || field === "password") mapped[field] = issue.message;
+            if (field === "username" || field === "password")
+              mapped[field] = issue.message;
           }
-          setFieldErrors(mapped); return;
+          setFieldErrors(mapped);
+          return;
         }
-        if (code === "invalid_credentials") { setGlobalError("Invalid username or password."); return; }
-        if (code === "account_locked") { setGlobalError(message ?? "Too many failed attempts. Please try again later."); return; }
+        if (code === "invalid_credentials") {
+          setGlobalError("Invalid username or password.");
+          return;
+        }
+        if (code === "account_locked") {
+          setGlobalError(
+            message ?? "Too many failed attempts. Please try again later.",
+          );
+          return;
+        }
         setGlobalError(message ?? "Login failed. Please try again.");
-      } else { setGlobalError("Something went wrong. Please try again."); }
-    } finally { setLoading(false); }
+      } else {
+        setGlobalError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -68,19 +103,23 @@ export default function Login() {
       <div className="pointer-events-none fixed left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[120px]" />
 
       <section className="relative z-10 grid w-full max-w-5xl gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-
         {/* ── Left: branding ── */}
         <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
-          <Link href="/" className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]">
+          <Link
+            href="/"
+            className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
+          >
             ← Back
           </Link>
 
           <Image
             src="/brand/logo.png?v=transparent-1"
             alt="Ayakashi"
-            width={80} height={80}
+            width={80}
+            height={80}
             className="logo-filter h-auto w-20"
-            priority unoptimized
+            priority
+            unoptimized
           />
 
           <div>
@@ -94,6 +133,19 @@ export default function Login() {
             Sign in to access your card collection, live auctions, guild events,
             and WhatsApp-linked rewards.
           </p>
+
+          {/* Live player count — quiet social proof, only shown once loaded */}
+          {playerCount !== null && (
+            <div className="flex items-center gap-2 text-xs text-[rgba(200,168,75,0.5)]">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#c8a84b] opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#c8a84b]" />
+              </span>
+              <span>
+                {playerCount.toLocaleString("en-US")} players in the network
+              </span>
+            </div>
+          )}
 
           <p className="text-xs text-[rgba(200,168,75,0.35)] uppercase tracking-[0.15em]">
             ✦ &nbsp; Ayakashi &nbsp; ✦
@@ -130,9 +182,12 @@ export default function Login() {
                 autoComplete="username"
                 placeholder="xenkai"
                 maxLength={20}
+                autoFocus
                 className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
               />
-              {fieldErrors.username && <p className="text-xs text-red-400">{fieldErrors.username}</p>}
+              {fieldErrors.username && (
+                <p className="text-xs text-red-400">{fieldErrors.username}</p>
+              )}
             </label>
 
             {/* Password */}
@@ -144,7 +199,9 @@ export default function Login() {
                 onChange={(v) => set("password", v)}
                 required
               />
-              {fieldErrors.password && <p className="text-xs text-red-400">{fieldErrors.password}</p>}
+              {fieldErrors.password && (
+                <p className="text-xs text-red-400">{fieldErrors.password}</p>
+              )}
             </div>
           </div>
 
@@ -158,31 +215,70 @@ export default function Login() {
                 onChange={(e) => set("rememberMe", e.target.checked)}
                 className="h-4 w-4 cursor-pointer accent-[#c8a84b]"
               />
-              <span className="text-xs text-[rgba(200,168,75,0.5)]">Remember me</span>
+              <span className="text-xs text-[rgba(200,168,75,0.5)]">
+                Remember me
+              </span>
             </label>
-            <a href={FORGOT_WA_URL} target="_blank" rel="noopener noreferrer"
-              className="text-xs font-medium text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]">
+            <a
+              href={FORGOT_WA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
+            >
               Forgot password?
             </a>
           </div>
 
           {globalError && (
-            <p className="mt-4 border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-400">
+            <p
+              className="mt-4 border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-400"
+              role="alert"
+            >
               {globalError}
             </p>
           )}
 
           {/* Submit — brush stroke button */}
           <div className="mt-6 flex justify-center">
-            <button type="submit" disabled={loading} className="brush-btn w-56 disabled:opacity-60 disabled:cursor-not-allowed">
-              {loading ? "Signing In…" : "Sign In"}
+            <button
+              type="submit"
+              disabled={loading}
+              className="brush-btn w-56 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg
+                    className="h-3.5 w-3.5 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                  Signing In…
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </button>
           </div>
 
           <p className="mt-5 text-center text-xs text-[rgba(200,168,75,0.35)]">
             No account?{" "}
             <span className="text-[rgba(200,168,75,0.55)]">
-              Run <span className="font-mono text-[#c8a84b]">.register</span> in WhatsApp.
+              Run <span className="font-mono text-[#c8a84b]">.register</span> in
+              WhatsApp.
             </span>
           </p>
         </form>

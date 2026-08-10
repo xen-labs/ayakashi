@@ -42,7 +42,7 @@ export function BackToWhatsApp({
         />
 
         {/* Warning icon */}
-        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-astral-gold/40 bg-astral-gold/10">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-ayakashi-gold/40 bg-ayakashi-gold/10">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -51,7 +51,7 @@ export function BackToWhatsApp({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-7 w-7 text-astral-gold"
+            className="h-7 w-7 text-ayakashi-gold"
             aria-hidden="true"
           >
             <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -73,7 +73,7 @@ export function BackToWhatsApp({
           href={waUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-12 w-full items-center justify-center gap-2 border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(224,48,74,0.35)] transition-all hover:brightness-110"
+          className="flex h-12 w-full items-center justify-center gap-2 border border-ayakashi-gold bg-ayakashi-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(200,168,75,0.35)] transition-all hover:brightness-110"
         >
           {/* WhatsApp icon */}
           <svg

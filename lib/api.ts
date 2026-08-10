@@ -229,7 +229,12 @@ export const getDashboard = () => apiFetch<DashboardResponse>("/dashboard");
 // POST /shop/buy { itemId, currency?, quantity }
 
 export type ShopSection = "items" | "rob_gear" | "defence_gear";
-export type RobItemCategory = "rob" | "bag" | "vault-breach" | "intel" | "defense";
+export type RobItemCategory =
+  | "rob"
+  | "bag"
+  | "vault-breach"
+  | "intel"
+  | "defense";
 
 export interface ShopListing {
   itemId: string;
@@ -293,33 +298,52 @@ export interface InventoryItem {
   rarity?: "common" | "uncommon" | "rare" | "epic" | "legendary";
   webappImage: string;
   flavor: string;
-  sellPrice?: number;       // materials only
   durability?: "shatter-on-fail" | "single-use" | "charges" | "permanent";
   maxCharges?: number;
   toolLevel?: number;
   nextLevelCost?: { materialQty: number; ryo: number } | null;
 }
 
+export interface OwnedFrameItem {
+  frameId: string;
+  name: string;
+  frameUrl: string;
+  isAnimated: boolean;
+  isEquipped: boolean;
+}
+
+export interface InventoryCosmeticUpload {
+  uploadId: string;
+  slot: "avatar" | "banner" | "deckBackground";
+  kind: "static" | "animated";
+  url: string;
+  createdAt: string;
+  isEquipped: boolean;
+}
+
+export interface DeckBackgroundGroup {
+  slotIndex: number;
+  uploads: InventoryCosmeticUpload[];
+}
+
+export interface InventoryCosmetics {
+  frames: OwnedFrameItem[];
+  avatars: InventoryCosmeticUpload[];
+  banners: InventoryCosmeticUpload[];
+  deckBackgrounds: DeckBackgroundGroup[];
+}
+
 export interface InventoryResponse {
   items: InventoryItem[];
   ownedItemIds: string[];
+  cosmetics: InventoryCosmetics;
 }
 export const getInventory = () => apiFetch<InventoryResponse>("/inventory");
 
-export interface SellItemPayload {
-  itemId: string;
-  quantity: number;
-}
-export interface SellItemResponse {
-  itemId: string;
-  quantitySold: number;
-  ryoEarned: number;
-}
-export const sellItem = (body: SellItemPayload) =>
-  apiFetch<SellItemResponse>("/inventory/sell", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+// Note: /inventory/sell was removed backend-side — flat material selling
+// paid out NaN (sellPrice never existed on ALL_MATERIALS) and has been
+// superseded by dedicated per-material commands (.crack/.refine/etc.)
+// in-bot. Do not reintroduce a sell button/route here.
 
 // ── Inventory — cards ──────────────────────────────────────────────
 // GET /inventory/cards?page=&rarity=&series=&listed=&sort=
@@ -377,6 +401,8 @@ export interface ToolStatus {
     materialQty: number;
     material: string;
   } | null;
+  /** Set when level is 0 — route the player to Craft instead of Upgrade */
+  craftRecipeId: string | null;
 }
 
 export interface UpgradeToolsResponse {
@@ -440,9 +466,7 @@ export interface LeaderboardResponse {
 }
 
 export const getLeaderboard = (metric: LeaderboardMetric, page = 1) =>
-  apiFetch<LeaderboardResponse>(
-    `/leaderboard?metric=${metric}&page=${page}`,
-  );
+  apiFetch<LeaderboardResponse>(`/leaderboard?metric=${metric}&page=${page}`);
 
 // ── Settings ──────────────────────────────────────────────────────
 // GET  /settings/profile
@@ -509,6 +533,12 @@ export interface DeckSlot {
   slots?: (string | null)[];
 }
 
+export type FriendStatus =
+  | "none"
+  | "friends"
+  | "request_sent"
+  | "request_received";
+
 export interface ProfileResponse {
   identity: {
     username: string;
@@ -523,7 +553,13 @@ export interface ProfileResponse {
     joinedAt: string;
     likeCount: number;
     isLikedByViewer: boolean;
+    friendStatus: FriendStatus;
     isOwnProfile: boolean;
+    // Only present when isOwnProfile is true
+    avatarPassCount?: number;
+    bannerPassCount?: number;
+    avatarBanked?: boolean;
+    bannerBanked?: boolean;
   };
   deck: {
     slots: DeckSlot[];
@@ -541,7 +577,9 @@ export interface ProfileResponse {
         total: number;
         items: ProfileCardItem[];
       };
-  friends: { hidden: true } | { hidden: false; jids: string[] };
+  friends:
+    | { hidden: true }
+    | { hidden: false; jids: string[]; pendingReceivedJids?: string[] };
 }
 
 export const getProfile = (
@@ -552,7 +590,9 @@ export const getProfile = (
   if (params?.cardsPage) qs.set("cardsPage", String(params.cardsPage));
   if (params?.cardsSort) qs.set("cardsSort", params.cardsSort);
   const q = qs.toString();
-  return apiFetch<ProfileResponse>(`/profile/${encodeURIComponent(username)}${q ? `?${q}` : ""}`);
+  return apiFetch<ProfileResponse>(
+    `/profile/${encodeURIComponent(username)}${q ? `?${q}` : ""}`,
+  );
 };
 
 export interface LikeProfileResponse {
@@ -560,9 +600,38 @@ export interface LikeProfileResponse {
   likeCount: number;
 }
 export const likeProfile = (username: string) =>
-  apiFetch<LikeProfileResponse>(`/profile/${encodeURIComponent(username)}/like`, {
-    method: "POST",
-  });
+  apiFetch<LikeProfileResponse>(
+    `/profile/${encodeURIComponent(username)}/like`,
+    {
+      method: "POST",
+    },
+  );
+
+export interface FriendActionResponse {
+  status?: "pending" | "accepted";
+  friendStatus: FriendStatus;
+}
+export const sendFriendRequest = (username: string) =>
+  apiFetch<FriendActionResponse>(
+    `/profile/${encodeURIComponent(username)}/friend-request`,
+    {
+      method: "POST",
+    },
+  );
+export const acceptFriendRequest = (username: string) =>
+  apiFetch<FriendActionResponse>(
+    `/profile/${encodeURIComponent(username)}/friend-accept`,
+    {
+      method: "POST",
+    },
+  );
+export const removeFriend = (username: string) =>
+  apiFetch<{ removed: boolean; friendStatus: FriendStatus }>(
+    `/profile/${encodeURIComponent(username)}/friend-remove`,
+    {
+      method: "POST",
+    },
+  );
 
 // ── Craft ─────────────────────────────────────────────────────────
 // GET  /craft/recipes
@@ -572,22 +641,29 @@ export interface CraftInput {
   itemId: string;
   displayName: string;
   emoji: string;
+  webappImage?: string;
+  rarity?: "common" | "uncommon" | "rare" | "epic" | "legendary";
   qty: number;
   have: number;
 }
 
+export type CraftOutput =
+  | { type: "item"; itemId: string; amount: number }
+  | { type: "kitsu"; amount: number }
+  | { type: "kitsu"; min: number; max: number; bulkBonusPerCore?: number };
+
 export interface CraftRecipe {
   recipeId: string;
-  label: string;
+  name: string;
+  emoji: string;
+  description: string;
   inputs: CraftInput[];
-  output: {
-    type: "item" | "kitsu";
-    itemId?: string;
-    amount: number;
-  };
+  output: CraftOutput;
   /** Display name for item-type outputs, absent for kitsu outputs */
   outputDisplayName?: string;
   outputEmoji?: string;
+  outputWebappImage?: string;
+  outputRarity?: "common" | "uncommon" | "rare" | "epic" | "legendary";
   successRate: number;
   ryoCost: number;
   alreadyOwnsTool: boolean;
@@ -620,55 +696,96 @@ export const executeCraft = (recipeId: string) =>
   });
 
 // ── Bank & Vault ──────────────────────────────────────────────────
-// GET /bank-vault?page=N
+// GET /bank-vault?page=N — matches routes/bankVault.ts exactly.
+// POST /bank/claim — claims interest previewed by bank.interestClaim
+// below; see routes/bank.ts. Deposit/withdraw/open live in bank.ts too
+// but aren't wired into the Bank & Vault page (not part of this pass).
 
 export interface BankVaultTransaction {
+  id: string;
+  action: string;
+  description: string;
   currency: "ryo" | "kitsu";
   location: string;
-  action: string;
   amount: number;
   balanceAfter: number;
-  description: string;
+  itemId: string | null;
+  meta: Record<string, unknown> | null;
   createdAt: string;
 }
 
 export interface BankVaultResponse {
   balances: {
-    pocket: { ryo: number; kitsu: number };
-    bank: { ryo: number; cap: number; tier: number };
-    homeVault: { ryo: number; kitsu: number; ryoCap: number; kitsuCap: number } | null;
+    pocketRyo: number;
+    pocketKitsu: number;
   };
   bank: {
-    tier: number;
+    balance: number;
     cap: number;
-    upgradeCost: { ryo: number } | null;
-    atMaxTier: boolean;
-  };
-  homeVault: {
     tier: number;
-    caps: { ryo: number; kitsu: number };
-    health: number;
-    maxHealth: number;
-    vulnerabilityBonus: number;
-    repairCost: {
-      pointsToRepair: number;
-      ryo: number;
-      material: string;
-      materialQty: number;
-    } | null;
-    upgradeCost: { ryo: number } | null;
-    atMaxTier: boolean;
-  } | null;
+    maxTier: number;
+    isMaxTier: boolean;
+    nextTierCost: number | null;
+    interestClaim: {
+      available: boolean;
+      remainingMs: number;
+      ratePercent: number;
+      projectedAmount: number;
+    };
+  };
+  homeVault:
+    | {
+        owned: true;
+        tier: number;
+        maxTier: number;
+        isMaxTier: boolean;
+        nextTierCost: number | null;
+        caps: { ryo: number; kitsu: number };
+        balances: { ryo: number; kitsu: number };
+        health: { current: number; max: number; maxAtTier: number };
+        vulnerabilityBonusPercent: number;
+        repair:
+          | {
+              needed: true;
+              pointsToRepair: number;
+              ryoCost: number;
+              material: {
+                itemId: string;
+                quantity: number;
+                displayName: string;
+                emoji: string;
+              };
+            }
+          | { needed: false };
+      }
+    | {
+        owned: false;
+        purchaseInfo: {
+          itemId: string;
+          price: number;
+          currency: "ryo" | "kitsu";
+          description: string;
+        };
+      };
   transactions: {
     page: number;
-    totalPages: number;
+    pageSize: number;
     total: number;
+    totalPages: number;
     items: BankVaultTransaction[];
   };
 }
 
 export const getBankVault = (page = 1) =>
   apiFetch<BankVaultResponse>(`/bank-vault?page=${page}`);
+
+export interface ClaimBankInterestResponse {
+  tier: number;
+  amount: number;
+  newBalance: number;
+}
+export const claimBankInterest = () =>
+  apiFetch<ClaimBankInterestResponse>("/bank/claim", { method: "POST" });
 
 // ── Decks ─────────────────────────────────────────────────────────
 // GET    /decks
@@ -720,7 +837,13 @@ export const removeCardFromDeck = (slotIndex: number, position: number) =>
 // ── Trade ─────────────────────────────────────────────────────────
 
 export type TradeCurrency = "ryo" | "kitsu";
-export type TradeStatus = "pending" | "countered" | "accepted" | "declined" | "cancelled" | "expired";
+export type TradeStatus =
+  | "pending"
+  | "countered"
+  | "accepted"
+  | "declined"
+  | "cancelled"
+  | "expired";
 
 export interface TradeOffer {
   cardInstanceIds: string[];
@@ -752,12 +875,9 @@ export interface TradeListResponse {
 }
 
 export const getTrades = (status?: TradeStatus) =>
-  apiFetch<TradeListResponse>(
-    status ? `/trade?status=${status}` : "/trade",
-  );
+  apiFetch<TradeListResponse>(status ? `/trade?status=${status}` : "/trade");
 
-export const getTradeById = (id: string) =>
-  apiFetch<Trade>(`/trade/${id}`);
+export const getTradeById = (id: string) => apiFetch<Trade>(`/trade/${id}`);
 
 export interface ProposeTradePayload {
   recipientUsername: string;
@@ -767,8 +887,17 @@ export interface ProposeTradePayload {
 export const proposeTrade = (body: ProposeTradePayload) =>
   apiFetch<Trade>("/trade", { method: "POST", body: JSON.stringify(body) });
 
-export const counterTrade = (id: string, body: { initiatorOffer?: Partial<TradeOffer>; recipientOffer?: Partial<TradeOffer> }) =>
-  apiFetch<Trade>(`/trade/${id}/counter`, { method: "POST", body: JSON.stringify(body) });
+export const counterTrade = (
+  id: string,
+  body: {
+    initiatorOffer?: Partial<TradeOffer>;
+    recipientOffer?: Partial<TradeOffer>;
+  },
+) =>
+  apiFetch<Trade>(`/trade/${id}/counter`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 export const acceptTrade = (id: string) =>
   apiFetch<Trade>(`/trade/${id}/accept`, { method: "POST" });
@@ -862,7 +991,14 @@ export const uploadCosmetic = async (
   slot: CosmeticSlot,
   file: File,
   slotIndex?: number,
-): Promise<{ uploadId: string; url: string; kind: string; slot: string; slotIndex: number | null }> => {
+): Promise<{
+  uploadId: string | null;
+  url: string;
+  kind: "static" | "animated";
+  slot: string;
+  slotIndex: number | null;
+  banked: boolean;
+}> => {
   const form = new FormData();
   // Text fields MUST come before the file so @fastify/multipart's req.file()
   // has them in data.fields when it resolves the stream.
@@ -883,7 +1019,8 @@ export const uploadCosmetic = async (
   } catch (networkErr) {
     throw new ApiResponseError(0, {
       code: "network_error",
-      message: "Could not reach the server. Check your connection and try again.",
+      message:
+        "Could not reach the server. Check your connection and try again.",
     });
   }
 
@@ -891,11 +1028,18 @@ export const uploadCosmetic = async (
 
   // Try to parse server error body
   let errorBody: { error?: ApiError } = {};
-  try { errorBody = await res.json(); } catch { /* ignore parse failure */ }
+  try {
+    errorBody = await res.json();
+  } catch {
+    /* ignore parse failure */
+  }
 
   throw new ApiResponseError(
     res.status,
-    errorBody?.error ?? { code: "upload_failed", message: `Upload failed (HTTP ${res.status})` },
+    errorBody?.error ?? {
+      code: "upload_failed",
+      message: `Upload failed (HTTP ${res.status})`,
+    },
   );
 };
 
@@ -906,10 +1050,13 @@ export interface EquipCosmeticPayload {
   frameId?: string | null;
 }
 export const equipCosmetic = (body: EquipCosmeticPayload) =>
-  apiFetch<{ slot: string; url?: string; frameId?: string | null }>("/cosmetics/equip", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  apiFetch<{ slot: string; url?: string; frameId?: string | null }>(
+    "/cosmetics/equip",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
 
 export const deleteCosmeticUpload = (id: string) =>
   apiFetch<{ removed: boolean }>(`/cosmetics/upload/${id}`, {
@@ -970,5 +1117,4 @@ export interface HomeStatsResponse {
   totalCardsInCatalog: number;
 }
 
-export const getHomeStats = () =>
-  apiFetch<HomeStatsResponse>("/home/stats");
+export const getHomeStats = () => apiFetch<HomeStatsResponse>("/home/stats");

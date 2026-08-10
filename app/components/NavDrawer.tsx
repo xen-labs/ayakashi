@@ -4,22 +4,32 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  X, Settings, LogOut, HelpCircle, MessageCircle,
-  Sparkles, ArrowLeftRight, Layers, Swords, Landmark, Search, User,
+  X,
+  Settings,
+  LogOut,
+  HelpCircle,
+  MessageCircle,
+  Sparkles,
+  ArrowLeftRight,
+  Layers,
+  Swords,
+  Landmark,
+  Search,
+  User,
 } from "lucide-react";
 import { authLogout } from "../../lib/api";
 import type { MeResponse } from "../../lib/api";
 
 const SECONDARY_LINKS = [
-  { href: "/profile",    label: "My Profile",   icon: User            },
-  { href: "/cosmetics",  label: "Cosmetics",    icon: Sparkles        },
-  { href: "/decks",      label: "Decks",        icon: Layers          },
-  { href: "/trade",      label: "Trade",        icon: ArrowLeftRight  },
-  { href: "/loadout",    label: "Loadout",      icon: Swords          },
-  { href: "/bank-vault", label: "Bank & Vault", icon: Landmark        },
-  { href: "/players",    label: "Find Players", icon: Search          },
-  { href: "/settings",   label: "Settings",     icon: Settings        },
-  { href: "/help",       label: "Help",         icon: HelpCircle      },
+  { href: "/profile", label: "My Profile", icon: User },
+  { href: "/cosmetics", label: "Cosmetics", icon: Sparkles },
+  { href: "/decks", label: "Decks", icon: Layers },
+  { href: "/trade", label: "Trade", icon: ArrowLeftRight },
+  { href: "/loadout", label: "Loadout", icon: Swords },
+  { href: "/bank-vault", label: "Bank & Vault", icon: Landmark },
+  { href: "/players", label: "Find Players", icon: Search },
+  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/help", label: "Help", icon: HelpCircle },
 ];
 
 export function NavDrawer({
@@ -56,7 +66,7 @@ export function NavDrawer({
 
   return (
     <div
-      className={`fixed inset-0 z-50 transition-opacity ${
+      className={`fixed inset-0 z-50 transition-opacity duration-300 ${
         open
           ? "pointer-events-auto opacity-100"
           : "pointer-events-none opacity-0"
@@ -64,40 +74,42 @@ export function NavDrawer({
       aria-hidden={!open}
     >
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
 
       <div
         ref={panelRef}
-        className={`absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col border-l border-astral-gold/20 bg-[#0d0d1a] shadow-[-10px_0_30px_rgba(0,0,0,0.5)] transition-transform duration-300 ${
+        className={`absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col border-l border-ayakashi-gold/20 bg-black/95 shadow-[-10px_0_40px_rgba(0,0,0,0.8)] backdrop-blur-md transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <span className="theme-heading text-sm font-bold uppercase tracking-widest text-astral-gold">
+        <div className="flex items-center justify-between border-b border-ayakashi-gold/15 px-5 py-4">
+          <span className="theme-heading text-sm font-bold uppercase tracking-widest text-ayakashi-gold">
             Menu
           </span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close menu"
-            className="text-gray-400 transition-colors hover:text-white"
+            className="text-[rgba(200,168,75,0.50)] transition-colors hover:text-ayakashi-gold"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {user && (
-          <div className="border-b border-white/10 px-5 py-4">
-            <p className="theme-body text-sm font-semibold text-white">
+          <div className="border-b border-ayakashi-gold/15 px-5 py-4">
+            <p className="theme-body text-sm font-semibold text-[#f0e6c8]">
               {user.displayName}
             </p>
-            <p className="text-xs text-gray-500">@{user.username}</p>
+            <p className="text-xs text-[rgba(200,168,75,0.40)]">
+              @{user.username}
+            </p>
           </div>
         )}
 
-        <div className="flex flex-1 flex-col gap-1 px-2 py-3">
+        <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
           {SECONDARY_LINKS.map((link) => {
             const Icon = link.icon;
             return (
@@ -105,7 +117,7 @@ export function NavDrawer({
                 key={link.href}
                 href={link.href}
                 onClick={onClose}
-                className="flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-astral-gold"
+                className="flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm text-[rgba(240,230,200,0.75)] transition-colors hover:bg-ayakashi-gold/8 hover:text-ayakashi-gold"
               >
                 <Icon className="h-4 w-4" />
                 {link.label}
@@ -117,14 +129,14 @@ export function NavDrawer({
             href="https://whatsapp.com/channel/0029VbCUyYDJUM2hhDyMld2w"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-astral-gold"
+            className="flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm text-[rgba(240,230,200,0.75)] transition-colors hover:bg-ayakashi-gold/8 hover:text-ayakashi-gold"
           >
             <MessageCircle className="h-4 w-4" />
             WhatsApp Channel
           </a>
         </div>
 
-        <div className="border-t border-white/10 px-2 py-3">
+        <div className="border-t border-ayakashi-gold/15 px-2 py-3">
           <button
             type="button"
             onClick={handleLogout}

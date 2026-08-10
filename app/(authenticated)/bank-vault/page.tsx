@@ -7,6 +7,7 @@ import {
   upgradeBank,
   upgradeVault,
   repairVault,
+  claimBankInterest,
   ApiResponseError,
 } from "../../../lib/api";
 import type { BankVaultResponse, BankVaultTransaction } from "../../../lib/api";
@@ -18,10 +19,20 @@ function fmt(n: number | null | undefined) {
   return n.toLocaleString("en-US");
 }
 
+function formatMs(ms: number): string {
+  if (ms <= 0) return "Ready";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between border-b border-[rgba(200,168,75,0.08)] py-2.5 last:border-0">
-      <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.50)]">{label}</span>
+      <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+        {label}
+      </span>
       <span className="text-sm font-bold text-[#e6c96a]">{value}</span>
     </div>
   );
@@ -32,13 +43,24 @@ function TxRow({ tx }: { tx: BankVaultTransaction }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-[rgba(200,168,75,0.08)] py-2.5 last:border-0">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-xs text-[#f0e6c8]">{tx.description}</span>
+        <span className="truncate text-xs text-[#f0e6c8]">
+          {tx.description}
+        </span>
         <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
-          {tx.location} · {new Date(tx.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+          {tx.location} ·{" "}
+          {new Date(tx.createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}
         </span>
       </div>
-      <span className={`flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums ${positive ? "text-green-400" : "text-red-400"}`}>
-        {positive ? "+" : ""}{fmt(tx.amount)}
+      <span
+        className={`flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums ${positive ? "text-green-400" : "text-red-400"}`}
+      >
+        {positive ? "+" : ""}
+        {fmt(tx.amount)}
         <CurrencyIcon type={tx.currency} size={13} />
       </span>
     </div>
@@ -59,21 +81,31 @@ export default function BankVaultPage() {
   const [busyBank, setBusyBank] = useState(false);
   const [busyVault, setBusyVault] = useState(false);
   const [busyRepair, setBusyRepair] = useState(false);
+  const [busyInterest, setBusyInterest] = useState(false);
 
-  const load = useCallback(async (page = 1) => {
-    setLoading(true); setError("");
-    try {
-      const res = await getBankVault(page);
-      setData(res);
-    } catch (err) {
-      if (err instanceof ApiResponseError && err.status === 401) { router.push("/login"); return; }
-      setError("Couldn't load bank & vault data. Try refreshing.");
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+  const load = useCallback(
+    async (page = 1) => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await getBankVault(page);
+        setData(res);
+      } catch (err) {
+        if (err instanceof ApiResponseError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError("Couldn't load bank & vault data. Try refreshing.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router],
+  );
 
-  useEffect(() => { load(1); }, [load]);
+  useEffect(() => {
+    load(1);
+  }, [load]);
 
   useEffect(() => {
     if (!toast) return;
@@ -87,39 +119,77 @@ export default function BankVaultPage() {
   };
 
   const handleBankUpgrade = async () => {
-    setBusyBank(true); setErrMsg("");
+    setBusyBank(true);
+    setErrMsg("");
     try {
       const res = await upgradeBank();
       setToast(`✦ Bank upgraded to Tier ${res.tier} · Cap: ${fmt(res.cap)}`);
       await load(txPage);
       refreshCurrency();
     } catch (err) {
-      showErr(err instanceof ApiResponseError ? err.error.message : "Bank upgrade failed.");
-    } finally { setBusyBank(false); }
+      showErr(
+        err instanceof ApiResponseError
+          ? err.error.message
+          : "Bank upgrade failed.",
+      );
+    } finally {
+      setBusyBank(false);
+    }
   };
 
   const handleVaultUpgrade = async () => {
-    setBusyVault(true); setErrMsg("");
+    setBusyVault(true);
+    setErrMsg("");
     try {
       const res = await upgradeVault();
       setToast(`✦ Vault upgraded to Tier ${res.tier}`);
       await load(txPage);
       refreshCurrency();
     } catch (err) {
-      showErr(err instanceof ApiResponseError ? err.error.message : "Vault upgrade failed.");
-    } finally { setBusyVault(false); }
+      showErr(
+        err instanceof ApiResponseError
+          ? err.error.message
+          : "Vault upgrade failed.",
+      );
+    } finally {
+      setBusyVault(false);
+    }
   };
 
   const handleRepair = async () => {
-    setBusyRepair(true); setErrMsg("");
+    setBusyRepair(true);
+    setErrMsg("");
     try {
       const res = await repairVault();
       setToast(`✦ Vault repaired (${res.pointsRepaired} pts)`);
       await load(txPage);
       refreshCurrency();
     } catch (err) {
-      showErr(err instanceof ApiResponseError ? err.error.message : "Repair failed.");
-    } finally { setBusyRepair(false); }
+      showErr(
+        err instanceof ApiResponseError ? err.error.message : "Repair failed.",
+      );
+    } finally {
+      setBusyRepair(false);
+    }
+  };
+
+  const handleClaimInterest = async () => {
+    setBusyInterest(true);
+    setErrMsg("");
+    try {
+      const res = await claimBankInterest();
+      setToast(`✦ Claimed ${fmt(res.amount)} ryo interest`);
+      await load(txPage);
+      refreshCurrency();
+    } catch (err) {
+      showErr(
+        err instanceof ApiResponseError
+          ? err.error.message
+          : "Interest claim failed.",
+      );
+    } finally {
+      setBusyInterest(false);
+    }
   };
 
   const changeTxPage = (p: number) => {
@@ -127,28 +197,53 @@ export default function BankVaultPage() {
     load(p);
   };
 
-  if (loading) return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <svg
+          className="h-8 w-8 animate-spin text-ayakashi-gold"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
+        </svg>
+      </div>
+    );
 
-  if (error || !data) return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
-      <p className="text-sm text-[rgba(200,168,75,0.60)]">{error || "Something went wrong."}</p>
-      <button type="button" onClick={() => load(1)} className="brush-btn w-40">Retry</button>
-    </div>
-  );
+  if (error || !data)
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
+        <p className="text-sm text-[rgba(200,168,75,0.60)]">
+          {error || "Something went wrong."}
+        </p>
+        <button
+          type="button"
+          onClick={() => load(1)}
+          className="brush-btn w-40"
+        >
+          Retry
+        </button>
+      </div>
+    );
 
   const { balances, bank, homeVault, transactions } = data;
+  const { interestClaim } = bank;
 
   return (
     <>
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
-
         <div className="section-header">
           <span className="section-header-text">Bank &amp; Vault</span>
         </div>
@@ -158,15 +253,38 @@ export default function BankVaultPage() {
         {/* ── Wallet snapshot ── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Pocket Ryo",   value: fmt(balances.pocket.ryo),   type: "ryo"   as const },
-            { label: "Pocket Kitsu", value: fmt(balances.pocket.kitsu), type: "kitsu" as const },
-            { label: "Bank",         value: fmt(balances.bank.ryo),     type: "bank"  as const },
-            { label: "Bank Cap",     value: fmt(balances.bank.cap),     type: "bank"  as const },
+            {
+              label: "Pocket Ryo",
+              value: fmt(balances.pocketRyo),
+              type: "ryo" as const,
+            },
+            {
+              label: "Pocket Kitsu",
+              value: fmt(balances.pocketKitsu),
+              type: "kitsu" as const,
+            },
+            {
+              label: "Bank",
+              value: fmt(bank.balance),
+              type: "bank" as const,
+            },
+            {
+              label: "Bank Cap",
+              value: fmt(bank.cap),
+              type: "bank" as const,
+            },
           ].map((s) => (
-            <div key={s.label} className="form-card flex flex-col items-center gap-1 border p-4 text-center">
+            <div
+              key={s.label}
+              className="form-card flex flex-col items-center gap-1 border p-4 text-center"
+            >
               <CurrencyIcon type={s.type} size={32} />
-              <span className="text-base font-bold text-[#e6c96a]">{s.value}</span>
-              <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.45)]">{s.label}</span>
+              <span className="text-base font-bold text-[#e6c96a]">
+                {s.value}
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
+                {s.label}
+              </span>
             </div>
           ))}
         </div>
@@ -180,52 +298,110 @@ export default function BankVaultPage() {
               <CurrencyIcon type="bank" size={18} /> Bank
             </h2>
             <div className="flex flex-col">
-              <StatRow label="Tier"    value={String(bank.tier)} />
-              <StatRow label="Balance" value={fmt(balances.bank.ryo)} />
-              <StatRow label="Cap"     value={fmt(bank.cap)} />
-              {bank.upgradeCost && (
-                <StatRow label="Upgrade Cost" value={`${fmt(bank.upgradeCost.ryo)} ryo`} />
+              <StatRow label="Tier" value={`${bank.tier} / ${bank.maxTier}`} />
+              <StatRow label="Balance" value={fmt(bank.balance)} />
+              <StatRow label="Cap" value={fmt(bank.cap)} />
+              {bank.nextTierCost != null && (
+                <StatRow
+                  label="Upgrade Cost"
+                  value={`${fmt(bank.nextTierCost)} ryo`}
+                />
               )}
             </div>
+
+            {/* ── Interest claim ── */}
+            {bank.tier > 0 && (
+              <div className="border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.05)] px-3 py-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
+                    Interest ({interestClaim.ratePercent.toFixed(1)}%)
+                  </span>
+                  <span className="font-bold text-[#e6c96a]">
+                    +{fmt(interestClaim.projectedAmount)} ryo
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={busyInterest || !interestClaim.available}
+                  onClick={handleClaimInterest}
+                  className="mt-2 h-8 w-full border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busyInterest
+                    ? "Claiming…"
+                    : interestClaim.available
+                      ? "Claim Interest"
+                      : `Ready in ${formatMs(interestClaim.remainingMs)}`}
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
-              disabled={busyBank || bank.atMaxTier}
+              disabled={busyBank || bank.isMaxTier}
               onClick={handleBankUpgrade}
               className="mt-auto h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {bank.atMaxTier ? "Max Tier" : busyBank ? "Upgrading…" : "Upgrade Bank"}
+              {bank.isMaxTier
+                ? "Max Tier"
+                : busyBank
+                  ? "Upgrading…"
+                  : "Upgrade Bank"}
             </button>
           </div>
 
           {/* ── Home Vault card ── */}
-          <div className={`form-card flex flex-col gap-4 border p-5 ${!homeVault ? "opacity-50" : ""}`}>
+          <div
+            className={`form-card flex flex-col gap-4 border p-5 ${!homeVault.owned ? "opacity-50" : ""}`}
+          >
             <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#c8a84b]">
               Home Vault
             </h2>
-            {homeVault ? (
+            {homeVault.owned ? (
               <>
                 <div className="flex flex-col">
-                  <StatRow label="Tier"      value={String(homeVault.tier)} />
-                  <StatRow label="Ryo"       value={`${fmt(balances.homeVault?.ryo)} / ${fmt(homeVault.caps.ryo)}`} />
-                  <StatRow label="Kitsu"     value={`${fmt(balances.homeVault?.kitsu)} / ${fmt(homeVault.caps.kitsu)}`} />
-                  <StatRow label="Health"    value={`${homeVault.health} / ${homeVault.maxHealth}`} />
-                  {homeVault.vulnerabilityBonus > 0 && (
-                    <StatRow label="Vuln. Bonus" value={`+${homeVault.vulnerabilityBonus}%`} />
+                  <StatRow
+                    label="Tier"
+                    value={`${homeVault.tier} / ${homeVault.maxTier}`}
+                  />
+                  <StatRow
+                    label="Ryo"
+                    value={`${fmt(homeVault.balances.ryo)} / ${fmt(homeVault.caps.ryo)}`}
+                  />
+                  <StatRow
+                    label="Kitsu"
+                    value={`${fmt(homeVault.balances.kitsu)} / ${fmt(homeVault.caps.kitsu)}`}
+                  />
+                  <StatRow
+                    label="Health"
+                    value={`${homeVault.health.current} / ${homeVault.health.max}`}
+                  />
+                  {homeVault.vulnerabilityBonusPercent > 0 && (
+                    <StatRow
+                      label="Vuln. Bonus"
+                      value={`+${homeVault.vulnerabilityBonusPercent}%`}
+                    />
                   )}
-                  {homeVault.upgradeCost && (
-                    <StatRow label="Upgrade Cost" value={`${fmt(homeVault.upgradeCost.ryo)} ryo`} />
+                  {homeVault.nextTierCost != null && (
+                    <StatRow
+                      label="Upgrade Cost"
+                      value={`${fmt(homeVault.nextTierCost)} ryo`}
+                    />
                   )}
                 </div>
                 <div className="mt-auto flex flex-col gap-2">
                   <button
                     type="button"
-                    disabled={busyVault || homeVault.atMaxTier}
+                    disabled={busyVault || homeVault.isMaxTier}
                     onClick={handleVaultUpgrade}
                     className="h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {homeVault.atMaxTier ? "Max Tier" : busyVault ? "Upgrading…" : "Upgrade Vault"}
+                    {homeVault.isMaxTier
+                      ? "Max Tier"
+                      : busyVault
+                        ? "Upgrading…"
+                        : "Upgrade Vault"}
                   </button>
-                  {homeVault.repairCost && (
+                  {homeVault.repair.needed && (
                     <button
                       type="button"
                       disabled={busyRepair}
@@ -234,14 +410,16 @@ export default function BankVaultPage() {
                     >
                       {busyRepair
                         ? "Repairing…"
-                        : `Repair — ${fmt(homeVault.repairCost.ryo)} ryo + ${homeVault.repairCost.materialQty}× ${homeVault.repairCost.material}`}
+                        : `Repair — ${fmt(homeVault.repair.ryoCost)} ryo + ${homeVault.repair.material.quantity}× ${homeVault.repair.material.emoji} ${homeVault.repair.material.displayName}`}
                     </button>
                   )}
                 </div>
               </>
             ) : (
               <p className="text-xs text-[rgba(200,168,75,0.40)]">
-                Buy a Home Vault from the shop to get started.
+                Buy a Home Vault from the shop for{" "}
+                {fmt(homeVault.purchaseInfo.price)}{" "}
+                {homeVault.purchaseInfo.currency} to get started.
               </p>
             )}
           </div>
@@ -256,12 +434,14 @@ export default function BankVaultPage() {
           </div>
 
           {transactions.total === 0 ? (
-            <p className="text-center text-sm text-[rgba(200,168,75,0.40)]">No transactions yet.</p>
+            <p className="text-center text-sm text-[rgba(200,168,75,0.40)]">
+              No transactions yet.
+            </p>
           ) : (
             <>
               <div className="form-card border p-4">
-                {transactions.items.map((tx, i) => (
-                  <TxRow key={i} tx={tx} />
+                {transactions.items.map((tx) => (
+                  <TxRow key={tx.id} tx={tx} />
                 ))}
               </div>
 
@@ -276,7 +456,10 @@ export default function BankVaultPage() {
                     ← Prev
                   </button>
                   <span className="text-xs text-[rgba(200,168,75,0.40)]">
-                    Page {transactions.page} / {transactions.totalPages}
+                    Page {transactions.page} / {transactions.totalPages}{" "}
+                    <span className="text-[rgba(200,168,75,0.25)]">
+                      ({transactions.total} total)
+                    </span>
                   </span>
                   <button
                     type="button"

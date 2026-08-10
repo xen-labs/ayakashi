@@ -9,12 +9,17 @@ import type { LeaderboardMetric, LeaderboardResponse } from "../../../lib/api";
 import { AvatarWithFrame } from "../../components/AvatarWithFrame";
 import { CurrencyIcon } from "../../components/CurrencyIcon";
 
-const TABS: { id: LeaderboardMetric; label: string; icon: React.ReactNode }[] = [
-  { id: "xp",    label: "XP",    icon: "⭐" },
-  { id: "ryo",   label: "Ryo",   icon: <CurrencyIcon type="ryo"   size={16} /> },
-  { id: "kitsu", label: "Kitsu", icon: <CurrencyIcon type="kitsu" size={16} /> },
-  { id: "cards", label: "Cards", icon: "🃏" },
-];
+const TABS: { id: LeaderboardMetric; label: string; icon: React.ReactNode }[] =
+  [
+    { id: "xp", label: "XP", icon: "⭐" },
+    { id: "ryo", label: "Ryo", icon: <CurrencyIcon type="ryo" size={16} /> },
+    {
+      id: "kitsu",
+      label: "Kitsu",
+      icon: <CurrencyIcon type="kitsu" size={16} />,
+    },
+    { id: "cards", label: "Cards", icon: "🃏" },
+  ];
 
 const RANK_COLORS: Record<number, string> = {
   1: "text-[#FFD700]",
@@ -43,20 +48,29 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async (m: LeaderboardMetric, p: number) => {
-    setLoading(true); setError("");
-    try {
-      const res = await getLeaderboard(m, p);
-      setData(res);
-    } catch (err) {
-      if (err instanceof ApiResponseError && err.status === 401) { router.push("/login"); return; }
-      setError("Couldn't load leaderboard. Try refreshing.");
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+  const load = useCallback(
+    async (m: LeaderboardMetric, p: number) => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await getLeaderboard(m, p);
+        setData(res);
+      } catch (err) {
+        if (err instanceof ApiResponseError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError("Couldn't load leaderboard. Try refreshing.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router],
+  );
 
-  useEffect(() => { load(metric, page); }, [load, metric, page]);
+  useEffect(() => {
+    load(metric, page);
+  }, [load, metric, page]);
 
   const switchTab = (m: LeaderboardMetric) => {
     setMetric(m);
@@ -65,7 +79,6 @@ export default function Leaderboard() {
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-
       <div className="section-header">
         <span className="section-header-text">Leaderboard</span>
       </div>
@@ -97,16 +110,34 @@ export default function Leaderboard() {
       {/* ── Table ── */}
       {loading ? (
         <div className="flex min-h-[40vh] items-center justify-center">
-          <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          <svg
+            className="h-8 w-8 animate-spin text-ayakashi-gold"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            />
           </svg>
         </div>
       ) : error ? (
         <div className="flex flex-col items-center gap-4 py-10 text-center">
           <p className="text-sm text-[rgba(200,168,75,0.50)]">{error}</p>
-          <button type="button" onClick={() => load(metric, page)}
-            className="h-9 border border-[#c8a84b] px-6 text-xs font-bold uppercase tracking-widest text-[#c8a84b] hover:bg-[#c8a84b] hover:text-black">
+          <button
+            type="button"
+            onClick={() => load(metric, page)}
+            className="h-9 border border-[#c8a84b] px-6 text-xs font-bold uppercase tracking-widest text-[#c8a84b] hover:bg-[#c8a84b] hover:text-black"
+          >
             Retry
           </button>
         </div>
@@ -125,7 +156,9 @@ export default function Leaderboard() {
                     {RANK_MEDAL[row.rank] ? (
                       <span className="text-xl">{RANK_MEDAL[row.rank]}</span>
                     ) : (
-                      <span className={`text-sm font-bold tabular-nums ${RANK_COLORS[row.rank] ?? "text-[rgba(200,168,75,0.40)]"}`}>
+                      <span
+                        className={`text-sm font-bold tabular-nums ${RANK_COLORS[row.rank] ?? "text-[rgba(200,168,75,0.40)]"}`}
+                      >
                         {row.rank}
                       </span>
                     )}
@@ -170,7 +203,9 @@ export default function Leaderboard() {
                   </div>
 
                   {/* Value */}
-                  <span className={`shrink-0 flex items-center gap-1 text-sm font-bold tabular-nums ${isTop3 ? RANK_COLORS[row.rank] ?? "text-[#e6c96a]" : "text-[#e6c96a]"}`}>
+                  <span
+                    className={`shrink-0 flex items-center gap-1 text-sm font-bold tabular-nums ${isTop3 ? (RANK_COLORS[row.rank] ?? "text-[#e6c96a]") : "text-[#e6c96a]"}`}
+                  >
                     {(metric === "ryo" || metric === "kitsu") && (
                       <CurrencyIcon type={metric} size={14} />
                     )}

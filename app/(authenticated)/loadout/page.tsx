@@ -9,7 +9,12 @@ import {
   deleteLoadout,
   ApiResponseError,
 } from "../../../lib/api";
-import type { LoadoutResponse, LoadoutKit, LoadoutTier, LoadoutTool } from "../../../lib/api";
+import type {
+  LoadoutResponse,
+  LoadoutKit,
+  LoadoutTier,
+  LoadoutTool,
+} from "../../../lib/api";
 
 // ── Tool toggle button ────────────────────────────────────────────
 function ToolToggle({
@@ -29,16 +34,20 @@ function ToolToggle({
         selected
           ? "border-[#c8a84b] bg-[rgba(200,168,75,0.12)] text-[#c8a84b]"
           : tool.owned
-          ? "border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.60)] hover:border-[rgba(200,168,75,0.50)]"
-          : "border-[rgba(200,168,75,0.10)] text-[rgba(200,168,75,0.25)] opacity-50"
+            ? "border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.60)] hover:border-[rgba(200,168,75,0.50)]"
+            : "border-[rgba(200,168,75,0.10)] text-[rgba(200,168,75,0.25)] opacity-50"
       }`}
     >
       <span>{tool.emoji}</span>
       <span className="font-bold">{tool.name}</span>
       {tool.owned && (
-        <span className="ml-auto text-[10px] text-[rgba(200,168,75,0.45)]">×{tool.ownedQuantity}</span>
+        <span className="ml-auto text-[10px] text-[rgba(200,168,75,0.45)]">
+          ×{tool.ownedQuantity}
+        </span>
       )}
-      {selected && <CheckCircle className="ml-auto h-3.5 w-3.5 text-[#c8a84b]" />}
+      {selected && (
+        <CheckCircle className="ml-auto h-3.5 w-3.5 text-[#c8a84b]" />
+      )}
     </button>
   );
 }
@@ -58,7 +67,9 @@ function KitCard({
   return (
     <div className="form-card flex flex-col gap-3 border p-4">
       <div className="flex items-center justify-between">
-        <span className="font-display text-sm font-bold text-[#f0e6c8]">{kit.label}</span>
+        <span className="font-display text-sm font-bold text-[#f0e6c8]">
+          {kit.label}
+        </span>
         <button
           type="button"
           onClick={onDelete}
@@ -69,11 +80,18 @@ function KitCard({
         </button>
       </div>
       <div className="flex flex-col gap-1">
-        {kit.tools.map(t => (
-          <div key={t.itemId} className={`flex items-center gap-2 text-xs ${t.owned ? "text-[#f0e6c8]" : "text-[rgba(200,168,75,0.35)]"}`}>
+        {kit.tools.map((t) => (
+          <div
+            key={t.itemId}
+            className={`flex items-center gap-2 text-xs ${t.owned ? "text-[#f0e6c8]" : "text-[rgba(200,168,75,0.35)]"}`}
+          >
             <span>{t.emoji}</span>
             <span>{t.name}</span>
-            {!t.owned && <span className="text-red-400 text-[9px] uppercase tracking-widest">not owned</span>}
+            {!t.owned && (
+              <span className="text-red-400 text-[9px] uppercase tracking-widest">
+                not owned
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -95,7 +113,11 @@ function NewKitForm({
   tier: LoadoutTier;
   availableTools: string[];
   maxSlot: number;
-  onSave: (slotNumber: number, toolIds: string[], label: string) => Promise<void>;
+  onSave: (
+    slotNumber: number,
+    toolIds: string[],
+    label: string,
+  ) => Promise<void>;
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
@@ -106,16 +128,26 @@ function NewKitForm({
 
   // We need the tool metadata — pass it down from parent
   const toggle = (id: string) =>
-    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
 
   const submit = async () => {
-    if (selected.length === 0) { setError("Select at least one tool."); return; }
-    setSaving(true); setError("");
+    if (selected.length === 0) {
+      setError("Select at least one tool.");
+      return;
+    }
+    setSaving(true);
+    setError("");
     try {
       await onSave(slotNumber, selected, label.trim() || `Kit ${slotNumber}`);
     } catch (err) {
-      setError(err instanceof ApiResponseError ? err.error.message : "Failed to save.");
-    } finally { setSaving(false); }
+      setError(
+        err instanceof ApiResponseError ? err.error.message : "Failed to save.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -127,32 +159,38 @@ function NewKitForm({
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <div className="flex flex-col gap-1 flex-1">
-            <label className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.50)]">Label</label>
+            <label className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+              Label
+            </label>
             <input
               type="text"
               value={label}
-              onChange={e => setLabel(e.target.value)}
+              onChange={(e) => setLabel(e.target.value)}
               maxLength={40}
               placeholder={`Kit ${slotNumber}`}
               className="form-input h-8 border px-2 text-sm outline-none"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.50)]">Slot</label>
+            <label className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+              Slot
+            </label>
             <input
               type="number"
               min={1}
               max={maxSlot}
               value={slotNumber}
-              onChange={e => setSlotNumber(Number(e.target.value))}
+              onChange={(e) => setSlotNumber(Number(e.target.value))}
               className="form-input h-8 w-16 border px-2 text-sm outline-none"
             />
           </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.50)]">Tools</p>
-          {availableTools.map(id => (
+          <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+            Tools
+          </p>
+          {availableTools.map((id) => (
             <button
               key={id}
               type="button"
@@ -164,7 +202,9 @@ function NewKitForm({
               }`}
             >
               <span className="font-bold">{id}</span>
-              {selected.includes(id) && <CheckCircle className="ml-auto h-3.5 w-3.5" />}
+              {selected.includes(id) && (
+                <CheckCircle className="ml-auto h-3.5 w-3.5" />
+              )}
             </button>
           ))}
         </div>
@@ -173,12 +213,19 @@ function NewKitForm({
       {error && <p className="text-xs text-red-400">{error}</p>}
 
       <div className="flex gap-2">
-        <button type="button" onClick={onCancel}
-          className="h-8 flex-1 border border-[rgba(200,168,75,0.25)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)] hover:text-[#c8a84b]">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="h-8 flex-1 border border-[rgba(200,168,75,0.25)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)] hover:text-[#c8a84b]"
+        >
           Cancel
         </button>
-        <button type="button" onClick={submit} disabled={saving}
-          className="h-8 flex-1 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] hover:bg-[#c8a84b] hover:text-black disabled:opacity-40">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={saving}
+          className="h-8 flex-1 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] hover:bg-[#c8a84b] hover:text-black disabled:opacity-40"
+        >
           {saving ? "Saving…" : "Save Kit"}
         </button>
       </div>
@@ -208,11 +255,18 @@ function TierPanel({
     try {
       await deleteLoadout(tier, slotNumber);
       onRefresh();
-    } catch { /* noop */ }
-    finally { setDeleting(null); }
+    } catch {
+      /* noop */
+    } finally {
+      setDeleting(null);
+    }
   };
 
-  const handleSave = async (slotNumber: number, toolIds: string[], label: string) => {
+  const handleSave = async (
+    slotNumber: number,
+    toolIds: string[],
+    label: string,
+  ) => {
     await saveLoadout({ tier, slotNumber, toolIds, label });
     setAdding(false);
     onRefresh();
@@ -236,11 +290,13 @@ function TierPanel({
       </div>
 
       {kits.length === 0 && !adding && (
-        <p className="text-sm text-[rgba(200,168,75,0.40)]">No kits saved yet.</p>
+        <p className="text-sm text-[rgba(200,168,75,0.40)]">
+          No kits saved yet.
+        </p>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {kits.map(k => (
+        {kits.map((k) => (
           <KitCard
             key={k.slotNumber}
             kit={k}
@@ -272,36 +328,62 @@ export default function LoadoutPage() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       setData(await getLoadout());
     } catch (err) {
-      if (err instanceof ApiResponseError && err.status === 401) { router.push("/login"); return; }
+      if (err instanceof ApiResponseError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
       setError("Couldn't load loadouts.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  if (loading) return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <svg
+          className="h-8 w-8 animate-spin text-ayakashi-gold"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
+        </svg>
+      </div>
+    );
 
-  if (error || !data) return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
-      <p className="text-sm text-[rgba(200,168,75,0.60)]">{error}</p>
-      <button type="button" onClick={load} className="brush-btn w-40">Retry</button>
-    </div>
-  );
+  if (error || !data)
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
+        <p className="text-sm text-[rgba(200,168,75,0.60)]">{error}</p>
+        <button type="button" onClick={load} className="brush-btn w-40">
+          Retry
+        </button>
+      </div>
+    );
 
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
-
       <div className="section-header">
         <span className="section-header-text">Loadout</span>
       </div>

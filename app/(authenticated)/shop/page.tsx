@@ -18,22 +18,22 @@ import { CurrencyIcon } from "../../components/CurrencyIcon";
 // We only have loot-material images locally. Everything else falls
 // back to a large emoji rendered in the image slot.
 const LOCAL_ITEM_IMAGES: Record<string, string> = {
-  mat_abyssal_pearl:     "/loot-materials/loot-materials/abyssal-pearl.webp",
-  mat_ancient_relic:     "/loot-materials/loot-materials/ancient-relic.webp",
-  mat_astral_magatama:   "/loot-materials/loot-materials/astral-magatama.webp",
-  mat_cursed_fox_skull:  "/loot-materials/loot-materials/cursed-skull.webp",
-  mat_sea_dragon_scale:  "/loot-materials/loot-materials/dragon-scale.webp",
-  mat_prize_fish:        "/loot-materials/loot-materials/gather_fish_big_catch.webp",
-  mat_kitsu_core:        "/loot-materials/loot-materials/kitsu-core.webp",
-  mat_starborn_meteorite:"/loot-materials/loot-materials/meteorite.webp",
-  mat_mystic_crystal:    "/loot-materials/loot-materials/mystic-crystal.webp",
-  item_soul_ticket:      "/loot-materials/loot-materials/soul-ticket.webp",
+  mat_abyssal_pearl: "/loot-materials/loot-materials/abyssal-pearl.webp",
+  mat_ancient_relic: "/loot-materials/loot-materials/ancient-relic.webp",
+  mat_astral_magatama: "/loot-materials/loot-materials/astral-magatama.webp",
+  mat_cursed_fox_skull: "/loot-materials/loot-materials/cursed-skull.webp",
+  mat_sea_dragon_scale: "/loot-materials/loot-materials/dragon-scale.webp",
+  mat_prize_fish: "/loot-materials/loot-materials/gather_fish_big_catch.webp",
+  mat_kitsu_core: "/loot-materials/loot-materials/kitsu-core.webp",
+  mat_starborn_meteorite: "/loot-materials/loot-materials/meteorite.webp",
+  mat_mystic_crystal: "/loot-materials/loot-materials/mystic-crystal.webp",
+  item_soul_ticket: "/loot-materials/loot-materials/soul-ticket.webp",
 };
 
 // ── Tabs ───────────────────────────────────────────────────────────
 const TABS: { id: ShopSection; label: string }[] = [
-  { id: "items",        label: "Items"        },
-  { id: "rob_gear",     label: "Rob Gear"     },
+  { id: "items", label: "Items" },
+  { id: "rob_gear", label: "Rob Gear" },
   { id: "defence_gear", label: "Defence Gear" },
 ];
 
@@ -59,7 +59,11 @@ function ItemImage({ item }: { item: ShopListing }) {
           unoptimized
         />
       ) : (
-        <span className="text-6xl leading-none select-none" role="img" aria-label={item.name}>
+        <span
+          className="text-6xl leading-none select-none"
+          role="img"
+          aria-label={item.name}
+        >
           {item.emoji}
         </span>
       )}
@@ -88,7 +92,9 @@ function BuyModal({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [qty, setQty] = useState(1);
-  const [currency, setCurrency] = useState<"ryo" | "kitsu">(state.item.currency);
+  const [currency, setCurrency] = useState<"ryo" | "kitsu">(
+    state.item.currency,
+  );
 
   useEffect(() => {
     const el = dialogRef.current;
@@ -109,8 +115,8 @@ function BuyModal({
     currency === state.item.currency
       ? state.item.price
       : currency === "kitsu"
-      ? Math.ceil(state.item.price / KITSU_TO_RYO)
-      : state.item.price * KITSU_TO_RYO;
+        ? Math.ceil(state.item.price / KITSU_TO_RYO)
+        : state.item.price * KITSU_TO_RYO;
 
   const total = unitPrice * qty;
 
@@ -125,27 +131,38 @@ function BuyModal({
         <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#c8a84b]">
           {state.item.name}
         </h2>
-        <button type="button" onClick={onClose} aria-label="Close"
-          className="text-[rgba(200,168,75,0.5)] transition-colors hover:text-[#c8a84b]">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="text-[rgba(200,168,75,0.5)] transition-colors hover:text-[#c8a84b]"
+        >
           <X className="h-5 w-5" />
         </button>
       </div>
 
       <div className="flex flex-col gap-4 px-5 py-5">
         {state.item.flavor && (
-          <p className="text-xs italic leading-5 text-[rgba(200,168,75,0.50)]">{state.item.flavor}</p>
+          <p className="text-xs italic leading-5 text-[rgba(200,168,75,0.50)]">
+            {state.item.flavor}
+          </p>
         )}
 
         {state.item.itemId !== "lottery_ticket" && (
           <div className="flex gap-2">
             {(["ryo", "kitsu"] as const).map((c) => (
-              <button key={c} type="button" onClick={() => setCurrency(c)}
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCurrency(c)}
                 className={`flex-1 flex items-center justify-center gap-1.5 border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
                   currency === c
                     ? "border-[#c8a84b] bg-[rgba(200,168,75,0.12)] text-[#c8a84b]"
                     : "border-[rgba(200,168,75,0.15)] text-[rgba(200,168,75,0.45)] hover:border-[rgba(200,168,75,0.35)]"
-                }`}>
-                <CurrencyIcon type={c} size={14} />{c === "ryo" ? "Ryo" : "Kitsu"}
+                }`}
+              >
+                <CurrencyIcon type={c} size={14} />
+                {c === "ryo" ? "Ryo" : "Kitsu"}
               </button>
             ))}
           </div>
@@ -153,32 +170,60 @@ function BuyModal({
 
         {state.maxQty > 1 && (
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">Quantity</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">
+              Quantity
+            </span>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] hover:border-[#c8a84b] hover:text-[#c8a84b]">−</button>
-              <input type="number" value={qty} min={1} max={state.maxQty}
-                onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) setQty(Math.min(state.maxQty, Math.max(1, v))); }}
-                className="form-input h-8 w-16 border text-center outline-none" />
-              <button type="button" onClick={() => setQty((q) => Math.min(state.maxQty, q + 1))}
-                className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] hover:border-[#c8a84b] hover:text-[#c8a84b]">+</button>
+              <button
+                type="button"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] hover:border-[#c8a84b] hover:text-[#c8a84b]"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                value={qty}
+                min={1}
+                max={state.maxQty}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (!isNaN(v)) setQty(Math.min(state.maxQty, Math.max(1, v)));
+                }}
+                className="form-input h-8 w-16 border text-center outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setQty((q) => Math.min(state.maxQty, q + 1))}
+                className="h-8 w-8 border border-[rgba(200,168,75,0.25)] text-[#f0e6c8] hover:border-[#c8a84b] hover:text-[#c8a84b]"
+              >
+                +
+              </button>
             </div>
           </div>
         )}
 
         <div className="flex items-center justify-between border-t border-[rgba(200,168,75,0.12)] pt-4">
-          <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">Total</span>
+          <span className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.6)]">
+            Total
+          </span>
           <span className="text-lg font-bold text-[#e6c96a] flex items-center gap-1.5">
             <CurrencyIcon type={currency} size={18} /> {formatNumber(total)}
           </span>
         </div>
 
         {error && (
-          <p className="border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
+          <p className="border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            {error}
+          </p>
         )}
 
-        <button type="button" disabled={submitting} onClick={() => onConfirm(qty, currency)}
-          className="h-11 w-full border border-[#c8a84b] bg-[#c8a84b] text-sm font-bold uppercase tracking-widest text-black hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => onConfirm(qty, currency)}
+          className="h-11 w-full border border-[#c8a84b] bg-[#c8a84b] text-sm font-bold uppercase tracking-widest text-black hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {submitting ? "Purchasing…" : "Confirm Purchase"}
         </button>
       </div>
@@ -190,9 +235,9 @@ function BuyModal({
 function DurabilityBadge({ item }: { item: ShopListing }) {
   if (!item.durability) return null;
   const labels: Record<string, string> = {
-    permanent:        "Permanent",
-    "single-use":     "Single Use",
-    "shatter-on-fail":"Shatters on Fail",
+    permanent: "Permanent",
+    "single-use": "Single Use",
+    "shatter-on-fail": "Shatters on Fail",
     charges: item.maxCharges ? `${item.maxCharges} Charges` : "Charges",
   };
   return (
@@ -217,7 +262,8 @@ export default function Shop() {
   const [toast, setToast] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
-    setLoading(true); setLoadError("");
+    setLoading(true);
+    setLoadError("");
     try {
       const [shopRes, invRes] = await Promise.all([
         getShopListings(),
@@ -226,14 +272,19 @@ export default function Shop() {
       setListings(shopRes.listings);
       setOwnedItemIds(new Set(invRes.ownedItemIds));
     } catch (err) {
-      if (err instanceof ApiResponseError && err.status === 401) { router.push("/login"); return; }
+      if (err instanceof ApiResponseError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
       setLoadError("Couldn't load the shop. Try refreshing.");
     } finally {
       setLoading(false);
     }
   }, [router]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     if (!toast) return;
@@ -244,7 +295,8 @@ export default function Shop() {
   const visibleListings = listings.filter((l) => l.section === tab);
 
   const openModal = (item: ShopListing) => {
-    const isOneOfAKind = ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
+    const isOneOfAKind =
+      ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
     if (isOneOfAKind && ownedItemIds.has(item.itemId)) return;
     const maxQty = isOneOfAKind ? 1 : 99;
     setModalError("");
@@ -253,46 +305,74 @@ export default function Shop() {
 
   const handleConfirm = async (quantity: number, currency: "ryo" | "kitsu") => {
     if (!modalState) return;
-    setSubmitting(true); setModalError("");
+    setSubmitting(true);
+    setModalError("");
     try {
-      const res = await buyItem({ itemId: modalState.item.itemId, currency, quantity });
-      if (ONE_OF_A_KIND.has(modalState.item.itemId) || modalState.item.durability === "permanent") {
+      const res = await buyItem({
+        itemId: modalState.item.itemId,
+        currency,
+        quantity,
+      });
+      if (
+        ONE_OF_A_KIND.has(modalState.item.itemId) ||
+        modalState.item.durability === "permanent"
+      ) {
         setOwnedItemIds((prev) => new Set(prev).add(modalState.item.itemId));
       }
       refreshCurrency();
       setToast(`+${res.quantity} ${modalState.item.name}`);
       setModalState(null);
     } catch (err) {
-      if (err instanceof ApiResponseError) setModalError(err.error.message ?? "Purchase failed.");
+      if (err instanceof ApiResponseError)
+        setModalError(err.error.message ?? "Purchase failed.");
       else setModalError("Purchase failed. Try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <svg
+          className="h-8 w-8 animate-spin text-ayakashi-gold"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
+        </svg>
+      </div>
+    );
 
-  if (loadError) return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
-      <p className="theme-body text-sm">{loadError}</p>
-      <button type="button" onClick={() => window.location.reload()}
-        className="h-11 border border-[#c8a84b] px-8 text-sm font-bold uppercase tracking-widest text-[#c8a84b] hover:bg-[#c8a84b] hover:text-black">
-        Retry
-      </button>
-    </div>
-  );
+  if (loadError)
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="theme-body text-sm">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="h-11 border border-[#c8a84b] px-8 text-sm font-bold uppercase tracking-widest text-[#c8a84b] hover:bg-[#c8a84b] hover:text-black"
+        >
+          Retry
+        </button>
+      </div>
+    );
 
   return (
     <>
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-
         <div className="section-header">
           <span className="section-header-text">Shop</span>
         </div>
@@ -302,10 +382,16 @@ export default function Shop() {
         {/* ── Tabs ── */}
         <div className="flex gap-0 border-b border-[rgba(200,168,75,0.15)]">
           {TABS.map((t) => (
-            <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
               className={`relative px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
-                tab === t.id ? "text-[#c8a84b]" : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
-              }`}>
+                tab === t.id
+                  ? "text-[#c8a84b]"
+                  : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
+              }`}
+            >
               {t.label}
               {tab === t.id && (
                 <span className="absolute bottom-0 left-0 h-0.5 w-full bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
@@ -322,13 +408,15 @@ export default function Shop() {
             </p>
           )}
           {visibleListings.map((item) => {
-            const isOneOfAKind = ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
+            const isOneOfAKind =
+              ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
             const alreadyOwned = isOneOfAKind && ownedItemIds.has(item.itemId);
 
             return (
-              <div key={item.itemId}
-                className={`form-card flex flex-col overflow-hidden border transition-all hover:border-[rgba(200,168,75,0.45)] ${alreadyOwned ? "opacity-40" : ""}`}>
-
+              <div
+                key={item.itemId}
+                className={`form-card flex flex-col overflow-hidden border transition-all hover:border-[rgba(200,168,75,0.45)] ${alreadyOwned ? "opacity-40" : ""}`}
+              >
                 {/* ── Big image / emoji at top ── */}
                 <ItemImage item={item} />
 
@@ -356,15 +444,22 @@ export default function Shop() {
                   <div className="mt-auto flex items-center justify-between gap-2">
                     <DurabilityBadge item={item} />
                     <span className="text-sm font-bold text-[#e6c96a] flex items-center gap-1">
-                      <CurrencyIcon type={item.currency} size={14} /> {formatNumber(item.price)}
+                      <CurrencyIcon type={item.currency} size={14} />{" "}
+                      {formatNumber(item.price)}
                       {item.priceIsPlaceholder && (
-                        <span className="ml-1 text-[10px] text-[rgba(200,168,75,0.35)]">est.</span>
+                        <span className="ml-1 text-[10px] text-[rgba(200,168,75,0.35)]">
+                          est.
+                        </span>
                       )}
                     </span>
                   </div>
 
-                  <button type="button" disabled={alreadyOwned} onClick={() => openModal(item)}
-                    className="h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent">
+                  <button
+                    type="button"
+                    disabled={alreadyOwned}
+                    onClick={() => openModal(item)}
+                    className="h-9 border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent"
+                  >
                     {alreadyOwned ? "Already Owned" : "Buy"}
                   </button>
                 </div>
@@ -375,8 +470,13 @@ export default function Shop() {
       </section>
 
       {modalState && (
-        <BuyModal state={modalState} onClose={() => setModalState(null)}
-          onConfirm={handleConfirm} submitting={submitting} error={modalError} />
+        <BuyModal
+          state={modalState}
+          onClose={() => setModalState(null)}
+          onConfirm={handleConfirm}
+          submitting={submitting}
+          error={modalError}
+        />
       )}
 
       {toast && (
@@ -387,5 +487,3 @@ export default function Shop() {
     </>
   );
 }
-
-

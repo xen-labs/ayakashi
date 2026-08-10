@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useId } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check, X as XIcon } from "lucide-react";
 
 // ── Strength calculation ───────────────────────────────────────────
 type StrengthLevel = 0 | 1 | 2 | 3 | 4;
@@ -9,7 +9,7 @@ type StrengthLevel = 0 | 1 | 2 | 3 | 4;
 function calcStrength(pw: string): StrengthLevel {
   if (!pw) return 0;
   let score = 0;
-  if (pw.length >= 8) score++;
+  if (pw.length >= 6) score++;
   if (pw.length >= 12) score++;
   if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
   if (/[0-9]/.test(pw)) score++;
@@ -27,10 +27,10 @@ const STRENGTH_LABELS: Record<StrengthLevel, string> = {
 
 const STRENGTH_COLORS: Record<StrengthLevel, string> = {
   0: "transparent",
-  1: "#ef4444",   // red-500
-  2: "#f97316",   // orange-500
-  3: "#eab308",   // yellow-500
-  4: "#22c55e",   // green-500
+  1: "#ef4444", // red-500
+  2: "#f97316", // orange-500
+  3: "#eab308", // yellow-500
+  4: "#22c55e", // green-500
 };
 
 const STRENGTH_WIDTHS: Record<StrengthLevel, string> = {
@@ -66,6 +66,7 @@ export function PasswordField({
   matchValue,
 }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);
+  const [focused, setFocused] = useState(false);
   const id = useId();
   const strength = showStrength ? calcStrength(value) : 0;
 
@@ -74,30 +75,45 @@ export function PasswordField({
 
   return (
     <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-semibold uppercase tracking-widest text-astral-gold">
+      <label
+        htmlFor={id}
+        className="text-sm font-semibold uppercase tracking-widest text-ayakashi-gold"
+      >
         {label}
       </label>
 
       {/* Input row */}
-      <div className="relative">
+      <div
+        className={`relative transition-shadow duration-200 ${
+          focused
+            ? "shadow-[0_0_0_1px_rgba(200,168,75,0.5),0_0_18px_rgba(200,168,75,0.15)]"
+            : ""
+        }`}
+      >
         <input
           id={id}
           type={visible ? "text" : "password"}
           name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={placeholder}
           required={required}
           autoComplete={name === "password" ? "new-password" : "new-password"}
-          className="form-input h-12 w-full border px-4 pr-12 outline-none transition-colors placeholder:text-gray-500 focus:border-astral-gold"
+          className="form-input h-12 w-full border px-4 pr-12 outline-none transition-colors placeholder:text-gray-500 focus:border-ayakashi-gold"
         />
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? "Hide password" : "Show password"}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-astral-gold transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-ayakashi-gold"
         >
-          {visible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          {visible ? (
+            <EyeOff className="h-5 w-5" />
+          ) : (
+            <Eye className="h-5 w-5" />
+          )}
         </button>
       </div>
 
@@ -114,7 +130,7 @@ export function PasswordField({
             />
           </div>
           <p
-            className="text-xs font-medium"
+            className="text-xs font-medium transition-colors duration-200"
             style={{ color: STRENGTH_COLORS[strength] }}
           >
             {STRENGTH_LABELS[strength]}
@@ -124,8 +140,17 @@ export function PasswordField({
 
       {/* Match hint for confirm field */}
       {showMatch && (
-        <p className={`text-xs font-medium ${matches ? "text-green-500" : "text-red-400"}`}>
-          {matches ? "Passwords match ✓" : "Passwords do not match"}
+        <p
+          className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+            matches ? "text-green-500" : "text-red-400"
+          }`}
+        >
+          {matches ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <XIcon className="h-3.5 w-3.5" />
+          )}
+          {matches ? "Passwords match" : "Passwords do not match"}
         </p>
       )}
     </div>

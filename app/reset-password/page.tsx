@@ -152,7 +152,7 @@ function ResetPasswordInner() {
       <section className="relative z-10 flex w-full max-w-md flex-col items-center text-center">
         <Link
           href="/"
-          className="mb-8 self-start text-sm font-semibold uppercase tracking-widest text-astral-gold transition-colors hover:text-white"
+          className="mb-8 self-start text-sm font-semibold uppercase tracking-widest text-ayakashi-gold transition-colors hover:text-white"
         >
           ← Back to home
         </Link>
@@ -222,7 +222,7 @@ function ResetPasswordInner() {
           <button
             type="submit"
             disabled={loading || !password || !confirmPassword}
-            className="h-12 w-full border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 w-full border border-ayakashi-gold bg-ayakashi-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Saving…" : "Reset Password"}
           </button>
@@ -232,7 +232,7 @@ function ResetPasswordInner() {
           Remembered it?{" "}
           <Link
             href="/login"
-            className="font-semibold text-astral-gold hover:text-white transition-colors"
+            className="font-semibold text-ayakashi-gold hover:text-white transition-colors"
           >
             Back to Login
           </Link>

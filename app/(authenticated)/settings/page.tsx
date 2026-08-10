@@ -14,7 +14,9 @@ import { useAuth } from "../../../lib/useAuth";
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between border-b border-[rgba(200,168,75,0.08)] py-2.5 last:border-0">
-      <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.50)]">{label}</span>
+      <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+        {label}
+      </span>
       <span className="text-sm text-[#f0e6c8]">{value}</span>
     </div>
   );
@@ -24,7 +26,9 @@ export default function Settings() {
   const router = useRouter();
   const { user } = useAuth(false);
 
-  const [settings, setSettings] = useState<SettingsProfileResponse | null>(null);
+  const [settings, setSettings] = useState<SettingsProfileResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -41,7 +45,8 @@ export default function Settings() {
   const [bioSuccess, setBioSuccess] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       const res = await getSettingsProfile();
       setSettings(res);
@@ -49,7 +54,8 @@ export default function Settings() {
       setBioInput(res.bio ?? "");
     } catch (err) {
       if (err instanceof ApiResponseError && err.status === 401) {
-        router.push("/login"); return;
+        router.push("/login");
+        return;
       }
       setError("Couldn't load settings. Try refreshing.");
     } finally {
@@ -57,7 +63,9 @@ export default function Settings() {
     }
   }, [router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const saveDisplayName = async () => {
     if (!settings) return;
@@ -67,7 +75,9 @@ export default function Settings() {
       setNameError(`Display name must be ${min}–${max} characters.`);
       return;
     }
-    setNameSaving(true); setNameError(""); setNameSuccess(false);
+    setNameSaving(true);
+    setNameError("");
+    setNameSuccess(false);
     try {
       const res = await patchSettingsProfile({ displayName: trimmed });
       if (res.displayName) {
@@ -98,34 +108,57 @@ export default function Settings() {
       setBioError(`Bio must be at most ${settings.limits.bio.max} characters.`);
       return;
     }
-    setBioSaving(true); setBioError(""); setBioSuccess(false);
+    setBioSaving(true);
+    setBioError("");
+    setBioSuccess(false);
     try {
       await patchSettingsProfile({ bio: trimmed });
       setBioSuccess(true);
       setTimeout(() => setBioSuccess(false), 3000);
       await load();
     } catch (err) {
-      setBioError(err instanceof ApiResponseError ? err.error.message : "Failed to save.");
+      setBioError(
+        err instanceof ApiResponseError ? err.error.message : "Failed to save.",
+      );
     } finally {
       setBioSaving(false);
     }
   };
 
-  if (loading) return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <svg className="h-8 w-8 animate-spin text-astral-gold" viewBox="0 0 24 24" fill="none">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <svg
+          className="h-8 w-8 animate-spin text-ayakashi-gold"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
+        </svg>
+      </div>
+    );
 
-  if (error) return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
-      <p className="text-sm text-[rgba(200,168,75,0.60)]">{error}</p>
-      <button type="button" onClick={load} className="brush-btn w-40">Retry</button>
-    </div>
-  );
+  if (error)
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
+        <p className="text-sm text-[rgba(200,168,75,0.60)]">{error}</p>
+        <button type="button" onClick={load} className="brush-btn w-40">
+          Retry
+        </button>
+      </div>
+    );
 
   const cooldown = settings?.displayNameCooldown;
   const canChangeName = cooldown?.canChangeNow ?? false;
@@ -136,7 +169,6 @@ export default function Settings() {
 
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-
       {/* ── Header ── */}
       <div className="section-header">
         <span className="section-header-text">Settings</span>
@@ -146,26 +178,47 @@ export default function Settings() {
 
       {/* ── Account info card ── */}
       <div className="form-card flex flex-col gap-1 border p-5">
-        <h2 className="mb-3 font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">Account</h2>
-        <InfoRow label="Username" value={`@${user?.username ?? settings?.displayName ?? "—"}`} />
-        <InfoRow label="Age" value={user?.age != null ? String(user.age) : "—"} />
+        <h2 className="mb-3 font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">
+          Account
+        </h2>
+        <InfoRow
+          label="Username"
+          value={`@${user?.username ?? settings?.displayName ?? "—"}`}
+        />
+        <InfoRow
+          label="Age"
+          value={user?.age != null ? String(user.age) : "—"}
+        />
       </div>
 
       {/* ── Display Name card ── */}
       <div className="form-card flex flex-col gap-4 border p-5">
-        <h2 className="font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">Display Name</h2>
+        <h2 className="font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">
+          Display Name
+        </h2>
 
         {/* Cooldown status */}
         {cooldown && (
-          <div className={`flex items-center gap-2 border px-3 py-2 text-xs ${
-            canChangeName
-              ? "border-green-500/30 bg-green-500/10 text-green-400"
-              : "border-[rgba(200,168,75,0.25)] bg-[rgba(200,168,75,0.05)] text-[rgba(200,168,75,0.60)]"
-          }`}>
+          <div
+            className={`flex items-center gap-2 border px-3 py-2 text-xs ${
+              canChangeName
+                ? "border-green-500/30 bg-green-500/10 text-green-400"
+                : "border-[rgba(200,168,75,0.25)] bg-[rgba(200,168,75,0.05)] text-[rgba(200,168,75,0.60)]"
+            }`}
+          >
             {canChangeName ? (
-              <><CheckCircle className="h-3.5 w-3.5 shrink-0" /> You can change your display name now.</>
+              <>
+                <CheckCircle className="h-3.5 w-3.5 shrink-0" /> You can change
+                your display name now.
+              </>
             ) : (
-              <><Clock className="h-3.5 w-3.5 shrink-0" /> {cooldown.daysRemaining === 1 ? "1 day" : `${cooldown.daysRemaining} days`} until you can change your display name again.</>
+              <>
+                <Clock className="h-3.5 w-3.5 shrink-0" />{" "}
+                {cooldown.daysRemaining === 1
+                  ? "1 day"
+                  : `${cooldown.daysRemaining} days`}{" "}
+                until you can change your display name again.
+              </>
             )}
           </div>
         )}
@@ -210,14 +263,18 @@ export default function Settings() {
 
       {/* ── Bio card ── */}
       <div className="form-card flex flex-col gap-4 border p-5">
-        <h2 className="font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">Bio</h2>
+        <h2 className="font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">
+          Bio
+        </h2>
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
               About You
             </label>
-            <span className={`text-[10px] tabular-nums ${bioLen > bioMax ? "text-red-400" : "text-[rgba(200,168,75,0.35)]"}`}>
+            <span
+              className={`text-[10px] tabular-nums ${bioLen > bioMax ? "text-red-400" : "text-[rgba(200,168,75,0.35)]"}`}
+            >
               {bioLen} / {bioMax}
             </span>
           </div>
@@ -254,7 +311,6 @@ export default function Settings() {
           {bioSaving ? "Saving…" : "Save Bio"}
         </button>
       </div>
-
     </section>
   );
 }

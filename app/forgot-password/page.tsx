@@ -17,7 +17,7 @@ export default function ForgotPassword() {
       <section className="relative z-10 flex w-full max-w-md flex-col items-center text-center">
         <Link
           href="/login"
-          className="mb-8 self-start text-sm font-semibold uppercase tracking-widest text-astral-gold transition-colors hover:text-white"
+          className="mb-8 self-start text-sm font-semibold uppercase tracking-widest text-ayakashi-gold transition-colors hover:text-white"
         >
           ← Back to login
         </Link>
@@ -49,7 +49,7 @@ export default function ForgotPassword() {
           href={WA_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-sm border border-astral-gold bg-astral-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.3)] transition-all hover:bg-white"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-sm border border-ayakashi-gold bg-ayakashi-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.3)] transition-all hover:bg-white"
         >
           {/* WhatsApp icon */}
           <svg

@@ -22,7 +22,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     root.classList.add("dark");
     root.classList.remove("light");
-    localStorage.removeItem("astral-theme");
+    localStorage.removeItem("ayakashi-theme");
   }, []);
 
   return (
