@@ -146,6 +146,9 @@ export interface MeResponse {
   username: string;
   displayName: string;
   age: number;
+  avatarUrl: string | null;
+  /** Not yet resolved to an image URL frontend-side — see TopBar. */
+  frameId: string | null;
 }
 export const getMe = () => apiFetch<MeResponse>("/me");
 
@@ -228,7 +231,14 @@ export const getDashboard = () => apiFetch<DashboardResponse>("/dashboard");
 // GET /shop?section=items|rob_gear|defence_gear
 // POST /shop/buy { itemId, currency?, quantity }
 
-export type ShopSection = "items" | "rob_gear" | "defence_gear";
+export type ShopSection =
+  | "items"
+  | "rob_gear"
+  | "defence_gear"
+  | "cosmetics"
+  | "hunting"
+  | "farming"
+  | "cooking";
 export type RobItemCategory =
   | "rob"
   | "bag"
@@ -244,11 +254,15 @@ export interface ShopListing {
   flavor: string;
   section: ShopSection;
   robCategory?: RobItemCategory;
+  rarity?: "common" | "uncommon" | "rare" | "epic" | "legendary";
   price: number;
   currency: "ryo" | "kitsu";
   durability?: "shatter-on-fail" | "single-use" | "charges" | "permanent";
   maxCharges?: number;
   priceIsPlaceholder?: true;
+  noConversion?: true;
+  minLevel?: number;
+  kind?: "item" | "frame";
 }
 
 export interface ShopListingsResponse {
@@ -508,6 +522,13 @@ export const patchSettingsProfile = (body: PatchSettingsPayload) =>
 // POST /profile/:username/like
 
 export type CardRarity = "C" | "R" | "SR" | "SSR" | "UR";
+export type CardFileExtension =
+  | "png"
+  | "gif"
+  | "webp"
+  | "webm"
+  | "jpg"
+  | "jpeg";
 
 export interface ProfileCardItem {
   instanceId: string;
@@ -520,6 +541,7 @@ export interface ProfileCardItem {
   eventName: string | null;
   thumbUrl: string;
   mediaType: string;
+  fileExtension: CardFileExtension;
   ownerCount: number;
   wishlistCount: number;
   totalIssued: number;
@@ -583,7 +605,22 @@ export interface ProfileResponse {
       };
   friends:
     | { hidden: true }
-    | { hidden: false; jids: string[]; pendingReceivedJids?: string[] };
+    | {
+        hidden: false;
+        // Real display objects — see profile.ts's resolvePendingRequesters,
+        // reused here. Safe to link/render directly, no separate lookup needed.
+        friends: {
+          username: string;
+          displayName: string;
+          avatarUrl: string | null;
+        }[];
+        // Only present on isOwnProfile.
+        pendingReceived?: {
+          username: string;
+          displayName: string;
+          avatarUrl: string | null;
+        }[];
+      };
 }
 
 export const getProfile = (
@@ -660,6 +697,8 @@ export interface CraftRecipe {
   recipeId: string;
   name: string;
   emoji: string;
+  /** Ritual-specific art (the 5 Kitsu rituals) — distinct from outputWebappImage, which is the output ITEM's art and only set for item-type outputs. */
+  webappImage?: string;
   description: string;
   inputs: CraftInput[];
   output: CraftOutput;
@@ -829,9 +868,6 @@ export const assignCardToDeck = (
     method: "POST",
     body: JSON.stringify(body),
   });
-
-export const deleteDeck = (slotIndex: number) =>
-  apiFetch<{ deleted: boolean }>(`/decks/${slotIndex}`, { method: "DELETE" });
 
 export const removeCardFromDeck = (slotIndex: number, position: number) =>
   apiFetch<DeckManageSlot>(`/decks/${slotIndex}/cards/${position}`, {
@@ -1116,6 +1152,198 @@ export const deleteCosmeticUpload = (id: string) =>
   apiFetch<{ removed: boolean }>(`/cosmetics/upload/${id}`, {
     method: "DELETE",
   });
+
+// ── Card Catalog ──────────────────────────────────────────────────
+// GET /cards                       — browse/search/filter/sort
+// GET /cards/events                — distinct event names for filter
+// GET /cards/:shortId               — detail view
+// GET /cards/:shortId/price-history — price graph data
+// GET /cards/instance/:instanceId   — one copy's ownership chain
+//
+// Distinct from InventoryCardsResponse / getInventoryCards above —
+// that's the player's own collection view. This is the full public
+// catalog: every approved card, searchable and filterable, matching
+// routes/cards.ts exactly.
+
+export type CatalogCardRarity = "C" | "R" | "SR" | "SSR" | "UR";
+export type CatalogSort =
+  | "newest"
+  | "owners_desc"
+  | "owners_asc"
+  | "wishlist_desc"
+  | "issued_desc";
+
+export interface CatalogCard {
+  shortId: string;
+  name: string;
+  seriesName: string;
+  rarity: CatalogCardRarity;
+  isEvent: boolean;
+  eventName: string | null;
+  thumbUrl: string;
+  mediaType: string;
+  fileExtension: CardFileExtension;
+  ownerCount: number;
+  wishlistCount: number;
+  totalIssued: number;
+}
+
+export interface CatalogResponse {
+  results: CatalogCard[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface CatalogQuery {
+  q?: string;
+  /** comma-separated, e.g. "SR,SSR,UR" */
+  rarity?: string;
+  isEvent?: boolean;
+  eventName?: string;
+  sort?: CatalogSort;
+  page?: number;
+  pageSize?: number;
+}
+
+function buildCatalogQuery(params?: CatalogQuery): string {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.rarity) qs.set("rarity", params.rarity);
+  if (params?.isEvent) qs.set("isEvent", "true");
+  if (params?.eventName) qs.set("eventName", params.eventName);
+  if (params?.sort) qs.set("sort", params.sort);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  return qs.toString();
+}
+
+export const getCards = (params?: CatalogQuery) => {
+  const query = buildCatalogQuery(params);
+  return apiFetch<CatalogResponse>(`/cards${query ? `?${query}` : ""}`);
+};
+
+export interface CatalogEventsResponse {
+  events: string[];
+}
+export const getCardEvents = () =>
+  apiFetch<CatalogEventsResponse>("/cards/events");
+
+export interface CardOwner {
+  issueNumber: number;
+  condition: string;
+  acquiredAt: string;
+  player: {
+    username: string | null;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface CardWishlister {
+  wishlistedAt: string;
+  player: {
+    username: string | null;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface CardSeriesSibling {
+  shortId: string;
+  name: string;
+  rarity: CatalogCardRarity;
+  thumbUrl: string;
+}
+
+export interface CardDetailResponse {
+  card: {
+    shortId: string;
+    name: string;
+    seriesName: string;
+    tier: number;
+    rarity: CatalogCardRarity;
+    source: string;
+    isEvent: boolean;
+    eventName: string | null;
+    mediaUrl: string;
+    mediaType: string;
+    fileExtension: CardFileExtension;
+    totalIssued: number;
+    totalInCirculation: number;
+    ownerCount: number;
+    basePrice: number;
+    currentPrice: number;
+    wishlistCount: number;
+    isCustom: boolean;
+    creatorCredit: string | null;
+  };
+  owners: CardOwner[];
+  wishlistedBy: CardWishlister[];
+  seriesSiblings: CardSeriesSibling[];
+}
+
+export const getCardDetail = (shortId: string) =>
+  apiFetch<CardDetailResponse>(`/cards/${encodeURIComponent(shortId)}`);
+
+export interface CardPricePoint {
+  price: number;
+  reason: string;
+  recordedAt: string;
+}
+export interface CardPriceHistoryResponse {
+  points: CardPricePoint[];
+}
+export const getCardPriceHistory = (shortId: string, days = 90) =>
+  apiFetch<CardPriceHistoryResponse>(
+    `/cards/${encodeURIComponent(shortId)}/price-history?days=${days}`,
+  );
+
+export interface CardInstanceHistoryEvent {
+  ownerId: string;
+  ownerName: string;
+  ownerAvatarUrl: string | null;
+  method: string;
+  fromOwnerId: string | null;
+  fromOwnerName: string | null;
+  price: number | null;
+  acquiredAt: string;
+}
+export interface CardInstanceHistoryResponse {
+  instanceId: string;
+  issueNumber: number;
+  condition: string;
+  currentOwnerId: string;
+  card: {
+    shortId: string;
+    name: string;
+    rarity: CatalogCardRarity;
+    seriesName: string;
+    thumbUrl: string;
+  };
+  history: CardInstanceHistoryEvent[];
+}
+export const getCardInstanceHistory = (instanceId: string) =>
+  apiFetch<CardInstanceHistoryResponse>(`/cards/instance/${instanceId}`);
+
+// NOTE: no backend route exists for this yet — cards.ts has zero
+// wishlist mutation endpoints, only the bare Wishlist model. This is
+// written to match this codebase's existing POST-toggle convention
+// (see likeProfile) so it's a one-file backend addition, not a
+// frontend contract mismatch, once POST /cards/:shortId/wishlist
+// exists. Calling this today will 404.
+export interface ToggleWishlistResponse {
+  wishlisted: boolean;
+  wishlistCount: number;
+}
+export const toggleCardWishlist = (shortId: string) =>
+  apiFetch<ToggleWishlistResponse>(
+    `/cards/${encodeURIComponent(shortId)}/wishlist`,
+    {
+      method: "POST",
+    },
+  );
 
 // ── Player Search ─────────────────────────────────────────────────
 // GET /players/search?q=&page=

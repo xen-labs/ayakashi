@@ -8,31 +8,35 @@ import {
   ShoppingBag,
   Backpack,
   Hammer,
-  Trophy,
+  Layers,
   MoreHorizontal,
 } from "lucide-react";
 import { useState } from "react";
 
 // Primary nav — 6 items (Home + 5 pages)
+// Cards takes the 6th slot over Ranks: it's core browsing content on
+// the same footing as Shop/Items, while Ranks is a page people check
+// occasionally rather than navigate to constantly — moved into More.
 const PRIMARY_NAV = [
-  { href: "/",            label: "Home",      Icon: Home            },
-  { href: "/dashboard",   label: "Dashboard", Icon: LayoutDashboard },
-  { href: "/shop",        label: "Shop",      Icon: ShoppingBag     },
-  { href: "/inventory",   label: "Items",     Icon: Backpack        },
-  { href: "/craft",       label: "Craft",     Icon: Hammer          },
-  { href: "/leaderboard", label: "Ranks",     Icon: Trophy          },
+  { href: "/", label: "Home", Icon: Home },
+  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/shop", label: "Shop", Icon: ShoppingBag },
+  { href: "/inventory", label: "Items", Icon: Backpack },
+  { href: "/craft", label: "Craft", Icon: Hammer },
+  { href: "/cards", label: "Cards", Icon: Layers },
 ];
 
 // Secondary nav — shown in overflow drawer
 const SECONDARY_NAV = [
-  { href: "/upgrade",    label: "Upgrade"    },
+  { href: "/leaderboard", label: "Ranks" },
+  { href: "/upgrade", label: "Upgrade" },
   { href: "/bank-vault", label: "Bank/Vault" },
-  { href: "/trade",      label: "Trade"      },
-  { href: "/loadout",    label: "Loadout"    },
-  { href: "/decks",      label: "Decks"      },
-  { href: "/players",    label: "Players"    },
-  { href: "/cosmetics",  label: "Cosmetics"  },
-  { href: "/profile",    label: "Profile"    },
+  { href: "/trade", label: "Trade" },
+  { href: "/loadout", label: "Loadout" },
+  { href: "/decks", label: "Decks" },
+  { href: "/players", label: "Players" },
+  { href: "/cosmetics", label: "Cosmetics" },
+  { href: "/profile", label: "Profile" },
 ];
 
 export function BottomNav() {
@@ -52,9 +56,10 @@ export function BottomNav() {
         <div className="mx-auto flex max-w-lg items-stretch">
           {PRIMARY_NAV.map(({ href, label, Icon }) => {
             // "/" must be exact-match only — every path starts with "/"
-            const active = href === "/"
-              ? pathname === "/"
-              : pathname === href || pathname?.startsWith(href + "/");
+            const active =
+              href === "/"
+                ? pathname === "/"
+                : pathname === href || pathname?.startsWith(href + "/");
             return (
               <Link
                 key={href}
@@ -68,8 +73,13 @@ export function BottomNav() {
                 {active && (
                   <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
                 )}
-                <Icon className="h-[20px] w-[20px]" strokeWidth={active ? 2.2 : 1.6} />
-                <span className={`text-[9px] font-bold uppercase tracking-[0.08em] ${active ? "text-[#c8a84b]" : ""}`}>
+                <Icon
+                  className="h-[20px] w-[20px]"
+                  strokeWidth={active ? 2.2 : 1.6}
+                />
+                <span
+                  className={`text-[9px] font-bold uppercase tracking-[0.08em] ${active ? "text-[#c8a84b]" : ""}`}
+                >
                   {label}
                 </span>
               </Link>
@@ -91,8 +101,13 @@ export function BottomNav() {
             {(isSecondaryActive || moreOpen) && (
               <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
             )}
-            <MoreHorizontal className="h-[20px] w-[20px]" strokeWidth={moreOpen ? 2.2 : 1.6} />
-            <span className="text-[9px] font-bold uppercase tracking-[0.08em]">More</span>
+            <MoreHorizontal
+              className="h-[20px] w-[20px]"
+              strokeWidth={moreOpen ? 2.2 : 1.6}
+            />
+            <span className="text-[9px] font-bold uppercase tracking-[0.08em]">
+              More
+            </span>
           </button>
         </div>
       </nav>
@@ -108,7 +123,8 @@ export function BottomNav() {
           <div className="fixed bottom-16 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.20)] bg-[#0d0c00]/98 backdrop-blur-md">
             <div className="mx-auto grid max-w-lg grid-cols-4 gap-0">
               {SECONDARY_NAV.map(({ href, label }) => {
-                const active = pathname === href || pathname?.startsWith(href + "/");
+                const active =
+                  pathname === href || pathname?.startsWith(href + "/");
                 return (
                   <Link
                     key={href}
@@ -120,7 +136,9 @@ export function BottomNav() {
                         : "text-[rgba(200,168,75,0.50)] hover:bg-[rgba(200,168,75,0.05)] hover:text-[rgba(200,168,75,0.80)]"
                     }`}
                   >
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">{label}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">
+                      {label}
+                    </span>
                   </Link>
                 );
               })}

@@ -474,6 +474,61 @@ dialog::backdrop {
   }
 }
 
+/* ── Shop — card grid entrance + rarity glow ────────────────────── */
+@keyframes shop-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shop-shimmer-sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes shop-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* ── Hide scrollbar on horizontally-scrollable tab bars ─────────── */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Shop — coin-spark burst on purchase confirm ─────────────────── */
+@keyframes shop-coin-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--burst-x), var(--burst-y)) scale(0.3);
+  }
+}
+.coin-spark {
+  animation: shop-coin-burst 0.5s ease-out forwards;
+}
+
 /* ── Craft — recipe card ──────────────────────────────────────────── */
 .craft-card {
   background:
@@ -501,6 +556,49 @@ dialog::backdrop {
 .craft-card-locked {
   opacity: 0.42;
   filter: grayscale(0.5);
+}
+
+/* ── Item card — tap-to-expand lift ──────────────────────────────── */
+/*
+ * Distinct from .card-tile's pointer-tracked 3D tilt (catalog art
+ * tiles). These cards hold real text/UI inside them — a full tilt
+ * would skew and distort that content, so this is a flatter "picked
+ * up off the table" lift: scale + translateY + deepened shadow,
+ * triggered by a tap-toggled `.is-expanded` class rather than :hover
+ * so it works the same on touch and mouse. The description/flavor
+ * text block expands alongside it via grid-template-rows (animatable,
+ * unlike height: auto).
+ */
+.item-card-lift {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s ease;
+  cursor: pointer;
+}
+
+.item-card-lift.is-expanded {
+  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(200, 168, 75, 0.5);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.7),
+    0 0 28px rgba(200, 168, 75, 0.14),
+    inset 0 1px 0 rgba(200, 168, 75, 0.12);
+}
+
+.item-card-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.item-card-lift.is-expanded .item-card-reveal {
+  grid-template-rows: 1fr;
+}
+
+.item-card-reveal > div {
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* rarity ring around item art thumbnails */
@@ -666,4 +764,60 @@ dialog::backdrop {
 }
 .number-tick {
   animation: number-tick 0.15s ease both;
+}
+
+/* ── Card catalog — 3D lift/tilt ─────────────────────────────────── */
+/*
+ * The tile itself just needs perspective + a resting shadow. The tilt
+ * angle (rotateX/rotateY) is set inline by CardTile.tsx from real
+ * pointer position — CSS alone can't know where on the card the
+ * pointer is, only JS can. This class supplies the "spring back to
+ * flat" transition for when the pointer leaves or on touch release,
+ * and the elevated resting/active shadow so the art actually reads
+ * as lifted off the page rather than just rotated in place.
+ */
+.card-tile-wrap {
+  perspective: 900px;
+}
+
+.card-tile {
+  transform-style: preserve-3d;
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(200, 168, 75, 0.12);
+  will-change: transform;
+}
+
+.card-tile.is-active {
+  transition:
+    transform 0.05s linear,
+    box-shadow 0.2s ease;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.65),
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(200, 168, 75, 0.35),
+    0 0 30px rgba(200, 168, 75, 0.1);
+}
+
+/* Specular sheen that tracks the same pointer offset the tilt uses —
+   sits on its own layer above the art so it reads as light hitting a
+   glossy card surface, not a filter over the image. Opacity is driven
+   inline alongside the tilt transform. */
+.card-tile-sheen {
+  background: radial-gradient(
+    circle at var(--sheen-x, 50%) var(--sheen-y, 50%),
+    rgba(255, 255, 255, 0.35),
+    transparent 55%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card-tile.is-active .card-tile-sheen {
+  opacity: 1;
 }

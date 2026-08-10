@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  use as usePromise,
+} from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,6 +23,8 @@ import {
   X,
   Check,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   getProfile,
@@ -37,19 +45,12 @@ import type {
   FriendStatus,
 } from "../../../../lib/api";
 import { AvatarWithFrame } from "../../../components/AvatarWithFrame";
+import { CardTile } from "../../../components/CardTile";
 
 // ── helpers ───────────────────────────────────────────────────────
-function fmt(n: number | undefined | null) {
-  return (n ?? 0).toLocaleString("en-US");
+function fmt(n: number) {
+  return n.toLocaleString("en-US");
 }
-
-const RARITY_COLORS: Record<string, string> = {
-  UR: "text-[#FFD700] border-[#FFD700]/40",
-  SSR: "text-purple-400 border-purple-400/40",
-  SR: "text-blue-400 border-blue-400/40",
-  R: "text-green-400 border-green-400/40",
-  C: "text-[rgba(200,168,75,0.50)] border-[rgba(200,168,75,0.20)]",
-};
 
 // ── XP bar ────────────────────────────────────────────────────────
 function XpBar({ xp, level }: { xp: number; level: number }) {
@@ -148,41 +149,6 @@ function FriendButton({
   );
 }
 
-// ── Card thumb ────────────────────────────────────────────────────
-function CardThumb({ item }: { item: ProfileCardItem }) {
-  const rarity = item.rarity ?? "C";
-  return (
-    <div
-      className={`relative overflow-hidden rounded-md border transition-transform hover:-translate-y-0.5 ${RARITY_COLORS[rarity] ?? "border-[rgba(200,168,75,0.20)]"} bg-[rgba(200,168,75,0.03)]`}
-    >
-      {item.thumbUrl ? (
-        <Image
-          src={item.thumbUrl}
-          alt={item.name}
-          width={120}
-          height={160}
-          className="h-full w-full object-cover"
-          unoptimized
-        />
-      ) : (
-        <div className="flex h-36 items-center justify-center text-3xl">🃏</div>
-      )}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1.5 py-1">
-        <p className="truncate text-[9px] font-bold leading-tight text-[#f0e6c8]">
-          {item.name ?? "Unknown"}
-        </p>
-        <div className="mt-0.5 flex items-center gap-1">
-          <span
-            className={`text-[8px] font-bold uppercase ${RARITY_COLORS[rarity]?.split(" ")[0] ?? ""}`}
-          >
-            {rarity}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Deck slot card ────────────────────────────────────────────────
 function DeckSlotCard({ slot }: { slot: DeckSlot }) {
   if (slot.state === "locked") {
@@ -206,20 +172,24 @@ function DeckSlotCard({ slot }: { slot: DeckSlot }) {
   }
   return (
     <div className="craft-card flex flex-col gap-2 overflow-hidden rounded-xl p-3">
-      {slot.backgroundUrl && (
-        <div className="relative -m-3 mb-0 h-16 w-[calc(100%+1.5rem)] overflow-hidden">
+      {slot.backgroundUrl ? (
+        <div className="relative -m-3 mb-0 h-20 w-[calc(100%+1.5rem)] overflow-hidden">
           <Image
             src={slot.backgroundUrl}
-            alt="deck bg"
+            alt=""
             fill
             className="object-cover"
             unoptimized
           />
-          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+        </div>
+      ) : (
+        <div className="-m-3 mb-0 flex h-20 w-[calc(100%+1.5rem)] items-center justify-center bg-[rgba(200,168,75,0.04)] text-2xl opacity-30">
+          🃏
         </div>
       )}
       <p
-        className={`truncate text-xs font-bold text-[#f0e6c8] ${slot.backgroundUrl ? "mt-2" : ""}`}
+        className={`truncate text-xs font-bold text-[#f0e6c8] ${slot.backgroundUrl ? "-mt-6 relative z-10" : ""}`}
       >
         {slot.deckName ?? `Deck ${slot.slotIndex + 1}`}
       </p>
@@ -266,8 +236,7 @@ function CosmeticQuickSheet({
     setMode("switcher");
     setLoadingSwitcher(true);
     try {
-      const res = await getCosmeticUploads(slot);
-      setUploads(res.uploads);
+      setUploads((await getCosmeticUploads(slot)).uploads);
     } catch {
       /* noop */
     } finally {
@@ -423,6 +392,75 @@ function CosmeticQuickSheet({
   );
 }
 
+// ── Pending friend request row ───────────────────────────────────────
+function PendingRequestRow({
+  requester,
+  onAccept,
+  onDecline,
+  busy,
+}: {
+  requester: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  onAccept: () => void;
+  onDecline: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(200,168,75,0.15)] bg-white/[0.02] p-3">
+      <Link
+        href={`/profile/${requester.username}`}
+        className="flex min-w-0 items-center gap-3"
+      >
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
+          {requester.avatarUrl ? (
+            <Image
+              src={requester.avatarUrl}
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[rgba(200,168,75,0.5)]">
+              {requester.displayName.slice(0, 1).toUpperCase()}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-[#f0e6c8]">
+            {requester.displayName}
+          </p>
+          <p className="truncate text-xs text-[rgba(200,168,75,0.40)]">
+            @{requester.username}
+          </p>
+        </div>
+      </Link>
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onAccept}
+          className="flex h-8 items-center gap-1 rounded-md border border-ayakashi-gold bg-ayakashi-gold px-2.5 text-[10px] font-bold uppercase tracking-widest text-black transition-colors hover:brightness-110 disabled:opacity-50"
+        >
+          <Check className="h-3 w-3" /> Accept
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDecline}
+          className="flex h-8 items-center justify-center rounded-md border border-red-500/40 px-2.5 text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Sort options ──────────────────────────────────────────────────
 const SORT_OPTIONS = [
   { id: "newest" as const, label: "Newest" },
@@ -430,13 +468,22 @@ const SORT_OPTIONS = [
   { id: "name" as const, label: "Name" },
 ];
 
+// ── Tab config — extend this array to add Achievements/Guild later ──
+type TabId = "decks" | "cards" | "friends";
+const TABS: { id: TabId; label: string }[] = [
+  { id: "decks", label: "Decks" },
+  { id: "cards", label: "Cards" },
+  { id: "friends", label: "Friends" },
+];
+
 // ── Main page ──────────────────────────────────────────────────────
-export default function ProfilePage() {
-  const params = useParams();
+export default function ProfilePage({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = usePromise(params);
   const router = useRouter();
-  const username = Array.isArray(params.username)
-    ? params.username[0]
-    : (params.username as string);
 
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -454,10 +501,16 @@ export default function ProfilePage() {
 
   const [friendStatus, setFriendStatus] = useState<FriendStatus>("none");
   const [friendBusy, setFriendBusy] = useState(false);
+  const [pendingBusy, setPendingBusy] = useState<string | null>(null);
 
   const [quickSheet, setQuickSheet] = useState<"avatar" | "banner" | null>(
     null,
   );
+
+  // ── swipeable tabs ──
+  const [activeTab, setActiveTab] = useState<TabId>("decks");
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScroll = useRef(false);
 
   const load = useCallback(
     async (page = 1, sort: "newest" | "rarity" | "name" = "newest") => {
@@ -478,9 +531,9 @@ export default function ProfilePage() {
           router.push("/login");
           return;
         }
-        if (err instanceof ApiResponseError && err.status === 404) {
+        if (err instanceof ApiResponseError && err.status === 404)
           setError("Player not found.");
-        } else setError("Couldn't load profile. Try refreshing.");
+        else setError("Couldn't load profile. Try refreshing.");
       } finally {
         setLoading(false);
         setCardsLoading(false);
@@ -498,7 +551,6 @@ export default function ProfilePage() {
     setCardsPage(1);
     load(1, s);
   };
-
   const handlePageChange = (p: number) => {
     setCardsPage(p);
     load(p, cardsSort);
@@ -527,12 +579,50 @@ export default function ProfilePage() {
         setFriendStatus((await sendFriendRequest(username)).friendStatus);
       else if (action === "accept")
         setFriendStatus((await acceptFriendRequest(username)).friendStatus);
-      else setFriendStatus((await removeFriend(username)).friendStatus);
+      else setFriendStatus((await removeFriend(username)).friendStatus); // covers both remove & decline
     } catch {
       /* noop */
     } finally {
       setFriendBusy(false);
     }
+  };
+
+  const handlePendingAction = async (
+    requesterUsername: string,
+    action: "accept" | "decline",
+  ) => {
+    setPendingBusy(requesterUsername);
+    try {
+      if (action === "accept") await acceptFriendRequest(requesterUsername);
+      else await removeFriend(requesterUsername); // decline == remove, per backend
+      await load(cardsPage, cardsSort); // refresh pendingReceived + friends list
+    } catch {
+      /* noop */
+    } finally {
+      setPendingBusy(null);
+    }
+  };
+
+  // ── tab <-> scroll sync ──
+  const scrollToTab = (tabId: TabId) => {
+    const idx = TABS.findIndex((t) => t.id === tabId);
+    const el = scrollerRef.current;
+    if (!el) return;
+    isProgrammaticScroll.current = true;
+    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+    setActiveTab(tabId);
+    setTimeout(() => {
+      isProgrammaticScroll.current = false;
+    }, 400);
+  };
+
+  const handleScroll = () => {
+    if (isProgrammaticScroll.current) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const tab = TABS[idx];
+    if (tab && tab.id !== activeTab) setActiveTab(tab.id);
   };
 
   if (loading)
@@ -577,10 +667,12 @@ export default function ProfilePage() {
     );
 
   const { identity, deck, cards, friends } = data;
+  const pendingCount =
+    (!friends.hidden && friends.pendingReceived?.length) || 0;
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-8 pb-8">
-      {/* ── Back button — floats over the banner ── */}
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 pb-8">
+      {/* ── Hero: overlapping banner + avatar ── */}
       <div className="relative">
         <button
           type="button"
@@ -590,7 +682,6 @@ export default function ProfilePage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </button>
 
-        {/* ── Banner (full-bleed, taller) ── */}
         <button
           type="button"
           disabled={!identity.isOwnProfile}
@@ -617,7 +708,6 @@ export default function ProfilePage() {
           )}
         </button>
 
-        {/* ── Avatar — overlaps the banner's bottom edge ── */}
         <div className="absolute -bottom-12 left-4 z-10 sm:-bottom-14 sm:left-6">
           <button
             type="button"
@@ -645,8 +735,8 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-8 px-4 sm:px-6 lg:px-8">
-        {/* ── Identity header — space reserved for the overlapping avatar ── */}
+      <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
+        {/* ── Identity header ── */}
         <div className="flex flex-col gap-3 pt-14 sm:pt-2 sm:pl-[124px]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -687,12 +777,21 @@ export default function ProfilePage() {
                 </>
               )}
               {identity.isOwnProfile && (
-                <Link
-                  href="/settings"
-                  className="rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
-                >
-                  Edit Profile
-                </Link>
+                <>
+                  {/* Own-profile like count IS shown — read-only, since
+                      the like button itself is meaningless on your own
+                      profile (can't self-like), but the count is still
+                      relevant information about you. */}
+                  <span className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.20)] px-3 py-1.5 text-xs font-bold text-[rgba(200,168,75,0.55)]">
+                    <Heart className="h-3.5 w-3.5" /> {fmt(likeCount)}
+                  </span>
+                  <Link
+                    href="/settings"
+                    className="rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                  >
+                    Edit Profile
+                  </Link>
+                </>
               )}
             </div>
           </div>
@@ -704,12 +803,9 @@ export default function ProfilePage() {
           )}
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-            {!identity.isOwnProfile && (
-              <span className="flex items-center gap-1">
-                <Heart className="h-3 w-3" /> {fmt(likeCount)} likes
-              </span>
+            {!friends.hidden && (
+              <span>👥 {friends.friends.length} friends</span>
             )}
-            {!friends.hidden && <span>👥 {friends.jids.length} friends</span>}
             <span>
               📅 Joined{" "}
               {new Date(identity.joinedAt).toLocaleDateString("en-US", {
@@ -722,134 +818,271 @@ export default function ProfilePage() {
 
         <hr className="gold-rule" />
 
-        {/* ── Decks ── */}
-        <div>
-          <div className="section-header mb-5">
-            <span className="section-header-text">Decks</span>
-          </div>
-          {deck.slots.every((s) => s.state === "locked") ? (
-            <p className="text-sm text-[rgba(200,168,75,0.40)]">
-              No decks yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {deck.slots
-                .filter(
-                  (s) => !(s.state === "locked" && !identity.isOwnProfile),
-                )
-                .map((slot) => (
-                  <DeckSlotCard key={slot.slotIndex} slot={slot} />
-                ))}
-            </div>
-          )}
-          {identity.isOwnProfile && (
-            <div className="mt-3">
+        {/* ── Tab bar ── */}
+        <div className="flex gap-0 border-b border-[rgba(200,168,75,0.15)]">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => scrollToTab(t.id)}
+              className={`relative flex-1 px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
+                activeTab === t.id
+                  ? "text-ayakashi-gold"
+                  : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
+              }`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                {t.label}
+                {t.id === "friends" && pendingCount > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                    {pendingCount}
+                  </span>
+                )}
+              </span>
+              {activeTab === t.id && (
+                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-ayakashi-gold shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Swipeable panels ── */}
+        <div
+          ref={scrollerRef}
+          onScroll={handleScroll}
+          className="flex snap-x snap-mandatory overflow-x-auto scrollbar-none"
+          style={{ scrollBehavior: "smooth" }}
+        >
+          {/* Decks panel */}
+          <div className="w-full shrink-0 snap-start px-0.5">
+            {deck.slots.every((s) => s.state === "locked") ? (
+              <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                No decks yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {deck.slots
+                  .filter(
+                    (s) => !(s.state === "locked" && !identity.isOwnProfile),
+                  )
+                  .map((slot) => (
+                    <DeckSlotCard key={slot.slotIndex} slot={slot} />
+                  ))}
+              </div>
+            )}
+            {identity.isOwnProfile && (
               <Link
                 href="/decks"
-                className="text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)] transition-colors hover:text-ayakashi-gold"
+                className="mt-4 inline-block text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)] transition-colors hover:text-ayakashi-gold"
               >
                 Manage Decks →
               </Link>
-            </div>
-          )}
-        </div>
-
-        <hr className="gold-rule" />
-
-        {/* ── Cards ── */}
-        <div>
-          <div className="section-header mb-5">
-            <span className="section-header-text">Cards</span>
+            )}
           </div>
 
-          {cards.hidden ? (
-            <p className="text-sm text-[rgba(200,168,75,0.40)]">
-              This player has hidden their card collection.
-            </p>
-          ) : (
-            <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs text-[rgba(200,168,75,0.45)]">
-                  {fmt(cards.totalCount)} card
-                  {cards.totalCount !== 1 ? "s" : ""}
-                </span>
-                <div className="flex gap-0 rounded-md border border-[rgba(200,168,75,0.20)] overflow-hidden">
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => handleSortChange(opt.id)}
-                      className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                        cardsSort === opt.id
-                          ? "bg-ayakashi-gold/15 text-ayakashi-gold"
-                          : "text-[rgba(200,168,75,0.40)] hover:text-[rgba(200,168,75,0.70)]"
-                      }`}
+          {/* Cards panel */}
+          <div className="w-full shrink-0 snap-start px-0.5">
+            {cards.hidden ? (
+              <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                This player has hidden their card collection.
+              </p>
+            ) : (
+              <>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-xs text-[rgba(200,168,75,0.45)]">
+                    {fmt(cards.totalCount)} card
+                    {cards.totalCount !== 1 ? "s" : ""}
+                  </span>
+                  <div className="flex gap-0 overflow-hidden rounded-md border border-[rgba(200,168,75,0.20)]">
+                    {SORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => handleSortChange(opt.id)}
+                        className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                          cardsSort === opt.id
+                            ? "bg-ayakashi-gold/15 text-ayakashi-gold"
+                            : "text-[rgba(200,168,75,0.40)] hover:text-[rgba(200,168,75,0.70)]"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {cardsLoading ? (
+                  <div className="flex h-40 items-center justify-center">
+                    <svg
+                      className="h-6 w-6 animate-spin text-ayakashi-gold"
+                      viewBox="0 0 24 24"
+                      fill="none"
                     >
-                      {opt.label}
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                  </div>
+                ) : cards.results.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                    No cards yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {cards.results.map((item) => (
+                      <CardTile
+                        key={item.instanceId}
+                        card={{
+                          shortId: item.shortId,
+                          name: item.name,
+                          seriesName: item.seriesName ?? "",
+                          rarity: item.rarity,
+                          isEvent: item.isEvent,
+                          eventName: item.eventName,
+                          thumbUrl: item.thumbUrl,
+                          mediaType: item.mediaType,
+                          fileExtension: item.fileExtension,
+                          ownerCount: item.ownerCount,
+                          wishlistCount: item.wishlistCount,
+                          totalIssued: item.totalIssued,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {!cardsLoading && cards.totalPages > 1 && (
+                  <div className="mt-5 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      disabled={cardsPage <= 1}
+                      onClick={() => handlePageChange(cardsPage - 1)}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
                     </button>
-                  ))}
+                    <div className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.55)]">
+                      <input
+                        type="number"
+                        min={1}
+                        max={cards.totalPages}
+                        value={cardsPage}
+                        onChange={(e) => {
+                          const p = Math.min(
+                            cards.totalPages,
+                            Math.max(1, Number(e.target.value) || 1),
+                          );
+                          handlePageChange(p);
+                        }}
+                        className="form-input h-8 w-14 border px-1.5 text-center text-xs outline-none"
+                      />
+                      <span>/ {cards.totalPages}</span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={cardsPage >= cards.totalPages}
+                      onClick={() => handlePageChange(cardsPage + 1)}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Friends panel */}
+          <div className="w-full shrink-0 snap-start px-0.5">
+            {friends.hidden ? (
+              <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                This player has hidden their friends list.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-6">
+                {identity.isOwnProfile &&
+                  friends.pendingReceived &&
+                  friends.pendingReceived.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+                        Requests ({friends.pendingReceived.length})
+                      </p>
+                      {friends.pendingReceived.map((r) => (
+                        <PendingRequestRow
+                          key={r.username}
+                          requester={r}
+                          busy={pendingBusy === r.username}
+                          onAccept={() =>
+                            handlePendingAction(r.username, "accept")
+                          }
+                          onDecline={() =>
+                            handlePendingAction(r.username, "decline")
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                <div className="flex flex-col gap-2">
+                  {friends.friends.length > 0 && (
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+                      Friends ({friends.friends.length})
+                    </p>
+                  )}
+                  {friends.friends.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                      No friends yet.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {friends.friends.map((f) => (
+                        <Link
+                          key={f.username}
+                          href={`/profile/${f.username}`}
+                          className="flex items-center gap-3 rounded-lg border border-[rgba(200,168,75,0.15)] bg-white/[0.02] p-3 transition-colors hover:border-ayakashi-gold/40"
+                        >
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
+                            {f.avatarUrl ? (
+                              <Image
+                                src={f.avatarUrl}
+                                alt=""
+                                width={40}
+                                height={40}
+                                className="h-full w-full object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[rgba(200,168,75,0.5)]">
+                                {f.displayName.slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-[#f0e6c8]">
+                              {f.displayName}
+                            </p>
+                            <p className="truncate text-xs text-[rgba(200,168,75,0.40)]">
+                              @{f.username}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {cardsLoading ? (
-                <div className="flex h-40 items-center justify-center">
-                  <svg
-                    className="h-6 w-6 animate-spin text-ayakashi-gold"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    />
-                  </svg>
-                </div>
-              ) : cards.results.length === 0 ? (
-                <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                  No cards yet.
-                </p>
-              ) : (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-                  {cards.results.map((item) => (
-                    <CardThumb key={item.instanceId} item={item} />
-                  ))}
-                </div>
-              )}
-
-              {!cardsLoading && cards.totalPages > 1 && (
-                <div className="mt-5 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    disabled={cardsPage <= 1}
-                    onClick={() => handlePageChange(cardsPage - 1)}
-                    className="h-9 rounded-md border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    ← Prev
-                  </button>
-                  <span className="text-xs text-[rgba(200,168,75,0.40)]">
-                    Page {cardsPage} / {cards.totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={cardsPage >= cards.totalPages}
-                    onClick={() => handlePageChange(cardsPage + 1)}
-                    className="h-9 rounded-md border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

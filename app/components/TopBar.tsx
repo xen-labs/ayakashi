@@ -13,37 +13,40 @@ import type { MeResponse } from "../../lib/api";
 const HIDDEN_ON = ["/profile", "/login", "/register"];
 
 const NAV_LINKS = [
-  { href: "/dashboard",   label: "Dashboard"   },
-  { href: "/shop",        label: "Shop"        },
-  { href: "/inventory",   label: "Inventory"   },
-  { href: "/upgrade",     label: "Upgrade"     },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/shop", label: "Shop" },
+  { href: "/inventory", label: "Inventory" },
+  { href: "/upgrade", label: "Upgrade" },
   { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 function formatCoin(n: number | null | undefined): string {
   if (n == null) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString("en-US");
 }
 
 export function TopBar({ user }: { user: MeResponse | null }) {
   const { ryo, kitsu } = useCurrency();
-  const router   = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const [loggingOut,  setLoggingOut]  = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const hidden = HIDDEN_ON.some(
-    (p) => pathname === p || pathname?.startsWith(p + "/")
+    (p) => pathname === p || pathname?.startsWith(p + "/"),
   );
 
   useEffect(() => {
     if (!profileOpen) return;
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      )
         setProfileOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -61,7 +64,11 @@ export function TopBar({ user }: { user: MeResponse | null }) {
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    try { await authLogout(); } catch { /* proceed anyway */ }
+    try {
+      await authLogout();
+    } catch {
+      /* proceed anyway */
+    }
     router.push("/login");
   };
 
@@ -89,13 +96,17 @@ export function TopBar({ user }: { user: MeResponse | null }) {
 
         {/* gold rule separator */}
         {isAuthenticated && (
-          <span className="hidden h-4 w-px bg-[rgba(200,168,75,0.25)] sm:block" aria-hidden="true" />
+          <span
+            className="hidden h-4 w-px bg-[rgba(200,168,75,0.25)] sm:block"
+            aria-hidden="true"
+          />
         )}
 
         {isAuthenticated && (
           <nav className="hidden items-center gap-5 sm:flex">
             {NAV_LINKS.map(({ href, label }) => {
-              const active = pathname === href || pathname?.startsWith(href + "/");
+              const active =
+                pathname === href || pathname?.startsWith(href + "/");
               return (
                 <Link
                   key={href}
@@ -117,7 +128,7 @@ export function TopBar({ user }: { user: MeResponse | null }) {
         {isAuthenticated && (
           <div className="flex items-center gap-2">
             {/* Ryo */}
-            <div className="topbar-coin flex items-center gap-1.5 px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5">
               <Image
                 src="/currency/ryo.webp"
                 alt="Ryo"
@@ -131,7 +142,7 @@ export function TopBar({ user }: { user: MeResponse | null }) {
               </span>
             </div>
             {/* Kitsu */}
-            <div className="topbar-coin flex items-center gap-1.5 px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5">
               <Image
                 src="/currency/kitsu.webp"
                 alt="Kitsu"
@@ -158,7 +169,10 @@ export function TopBar({ user }: { user: MeResponse | null }) {
               className="topbar-icon-btn flex items-center justify-center transition-colors"
             >
               <AvatarWithFrame
-                avatarSrc="/user-profile/user-profile/default-avatar.webp"
+                avatarSrc={
+                  user?.avatarUrl ||
+                  "/user-profile/user-profile/default-avatar.webp"
+                }
                 frameSrc="/user-profile/user-profile/default-avatar-frame.webp"
                 innerSize={26}
               />
@@ -168,8 +182,12 @@ export function TopBar({ user }: { user: MeResponse | null }) {
               <div className="topbar-dropdown absolute right-0 top-full mt-2 w-52 border shadow-[0_8px_40px_rgba(0,0,0,0.8)]">
                 {user && (
                   <div className="topbar-dropdown-header border-b px-4 py-3">
-                    <p className="text-sm font-bold text-[#f0e6c8]">{user.displayName}</p>
-                    <p className="topbar-dropdown-sub text-xs">@{user.username}</p>
+                    <p className="text-sm font-bold text-[#f0e6c8]">
+                      {user.displayName}
+                    </p>
+                    <p className="topbar-dropdown-sub text-xs">
+                      @{user.username}
+                    </p>
                   </div>
                 )}
 

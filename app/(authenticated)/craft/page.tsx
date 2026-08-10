@@ -57,7 +57,7 @@ function ItemArt({
   src,
   emoji,
   alt,
-  size = 56,
+  size = 64,
   rarity,
   className = "",
 }: {
@@ -107,7 +107,7 @@ function MaterialChip({ input }: { input: CraftInput }) {
         src={input.webappImage}
         emoji={input.emoji}
         alt={input.displayName}
-        size={26}
+        size={38}
         rarity={input.rarity}
       />
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
@@ -136,6 +136,7 @@ function RecipeCard({
   onCraft: (recipe: CraftRecipe) => void;
   busy: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const locked = !hasCraftingTable;
   const owned = recipe.alreadyOwnsTool;
   const unavailable = locked || owned || !recipe.canAfford;
@@ -155,19 +156,32 @@ function RecipeCard({
         : `${(recipe.output as { amount: number }).amount}`
       : `${(recipe.output as { amount: number }).amount}×`;
 
+  // Art priority: the recipe's own art (rituals, set in craftRecipes.ts)
+  // first, then the output item's registry art (tool/bag crafts), then
+  // the emoji fallback inside ItemArt itself.
+  const cardArt = recipe.webappImage ?? recipe.outputWebappImage;
+
   return (
     <div
-      className={`craft-card flex flex-col gap-4 rounded-xl p-4 ${locked ? "craft-card-locked" : ""}`}
+      className={`craft-card item-card-lift flex flex-col gap-4 rounded-xl p-4 ${locked ? "craft-card-locked" : ""} ${expanded ? "is-expanded" : ""}`}
+      onClick={() => setExpanded((v) => !v)}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((v) => !v);
+        }
+      }}
     >
       {/* Header row: output art + name + risk badge */}
       <div className="flex items-start gap-3">
         <ItemArt
-          src={
-            recipe.output.type === "item" ? recipe.outputWebappImage : undefined
-          }
+          src={cardArt}
           emoji={outputEmoji}
           alt={outputLabel}
-          size={52}
+          size={64}
           rarity={recipe.outputRarity}
         />
         <div className="min-w-0 flex-1">
@@ -186,10 +200,25 @@ function RecipeCard({
         )}
       </div>
 
+      {/* Description — collapsed preview, tap the card to read in full */}
       {recipe.description && (
-        <p className="text-[11px] leading-relaxed text-[rgba(200,168,75,0.40)] line-clamp-2">
-          {recipe.description}
-        </p>
+        <>
+          <div className="item-card-reveal">
+            <div>
+              <p className="pt-0.5 text-[11px] leading-relaxed text-[rgba(200,168,75,0.55)]">
+                {recipe.description}
+              </p>
+            </div>
+          </div>
+          {!expanded && (
+            <p className="line-clamp-1 text-[11px] leading-relaxed text-[rgba(200,168,75,0.40)]">
+              {recipe.description}{" "}
+              <span className="text-[rgba(200,168,75,0.30)]">
+                — tap to read
+              </span>
+            </p>
+          )}
+        </>
       )}
 
       {/* Materials */}
@@ -222,7 +251,10 @@ function RecipeCard({
       <button
         type="button"
         disabled={unavailable || busy}
-        onClick={() => onCraft(recipe)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCraft(recipe);
+        }}
         className="h-9 rounded-md border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.18)] disabled:text-[rgba(200,168,75,0.22)] disabled:hover:bg-transparent"
       >
         {busy
@@ -323,8 +355,10 @@ function CraftModal({
 
   const outputEmoji =
     recipe.output.type === "kitsu" ? "🔥" : (recipe.outputEmoji ?? "");
-  const outputWebappImage =
-    recipe.output.type === "item" ? recipe.outputWebappImage : undefined;
+  // Same priority as the card: ritual's own art first, then the output
+  // item's registry art — previously this only ever checked the item
+  // path, so every kitsu-yielding ritual's modal fell back to emoji.
+  const modalArt = recipe.webappImage ?? recipe.outputWebappImage;
 
   const canDismiss = phase !== "rolling";
 
@@ -352,7 +386,18 @@ function CraftModal({
             <div className="relative flex h-28 w-28 items-center justify-center">
               <div className="rune-spin absolute inset-0 rounded-full border-2 border-dashed border-[rgba(200,168,75,0.35)]" />
               <div className="rune-spin-reverse absolute inset-3 rounded-full border border-[rgba(200,168,75,0.20)]" />
-              <span className="text-4xl">{outputEmoji || "✦"}</span>
+              {modalArt ? (
+                <ItemArt
+                  src={modalArt}
+                  emoji={outputEmoji}
+                  alt={recipe.name}
+                  size={72}
+                  rarity={recipe.outputRarity}
+                  className="opacity-70"
+                />
+              ) : (
+                <span className="text-4xl">{outputEmoji || "✦"}</span>
+              )}
             </div>
             <div>
               <p className="font-display text-sm font-bold tracking-wide text-[#f0e6c8]">
@@ -369,9 +414,9 @@ function CraftModal({
           <>
             <div className="reveal-pop relative flex h-28 w-28 items-center justify-center">
               <div className="reveal-glow-pulse absolute inset-0 rounded-full bg-[#c8a84b]/20 blur-xl" />
-              {outputWebappImage ? (
+              {modalArt ? (
                 <ItemArt
-                  src={outputWebappImage}
+                  src={modalArt}
                   emoji={outputEmoji}
                   alt={recipe.name}
                   size={96}

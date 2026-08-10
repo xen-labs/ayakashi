@@ -3,7 +3,6 @@
 import { useAuth } from "../../lib/useAuth";
 import { TopBar } from "./TopBar";
 import { CurrencyProvider } from "./CurrencyContext";
-import { GithubCredits } from "./GithubCredits";
 import { BottomNav } from "./BottomNav";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -45,7 +44,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         {/* pb-16 reserves space so content clears the fixed bottom nav */}
         <div className="flex min-h-[calc(100dvh-56px)] flex-col pb-16">
           <main className="flex-1">{children}</main>
-          <GithubCredits />
         </div>
         <BottomNav />
       </div>

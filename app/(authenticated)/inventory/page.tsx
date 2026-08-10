@@ -14,36 +14,41 @@ import type {
 import { CurrencyIcon } from "../../components/CurrencyIcon";
 
 // ── Item art — image with emoji fallback (matches craft/upgrade) ────
+// Bug fix: this used to hardcode src={`/items/${item.itemId}.webp`},
+// a path that doesn't exist — the real asset lives wherever the
+// backend's item registry says (item.webappImage, already returned by
+// GET /inventory), so every image 404'd and silently fell back to the
+// emoji. Now reads the real field. Default size bumped from 48 to 72
+// for larger, more premium-feeling thumbnails.
+// Fills the width of its parent rather than a fixed pixel size, so it
+// scales naturally with the 2-up mobile grid instead of looking small
+// and boxed-in on narrower cards — matches the shop's art-forward
+// card treatment.
 function ItemArt({
   src,
   emoji,
   alt,
-  size = 48,
 }: {
   src?: string;
   emoji: string;
   alt: string;
-  size?: number;
 }) {
   const [broken, setBroken] = useState(false);
   const showImg = src && !broken;
   return (
-    <div
-      className="relative flex shrink-0 items-center justify-center rounded-lg bg-black/40 shadow-[0_0_0_1px_rgba(200,168,75,0.20)]"
-      style={{ width: size, height: size }}
-    >
+    <div className="relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40 shadow-[0_0_0_1px_rgba(200,168,75,0.20)]">
       {showImg ? (
         <Image
           src={src}
           alt={alt}
-          width={size}
-          height={size}
-          className="object-contain p-1"
+          fill
+          sizes="(max-width: 640px) 45vw, 220px"
+          className="object-contain p-2.5 transition-transform duration-300 group-hover:scale-105"
           unoptimized
           onError={() => setBroken(true)}
         />
       ) : (
-        <span style={{ fontSize: size * 0.45 }}>{emoji}</span>
+        <span className="text-5xl">{emoji}</span>
       )}
     </div>
   );
@@ -89,21 +94,35 @@ function durabilityLabel(item: InventoryItem): string | null {
 
 // ── Single item card ───────────────────────────────────────────────
 function ItemCard({ item }: { item: InventoryItem }) {
+  const [expanded, setExpanded] = useState(false);
   const dur = durabilityLabel(item);
   const ringClass = item.rarity ? RARITY_RING[item.rarity] : "";
 
   return (
-    <div className="craft-card flex flex-col gap-3 rounded-xl p-4">
-      <div className="flex items-start gap-3">
-        <div className={`rounded-lg ${ringClass}`}>
-          <ItemArt
-            src={`/items/${item.itemId}.webp`}
-            emoji={item.emoji}
-            alt={item.name}
-            size={48}
-          />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <div
+      className={`craft-card item-card-lift group flex flex-col overflow-hidden rounded-xl ${expanded ? "is-expanded" : ""}`}
+      onClick={() => setExpanded((v) => !v)}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((v) => !v);
+        }
+      }}
+    >
+      {/* Art leads the card, full-width — matches shop's art-forward
+          treatment so both pages feel like one system. */}
+      <div className={`relative ${ringClass}`}>
+        <ItemArt src={item.webappImage} emoji={item.emoji} alt={item.name} />
+        <span className="absolute right-2 top-2 rounded-md border border-[rgba(200,168,75,0.35)] bg-black/70 px-2 py-1 text-xs font-bold tabular-nums text-[#e6c96a] backdrop-blur-sm">
+          ×{item.quantity}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <span className="font-display truncate text-sm font-bold leading-tight text-[#f0e6c8]">
             {item.name}
           </span>
@@ -115,44 +134,52 @@ function ItemCard({ item }: { item: InventoryItem }) {
             </span>
           )}
         </div>
-        <span className="shrink-0 rounded-md border border-[rgba(200,168,75,0.30)] bg-[rgba(200,168,75,0.08)] px-2.5 py-1 text-sm font-bold tabular-nums text-[#e6c96a]">
-          ×{item.quantity}
-        </span>
+
+        {/* Flavor text — collapsed by default, tap the card to reveal in
+            full. Grid-rows based so it animates smoothly either way. */}
+        {item.flavor && (
+          <div className="item-card-reveal">
+            <div>
+              <p className="pt-0.5 text-[11px] italic leading-5 text-[rgba(200,168,75,0.55)]">
+                {item.flavor}
+              </p>
+            </div>
+          </div>
+        )}
+        {item.flavor && !expanded && (
+          <p className="line-clamp-1 text-[10px] italic leading-5 text-[rgba(200,168,75,0.35)]">
+            {item.flavor} <span className="not-italic">— tap to read</span>
+          </p>
+        )}
+
+        {(dur || item.toolLevel != null) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {dur && (
+              <span className="rounded border border-[rgba(200,168,75,0.22)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+                {dur}
+              </span>
+            )}
+            {item.toolLevel != null && (
+              <span className="rounded border border-blue-500/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-blue-400">
+                Lvl {item.toolLevel}
+              </span>
+            )}
+          </div>
+        )}
+
+        {item.toolLevel != null && item.nextLevelCost && (
+          <div className="flex items-center justify-between rounded-md border border-[rgba(200,168,75,0.12)] bg-white/[0.02] px-2.5 py-1.5 text-[10px]">
+            <span className="uppercase tracking-wider text-[rgba(200,168,75,0.40)]">
+              Next level
+            </span>
+            <span className="flex items-center gap-1 font-bold text-[rgba(200,168,75,0.65)]">
+              <CurrencyIcon type="ryo" size={11} />{" "}
+              {item.nextLevelCost.ryo.toLocaleString()} +{" "}
+              {item.nextLevelCost.materialQty}×mat
+            </span>
+          </div>
+        )}
       </div>
-
-      {item.flavor && (
-        <p className="line-clamp-2 text-[11px] italic leading-5 text-[rgba(200,168,75,0.42)]">
-          {item.flavor}
-        </p>
-      )}
-
-      {(dur || item.toolLevel != null) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {dur && (
-            <span className="rounded border border-[rgba(200,168,75,0.22)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
-              {dur}
-            </span>
-          )}
-          {item.toolLevel != null && (
-            <span className="rounded border border-blue-500/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-blue-400">
-              Lvl {item.toolLevel}
-            </span>
-          )}
-        </div>
-      )}
-
-      {item.toolLevel != null && item.nextLevelCost && (
-        <div className="flex items-center justify-between rounded-md border border-[rgba(200,168,75,0.12)] bg-white/[0.02] px-2.5 py-1.5 text-[10px]">
-          <span className="uppercase tracking-wider text-[rgba(200,168,75,0.40)]">
-            Next level
-          </span>
-          <span className="flex items-center gap-1 font-bold text-[rgba(200,168,75,0.65)]">
-            <CurrencyIcon type="ryo" size={11} />{" "}
-            {item.nextLevelCost.ryo.toLocaleString()} +{" "}
-            {item.nextLevelCost.materialQty}×mat
-          </span>
-        </div>
-      )}
     </div>
   );
 }
@@ -419,7 +446,7 @@ export default function Inventory() {
           <p className="text-[11px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
             {filtered.length} item{filtered.length !== 1 ? "s" : ""}
           </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
             {filtered.map((item) => (
               <ItemCard key={item.itemId} item={item} />
             ))}
