@@ -821,3 +821,150 @@ dialog::backdrop {
 .card-tile.is-active .card-tile-sheen {
   opacity: 1;
 }
+
+/* ── Trade page — row entrance, swap-arrow pulse, offer reveal ────── */
+@keyframes trade-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.trade-row-in {
+  animation: trade-row-in 0.3s ease-out backwards;
+}
+
+/* Gentle back-and-forth on the swap glyph in each trade row — reads as
+   "things are moving between two people" without being distracting at
+   rest. Paused on the badge stack so it doesn't fight for attention
+   with the status color. */
+@keyframes trade-swap-drift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+}
+.trade-swap-icon {
+  animation: trade-swap-drift 2.2s ease-in-out infinite;
+}
+
+/* Pending/countered status badges get a slow breathing glow — signals
+   "needs attention" at a glance across a long trade list, distinct
+   from the flat, static treatment on resolved (accepted/declined/
+   expired) trades. */
+@keyframes trade-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  50% {
+    box-shadow: 0 0 10px 1px rgba(245, 158, 11, 0.25);
+  }
+}
+.trade-status-pending {
+  animation: trade-status-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes trade-offer-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.trade-offer-in {
+  animation: trade-offer-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Leaderboard — podium glow, row entrance, value tick ──────────── */
+@keyframes leader-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.leader-row-in {
+  animation: leader-row-in 0.3s ease-out backwards;
+}
+
+/* Ambient glow behind rank 1-3 medals — same "this row matters more"
+   signal as .rarity-ring-legendary elsewhere, tuned per rank color via
+   an inline custom property rather than three near-duplicate classes. */
+@keyframes leader-podium-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.12);
+  }
+}
+.leader-podium-glow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    var(--podium-color, rgba(200, 168, 75, 0.4)),
+    transparent 70%
+  );
+  animation: leader-podium-glow 2.6s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes leader-tab-underline-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.leader-tab-underline {
+  animation: leader-tab-underline-in 0.25s ease-out both;
+  transform-origin: center;
+}
+
+/* ── Player search — result entrance, avatar hover ring ───────────── */
+@keyframes search-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.search-row-in {
+  animation: search-row-in 0.22s ease-out backwards;
+}
+
+@keyframes search-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(200, 168, 75, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(200, 168, 75, 0.18);
+  }
+}
+.search-loading-ring {
+  animation: search-pulse-ring 1.6s ease-in-out infinite;
+}

@@ -58,6 +58,7 @@ function ItemArt({
 const CATEGORY_TABS: { id: ItemCategory | "all"; label: string }[] = [
   { id: "all", label: "All" },
   { id: "material", label: "Materials" },
+  { id: "food", label: "Food" },
   { id: "rob_gear", label: "Rob Gear" },
   { id: "consumable", label: "Consumables" },
   { id: "vault_upgrade", label: "Upgrades" },

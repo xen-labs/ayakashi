@@ -31,7 +31,14 @@ const TABS: { id: ShopSection; label: string; icon: string }[] = [
 ];
 
 // ── One-of-a-kind permanent items ──────────────────────────────────
-const ONE_OF_A_KIND = new Set(["crafting_table", "home_vault", "debit_card"]);
+const ONE_OF_A_KIND = new Set([
+  "crafting_table",
+  "home_vault",
+  "debit_card",
+  "gear_hunting_rifle",
+  "gear_hoe",
+  "gear_cooking_pot",
+]);
 
 // ── Rarity theming — border/glow/text tint per rarity tier ─────────
 const RARITY_STYLES: Record<

@@ -301,6 +301,11 @@ export type ItemCategory =
   | "consumable"
   | "rob_gear"
   | "vault_upgrade"
+  | "cosmetic_pass"
+  | "hunting_gear"
+  | "farming_gear"
+  | "cooking_gear"
+  | "food"
   | "misc";
 
 export interface InventoryItem {
@@ -373,6 +378,7 @@ export interface CardInstance {
     rarity: "C" | "R" | "SR" | "SSR" | "UR";
     seriesName: string;
     mediaUrl: string;
+    fileExtension: CardFileExtension;
   } | null;
 }
 
@@ -408,6 +414,7 @@ export interface ToolStatus {
   tool: "gear_shovel" | "gear_fishing_rod" | "gear_pickaxe";
   name: string;
   emoji: string;
+  webappImage?: string;
   level: 0 | 1 | 2 | 3;
   atMax: boolean;
   nextLevelCost: {
@@ -1400,3 +1407,154 @@ export interface HomeStatsResponse {
 }
 
 export const getHomeStats = () => apiFetch<HomeStatsResponse>("/home/stats");
+// ── Marketplace ──────────────────────────────────────────────────
+// GET  /marketplace                    — browse/search/filter/sort listings
+// GET  /marketplace/card/:instanceId   — one listing's full detail
+// POST /marketplace/list               — list an owned card at a Kitsu price
+// POST /marketplace/buy/:instanceId    — buy a listed card at its listed price
+// POST /marketplace/cancel/:instanceId — pull an unsold listing back
+//
+// Kitsu-only — see routes/marketplace.ts's header for why (Ryo already
+// flows freely elsewhere; Kitsu is the marketplace's "real value" currency).
+
+export type MarketplaceSort = "price_asc" | "price_desc" | "newest" | "rarity";
+
+export interface MarketplaceListingCard {
+  name: string;
+  rarity: CatalogCardRarity;
+  seriesName: string;
+  mediaUrl: string;
+  mediaType: string;
+  currentPrice: number;
+}
+
+export interface MarketplaceListing {
+  instanceId: string;
+  issueNumber: number;
+  sellerId: string;
+  price: number;
+  listedAt: string;
+  card: MarketplaceListingCard | null;
+}
+
+export interface MarketplaceBrowseResponse {
+  page: number;
+  totalPages: number;
+  total: number;
+  listings: MarketplaceListing[];
+}
+
+export interface MarketplaceBrowseQuery {
+  page?: number;
+  sort?: MarketplaceSort;
+  /** comma-separated, e.g. "SR,SSR,UR" */
+  rarity?: string;
+  seriesName?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  q?: string;
+  /** Scope results to the caller's own active listings */
+  mine?: boolean;
+}
+
+function buildMarketplaceQuery(params?: MarketplaceBrowseQuery): string {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.sort) qs.set("sort", params.sort);
+  if (params?.rarity) qs.set("rarity", params.rarity);
+  if (params?.seriesName) qs.set("seriesName", params.seriesName);
+  if (params?.minPrice !== undefined)
+    qs.set("minPrice", String(params.minPrice));
+  if (params?.maxPrice !== undefined)
+    qs.set("maxPrice", String(params.maxPrice));
+  if (params?.q) qs.set("q", params.q);
+  if (params?.mine) qs.set("mine", "true");
+  return qs.toString();
+}
+
+export const getMarketplaceListings = (params?: MarketplaceBrowseQuery) => {
+  const query = buildMarketplaceQuery(params);
+  return apiFetch<MarketplaceBrowseResponse>(
+    `/marketplace${query ? `?${query}` : ""}`,
+  );
+};
+
+export interface MarketplaceCardDetail {
+  card: {
+    shortId: string;
+    name: string;
+    seriesName: string;
+    tier: number;
+    rarity: CatalogCardRarity;
+    source: string;
+    isEvent: boolean;
+    eventName: string | null;
+    mediaUrl: string;
+    mediaType: string;
+    fileExtension: CardFileExtension;
+    totalIssued: number;
+    totalInCirculation: number;
+    ownerCount: number;
+    basePrice: number;
+    currentPrice: number;
+    wishlistCount: number;
+    isCustom: boolean;
+    creatorCredit: string | null;
+  } | null;
+  currentOwnerId: string;
+  issueNumber: number;
+  condition: string;
+  listing: { type: "market"; price: number; listedAt: string } | null;
+  wishlistCount: number;
+  history: {
+    ownerId: string;
+    ownerName: string;
+    ownerAvatarUrl: string | null;
+    method: string;
+    fromOwnerId: string | null;
+    fromOwnerName: string | null;
+    price: number | null;
+    acquiredAt: string;
+  }[];
+  wishlisters: {
+    playerId: string;
+    name: string;
+    avatarUrl: string | null;
+  }[];
+}
+
+export const getMarketplaceCardDetail = (instanceId: string) =>
+  apiFetch<MarketplaceCardDetail>(
+    `/marketplace/card/${encodeURIComponent(instanceId)}`,
+  );
+
+export interface ListCardResponse {
+  instanceId: string;
+  price: number;
+  listedAt: string;
+}
+export const listCardOnMarketplace = (instanceId: string, price: number) =>
+  apiFetch<ListCardResponse>("/marketplace/list", {
+    method: "POST",
+    body: JSON.stringify({ instanceId, price }),
+  });
+
+export interface BuyListingResponse {
+  instanceId: string;
+  cardId: string;
+  price: number;
+}
+export const buyMarketplaceListing = (instanceId: string) =>
+  apiFetch<BuyListingResponse>(
+    `/marketplace/buy/${encodeURIComponent(instanceId)}`,
+    { method: "POST" },
+  );
+
+export interface CancelListingResponse {
+  instanceId: string;
+}
+export const cancelMarketplaceListing = (instanceId: string) =>
+  apiFetch<CancelListingResponse>(
+    `/marketplace/cancel/${encodeURIComponent(instanceId)}`,
+    { method: "POST" },
+  );

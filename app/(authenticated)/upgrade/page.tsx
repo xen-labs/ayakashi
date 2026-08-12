@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ShieldAlert, Wrench, Landmark, Home } from "lucide-react";
+import { ShieldAlert, Wrench, Landmark, Home, Sparkles, X } from "lucide-react";
 import {
   getUpgradeTools,
   upgradeTool,
@@ -32,61 +32,90 @@ const TOOL_EMOJIS: Record<string, string> = {
   gear_pickaxe: "⛏️",
 };
 
-// ── Item art — image with emoji fallback (matches craft page) ───────
+// Client-side display copy of games/upgradeItems.ts's TOOL_BREAK_CHANCE —
+// purely presentational (an approximate reliability line on the card),
+// not used for any calculation, so it's fine to inline rather than add
+// a backend field just to show it. If the backend curve changes, update
+// this to match — worst case is a stale flavor line, not a wrong price.
+const TOOL_RELIABILITY: Record<0 | 1 | 2 | 3, string> = {
+  0: "",
+  1: "Reliable — rarely breaks",
+  2: "Riskiest tier — real wear starts here",
+  3: "Durable — safer than Lv.2, not quite Lv.1",
+};
+
+// ── Item art — image with emoji fallback. Reads tool.webappImage, resolved
+// server-side per the tool's CURRENT level via itemRegistry.ts (see
+// upgrade.ts's GET /upgrade/tools). Previously this hardcoded a bare
+// /items/${tool}.webp path that never matched any real asset location and
+// silently fell back to the emoji for every tool at every level. ───────
 function ItemArt({
   src,
   emoji,
   alt,
-  size = 48,
+  frame = "card",
 }: {
   src?: string;
   emoji: string;
   alt: string;
-  size?: number;
+  frame?: "card" | "thumb";
 }) {
   const [broken, setBroken] = useState(false);
   const showImg = src && !broken;
+  const isThumb = frame === "thumb";
   return (
     <div
-      className="relative flex shrink-0 items-center justify-center rounded-lg bg-black/40 shadow-[0_0_0_1px_rgba(200,168,75,0.20)]"
-      style={{ width: size, height: size }}
+      className={`relative flex items-center justify-center overflow-hidden bg-[rgba(200,168,75,0.04)] ${
+        isThumb
+          ? "h-16 w-16 shrink-0 rounded-lg border border-[rgba(200,168,75,0.15)]"
+          : "aspect-square w-full border-b border-[rgba(200,168,75,0.12)]"
+      }`}
     >
       {showImg ? (
         <Image
           src={src}
           alt={alt}
-          width={size}
-          height={size}
-          className="object-contain p-1"
+          width={isThumb ? 64 : 200}
+          height={isThumb ? 64 : 200}
+          className={`relative object-contain drop-shadow-[0_4px_16px_rgba(200,168,75,0.35)] transition-transform duration-300 group-hover:scale-[1.08] ${
+            isThumb ? "h-11 w-11" : "h-[80%] w-[80%] p-2"
+          }`}
           unoptimized
           onError={() => setBroken(true)}
         />
       ) : (
-        <span style={{ fontSize: size * 0.5 }}>{emoji}</span>
+        <span
+          className={`relative leading-none select-none transition-transform duration-300 group-hover:scale-110 ${isThumb ? "text-3xl" : "text-7xl"}`}
+        >
+          {emoji}
+        </span>
       )}
     </div>
   );
 }
 
-// ── Level pips ────────────────────────────────────────────────────
+// ── Level pips — filled pip now carries the gold glow the rest of the
+// site's rarity system uses, plus a lit-in-sequence entrance instead of
+// a static row, so hitting a new level actually reads as an event.
 function LevelPips({ level, max = 3 }: { level: number; max?: number }) {
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: max }).map((_, i) => (
         <div
           key={i}
-          className={`h-2 w-6 rounded-sm transition-colors duration-300 ${
+          className={`h-2 w-6 rounded-sm transition-all duration-500 ${
             i < level
-              ? "bg-ayakashi-gold shadow-[0_0_6px_rgba(200,168,75,0.6)]"
+              ? "bg-ayakashi-gold shadow-[0_0_8px_rgba(200,168,75,0.65)]"
               : "bg-[rgba(200,168,75,0.12)]"
           }`}
+          style={{ transitionDelay: i < level ? `${i * 80}ms` : "0ms" }}
         />
       ))}
     </div>
   );
 }
 
-// ── Fill bar — used for bank cap + vault caps ────────────────────────
+// ── Fill bar ──────────────────────────────────────────────────────
 function FillBar({
   value,
   max,
@@ -107,7 +136,7 @@ function FillBar({
   );
 }
 
-// ── Health bar — color shifts gold → amber → red as it drops ────────
+// ── Health bar ────────────────────────────────────────────────────
 function HealthBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const color =
@@ -129,98 +158,203 @@ function HealthBar({ value, max }: { value: number; max: number }) {
 }
 
 // ── Tool card ─────────────────────────────────────────────────────
+// Rebuilt on craft-card + item-card-lift (the same hover-lift/shadow
+// combo shop and inventory already use) instead of the generic
+// form-card, plus a shop-card-in staggered entrance so the three tool
+// cards animate in rather than just appearing. The cost row now
+// pulses red (chip-short-pulse, borrowed from craft's insufficient-
+// material warning) when the player can't currently afford the next
+// level, instead of showing the exact same static cost chip whether
+// affordable or not.
 function ToolCard({
   tool,
+  index,
   hasCraftingTable,
+  canAfford,
   onUpgrade,
   busy,
 }: {
   tool: ToolStatus;
+  index: number;
   hasCraftingTable: boolean;
+  canAfford: boolean;
   onUpgrade: (toolId: string) => void;
   busy: boolean;
 }) {
   const locked = !hasCraftingTable;
   const notCrafted = tool.level === 0;
   const canUpgrade = !tool.atMax && !locked && !busy && !notCrafted;
+  const reliability = TOOL_RELIABILITY[tool.level];
 
   return (
     <div
-      className={`form-card flex flex-col gap-4 rounded-xl border p-5 transition-all duration-200 ${
-        locked ? "opacity-50" : "hover:border-[rgba(200,168,75,0.35)]"
+      className={`craft-card item-card-lift group flex flex-col overflow-hidden rounded-xl [animation:shop-card-in_0.35s_ease-out_backwards] ${
+        locked ? "craft-card-locked" : ""
       }`}
+      style={{ animationDelay: `${index * 60}ms` }}
     >
-      <div className="flex items-center gap-3">
+      <div className="relative">
         <ItemArt
-          src={`/items/${tool.tool}.webp`}
+          src={tool.webappImage}
           emoji={TOOL_EMOJIS[tool.tool] ?? tool.emoji}
           alt={tool.name}
-          size={48}
         />
-        <div className="flex flex-col gap-1">
-          <span className="font-display text-sm font-bold text-[#f0e6c8]">
-            {tool.name}
-          </span>
-          <LevelPips level={tool.level} />
-        </div>
-        <span className="ml-auto shrink-0 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
+        <span className="absolute right-2 top-2 rounded border border-[rgba(200,168,75,0.35)] bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a84b] backdrop-blur-sm">
           {tool.atMax ? "Max" : notCrafted ? "Not Owned" : `Lv ${tool.level}`}
         </span>
       </div>
 
-      {tool.nextLevelCost && !tool.atMax && !notCrafted && (
-        <div className="flex items-center gap-4 rounded-md border border-[rgba(200,168,75,0.15)] bg-white/[0.02] px-3 py-2 text-xs text-[rgba(200,168,75,0.65)]">
-          <span className="flex items-center gap-1 whitespace-nowrap">
-            <CurrencyIcon type="ryo" size={14} />{" "}
-            {formatNumber(tool.nextLevelCost.ryo)}
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-sm font-bold text-[#f0e6c8]">
+            {tool.name}
           </span>
-          <span className="text-[rgba(200,168,75,0.30)]">+</span>
-          <span className="truncate">
-            ×{tool.nextLevelCost.materialQty} {tool.nextLevelCost.material}
-          </span>
+          <LevelPips level={tool.level} />
+          {reliability && !tool.atMax && (
+            <p className="text-[10px] italic leading-4 text-[rgba(200,168,75,0.45)]">
+              {reliability}
+            </p>
+          )}
         </div>
-      )}
 
-      {notCrafted && !locked && (
-        <p className="text-[11px] text-[rgba(200,168,75,0.45)]">
-          Craft one first, then upgrade it here.
-        </p>
-      )}
-      {locked && (
-        <p className="flex items-center gap-1.5 text-[11px] text-[rgba(200,168,75,0.40)]">
-          <ShieldAlert className="h-3.5 w-3.5" /> Requires Crafting Table
-        </p>
-      )}
+        {tool.nextLevelCost && !tool.atMax && !notCrafted && (
+          <div
+            className={`flex items-center gap-3 rounded-md border px-3 py-2 text-xs transition-colors ${
+              canAfford
+                ? "border-[rgba(200,168,75,0.15)] bg-white/[0.02] text-[rgba(200,168,75,0.65)]"
+                : "chip-short border-red-500/35 bg-red-500/5 text-red-300/80"
+            }`}
+          >
+            <span className="flex items-center gap-1 whitespace-nowrap">
+              <CurrencyIcon type="ryo" size={14} />{" "}
+              {formatNumber(tool.nextLevelCost.ryo)}
+            </span>
+            <span className="text-[rgba(200,168,75,0.30)]">+</span>
+            <span className="truncate">
+              ×{tool.nextLevelCost.materialQty} {tool.nextLevelCost.material}
+            </span>
+          </div>
+        )}
 
-      <button
-        type="button"
-        disabled={!canUpgrade}
-        onClick={() => onUpgrade(tool.tool)}
-        className="mt-auto h-9 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent"
-      >
-        {tool.atMax
-          ? "Maxed Out"
-          : notCrafted
-            ? "Craft in Craft Page"
-            : busy
-              ? "Upgrading…"
-              : `Upgrade to Lv ${tool.level + 1}`}
-      </button>
+        {notCrafted && !locked && (
+          <p className="text-[11px] text-[rgba(200,168,75,0.45)]">
+            Craft one first, then upgrade it here.
+          </p>
+        )}
+        {locked && (
+          <p className="flex items-center gap-1.5 text-[11px] text-[rgba(200,168,75,0.40)]">
+            <ShieldAlert className="h-3.5 w-3.5" /> Requires Crafting Table
+          </p>
+        )}
+
+        <button
+          type="button"
+          disabled={!canUpgrade}
+          onClick={() => onUpgrade(tool.tool)}
+          className="mt-auto h-9 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.20)] disabled:text-[rgba(200,168,75,0.25)] disabled:hover:bg-transparent"
+        >
+          {tool.atMax
+            ? "Maxed Out"
+            : notCrafted
+              ? "Craft in Craft Page"
+              : busy
+                ? "Upgrading…"
+                : `Upgrade to Lv ${tool.level + 1}`}
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── Stat row for bank/vault sections ──────────────────────────────
+// ── Stat row ──────────────────────────────────────────────────────
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between border-b border-[rgba(200,168,75,0.08)] py-2 last:border-0">
       <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
         {label}
       </span>
-      <span className="text-sm font-bold tabular-nums text-[#e6c96a]">
+      <span
+        key={value}
+        className="number-tick text-sm font-bold tabular-nums text-[#e6c96a]"
+      >
         {value}
       </span>
     </div>
+  );
+}
+
+// ── Result modal — reuses shop's exact reveal-pop / shake-fail
+// celebration language for tool/bank/vault upgrades, instead of a flat
+// text toast. Keeps the same craft-modal-pop entrance as every other
+// modal on the site. ──────────────────────────────────────────────
+type ResultPhase = "success" | "fail";
+
+function ResultModal({
+  phase,
+  title,
+  detail,
+  onClose,
+}: {
+  phase: ResultPhase;
+  title: string;
+  detail: string;
+  onClose: () => void;
+}) {
+  return (
+    <dialog
+      open
+      className="craft-modal-pop fixed inset-0 z-50 m-auto w-full max-w-sm border border-[rgba(200,168,75,0.35)] bg-[#0d0c00] p-0 text-[#f0e6c8] outline-none backdrop:bg-black/80 backdrop:backdrop-blur-sm"
+      aria-modal="true"
+    >
+      {phase === "success" ? (
+        <div className="flex flex-col items-center gap-5 px-8 py-10 text-center">
+          <div className="reveal-pop relative flex h-24 w-24 items-center justify-center">
+            <div className="reveal-glow-pulse absolute inset-0 rounded-full bg-[#c8a84b]/20 blur-xl" />
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(200,168,75,0.30)] bg-black/40">
+              <Sparkles className="h-9 w-9 text-[#e6c96a]" />
+            </div>
+            <span
+              className="ember-particle absolute bottom-0 left-3 h-1.5 w-1.5 rounded-full bg-[#e6c96a]"
+              style={{ animationDelay: "0s" }}
+            />
+            <span
+              className="ember-particle absolute bottom-0 right-4 h-1.5 w-1.5 rounded-full bg-[#e6c96a]"
+              style={{ animationDelay: "0.4s" }}
+            />
+            <span
+              className="ember-particle absolute bottom-2 left-1/2 h-1.5 w-1.5 rounded-full bg-[#e6c96a]"
+              style={{ animationDelay: "0.8s" }}
+            />
+          </div>
+          <div>
+            <p className="font-display text-lg font-bold tracking-wide text-[#e6c96a]">
+              {title}
+            </p>
+            <p className="number-tick mt-1 text-sm text-[#f0e6c8]">{detail}</p>
+          </div>
+          <button type="button" onClick={onClose} className="brush-btn w-40">
+            Nice
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-5 px-8 py-10 text-center">
+          <div className="shake-fail flex h-24 w-24 items-center justify-center rounded-full border border-red-500/30 bg-red-500/5">
+            <X className="h-10 w-10 text-red-400/80" />
+          </div>
+          <div>
+            <p className="font-display text-lg font-bold tracking-wide text-red-400">
+              {title}
+            </p>
+            <p className="mt-1 text-xs text-[rgba(200,168,75,0.45)]">
+              {detail}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="brush-btn w-40">
+            Close
+          </button>
+        </div>
+      )}
+    </dialog>
   );
 }
 
@@ -237,8 +371,11 @@ export default function Upgrade() {
   const [busyBank, setBusyBank] = useState(false);
   const [busyVault, setBusyVault] = useState(false);
   const [busyRepair, setBusyRepair] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [errMsg, setErrMsg] = useState("");
+  const [result, setResult] = useState<{
+    phase: ResultPhase;
+    title: string;
+    detail: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -265,16 +402,8 @@ export default function Upgrade() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2800);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const showError = (msg: string) => {
-    setErrMsg(msg);
-    setTimeout(() => setErrMsg(""), 4000);
-  };
+  const showFail = (title: string, detail: string) =>
+    setResult({ phase: "fail", title, detail });
 
   const handleToolUpgrade = async (toolId: string) => {
     const tool = toolsData?.tools.find((t) => t.tool === toolId);
@@ -283,17 +412,21 @@ export default function Upgrade() {
       return;
     }
     setBusyTool(toolId);
-    setErrMsg("");
     try {
       const res = await upgradeTool(toolId);
-      setToast(
-        `✦ ${toolId.replace("gear_", "").replace("_", " ")} upgraded to Lv ${res.newLevel}`,
-      );
+      setResult({
+        phase: "success",
+        title: "Tool Upgraded",
+        detail: `${toolId.replace("gear_", "").replace("_", " ")} → Lv ${res.newLevel}`,
+      });
       await load();
       refreshCurrency();
     } catch (err) {
-      showError(
-        err instanceof ApiResponseError ? err.error.message : "Upgrade failed.",
+      showFail(
+        "Upgrade Failed",
+        err instanceof ApiResponseError
+          ? err.error.message
+          : "Something went wrong.",
       );
     } finally {
       setBusyTool(null);
@@ -302,19 +435,21 @@ export default function Upgrade() {
 
   const handleBankUpgrade = async () => {
     setBusyBank(true);
-    setErrMsg("");
     try {
       const res = await upgradeBank();
-      setToast(
-        `✦ Bank upgraded to Tier ${res.tier} · Cap: ${formatNumber(res.cap)}`,
-      );
+      setResult({
+        phase: "success",
+        title: "Bank Upgraded",
+        detail: `Tier ${res.tier} · Cap: ${formatNumber(res.cap)}`,
+      });
       await load();
       refreshCurrency();
     } catch (err) {
-      showError(
+      showFail(
+        "Bank Upgrade Failed",
         err instanceof ApiResponseError
           ? err.error.message
-          : "Bank upgrade failed.",
+          : "Something went wrong.",
       );
     } finally {
       setBusyBank(false);
@@ -323,17 +458,21 @@ export default function Upgrade() {
 
   const handleVaultUpgrade = async () => {
     setBusyVault(true);
-    setErrMsg("");
     try {
       const res = await upgradeVault();
-      setToast(`✦ Vault upgraded to Tier ${res.tier}`);
+      setResult({
+        phase: "success",
+        title: "Vault Upgraded",
+        detail: `Tier ${res.tier}`,
+      });
       await load();
       refreshCurrency();
     } catch (err) {
-      showError(
+      showFail(
+        "Vault Upgrade Failed",
         err instanceof ApiResponseError
           ? err.error.message
-          : "Vault upgrade failed.",
+          : "Something went wrong.",
       );
     } finally {
       setBusyVault(false);
@@ -342,15 +481,21 @@ export default function Upgrade() {
 
   const handleRepair = async () => {
     setBusyRepair(true);
-    setErrMsg("");
     try {
       const res = await repairVault();
-      setToast(`✦ Vault repaired (${res.pointsRepaired} pts)`);
+      setResult({
+        phase: "success",
+        title: "Vault Repaired",
+        detail: `${res.pointsRepaired} health points restored`,
+      });
       await load();
       refreshCurrency();
     } catch (err) {
-      showError(
-        err instanceof ApiResponseError ? err.error.message : "Repair failed.",
+      showFail(
+        "Repair Failed",
+        err instanceof ApiResponseError
+          ? err.error.message
+          : "Something went wrong.",
       );
     } finally {
       setBusyRepair(false);
@@ -427,15 +572,23 @@ export default function Upgrade() {
             )}
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {toolsData?.tools.map((tool) => (
-              <ToolCard
-                key={tool.tool}
-                tool={tool}
-                hasCraftingTable={toolsData.hasCraftingTable}
-                onUpgrade={handleToolUpgrade}
-                busy={busyTool === tool.tool}
-              />
-            ))}
+            {toolsData?.tools.map((tool, i) => {
+              const affordable = tool.nextLevelCost
+                ? dashData != null &&
+                  dashData.currency.ryo >= tool.nextLevelCost.ryo
+                : true;
+              return (
+                <ToolCard
+                  key={tool.tool}
+                  tool={tool}
+                  index={i}
+                  hasCraftingTable={toolsData.hasCraftingTable}
+                  canAfford={affordable}
+                  onUpgrade={handleToolUpgrade}
+                  busy={busyTool === tool.tool}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -444,7 +597,7 @@ export default function Upgrade() {
         {/* ── Bank + Vault side by side ── */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {/* Bank */}
-          <div className="form-card flex flex-col gap-4 rounded-xl border p-5">
+          <div className="craft-card flex flex-col gap-4 rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(200,168,75,0.30)] bg-black/50 text-ayakashi-gold">
                 <Landmark className="h-4 w-4" />
@@ -507,8 +660,12 @@ export default function Upgrade() {
 
           {/* Vault */}
           <div
-            className={`form-card flex flex-col gap-4 rounded-xl border p-5 transition-colors duration-300 ${
-              !vault ? "opacity-50" : vaultCritical ? "border-red-500/30" : ""
+            className={`craft-card flex flex-col gap-4 rounded-xl p-5 transition-colors duration-300 ${
+              !vault
+                ? "craft-card-locked"
+                : vaultCritical
+                  ? "border-red-500/30"
+                  : ""
             }`}
           >
             <div className="flex items-center gap-3">
@@ -545,8 +702,16 @@ export default function Upgrade() {
                   />
                 </div>
 
-                {/* Health bar — the standout visual for this card */}
-                <div className="flex flex-col gap-1.5 rounded-md border border-[rgba(200,168,75,0.12)] bg-black/30 p-3">
+                {/* Health bar — pulses via reveal-glow-pulse when critical,
+                    same urgency language the site already uses for other
+                    low-resource states, instead of a static red bar. */}
+                <div
+                  className={`flex flex-col gap-1.5 rounded-md border p-3 ${
+                    vaultCritical
+                      ? "border-red-500/25 bg-red-500/5"
+                      : "border-[rgba(200,168,75,0.12)] bg-black/30"
+                  }`}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
                       Vault Health
@@ -559,7 +724,7 @@ export default function Upgrade() {
                   </div>
                   <HealthBar value={vault.health} max={vault.maxHealth} />
                   {vaultCritical && (
-                    <p className="flex items-center gap-1.5 text-[10px] text-red-400">
+                    <p className="reveal-glow-pulse flex items-center gap-1.5 text-[10px] text-red-400">
                       <ShieldAlert className="h-3 w-3" /> Vulnerable — repair
                       soon
                     </p>
@@ -602,18 +767,13 @@ export default function Upgrade() {
         </div>
       </section>
 
-      {/* Error toast */}
-      {errMsg && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-md border border-red-500/50 bg-black/95 px-5 py-3 text-sm font-bold text-red-400 shadow-lg lg:bottom-6">
-          {errMsg}
-        </div>
-      )}
-
-      {/* Success toast */}
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 animate-[shop-toast-in_0.3s_ease-out] rounded-md border border-ayakashi-gold bg-black/95 px-5 py-3 text-sm font-bold text-ayakashi-gold shadow-[0_0_25px_rgba(200,168,75,0.35)] lg:bottom-6">
-          {toast}
-        </div>
+      {result && (
+        <ResultModal
+          phase={result.phase}
+          title={result.title}
+          detail={result.detail}
+          onClose={() => setResult(null)}
+        />
       )}
     </>
   );

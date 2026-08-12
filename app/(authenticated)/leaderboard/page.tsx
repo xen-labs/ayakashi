@@ -33,6 +33,15 @@ const RANK_MEDAL: Record<number, string> = {
   3: "🥉",
 };
 
+// Podium glow tint per rank — used as the --podium-color custom
+// property on .leader-podium-glow, so the ambient pulse behind each
+// medal matches its own metal rather than one flat gold for all three.
+const RANK_GLOW: Record<number, string> = {
+  1: "rgba(255, 215, 0, 0.45)",
+  2: "rgba(192, 192, 192, 0.4)",
+  3: "rgba(205, 127, 50, 0.4)",
+};
+
 function formatValue(value: number, metric: LeaderboardMetric): string {
   if (metric === "cards") return value.toLocaleString("en-US");
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
@@ -79,7 +88,7 @@ export default function Leaderboard() {
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="section-header">
+      <div className="section-header [animation:shop-card-in_0.3s_ease-out_backwards]">
         <span className="section-header-text">Leaderboard</span>
       </div>
 
@@ -92,16 +101,18 @@ export default function Leaderboard() {
             key={t.id}
             type="button"
             onClick={() => switchTab(t.id)}
-            className={`relative flex flex-1 flex-col items-center gap-1 px-3 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors sm:flex-row sm:justify-center sm:gap-1.5 sm:text-xs ${
+            className={`relative flex flex-1 flex-col items-center gap-1 px-3 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition-all sm:flex-row sm:justify-center sm:gap-1.5 sm:text-xs ${
               metric === t.id
                 ? "text-[#c8a84b]"
                 : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
             }`}
           >
-            <span>{t.icon}</span>
+            <span className="transition-transform group-hover:scale-110">
+              {t.icon}
+            </span>
             <span>{t.label}</span>
             {metric === t.id && (
-              <span className="absolute bottom-0 left-0 h-0.5 w-full bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
+              <span className="leader-tab-underline absolute bottom-0 left-0 h-0.5 w-full bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
             )}
           </button>
         ))}
@@ -144,20 +155,33 @@ export default function Leaderboard() {
       ) : (
         <>
           <div className="flex flex-col">
-            {data?.items.map((row) => {
+            {data?.items.map((row, i) => {
               const isTop3 = row.rank <= 3;
               return (
                 <div
                   key={row.jid}
-                  className={`flex items-center gap-3 border-b border-[rgba(200,168,75,0.08)] px-2 py-3 transition-colors last:border-0 hover:bg-[rgba(200,168,75,0.04)] ${isTop3 ? "bg-[rgba(200,168,75,0.03)]" : ""}`}
+                  className={`leader-row-in group flex items-center gap-3 border-b border-[rgba(200,168,75,0.08)] px-2 py-3 transition-all last:border-0 hover:bg-[rgba(200,168,75,0.04)] ${isTop3 ? "bg-[rgba(200,168,75,0.03)] hover:-translate-y-0.5" : ""}`}
+                  style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
                 >
                   {/* Rank */}
-                  <div className="w-8 shrink-0 text-center">
+                  <div className="relative w-8 shrink-0 text-center">
+                    {isTop3 && (
+                      <span
+                        className="leader-podium-glow"
+                        style={
+                          {
+                            "--podium-color": RANK_GLOW[row.rank],
+                          } as React.CSSProperties
+                        }
+                      />
+                    )}
                     {RANK_MEDAL[row.rank] ? (
-                      <span className="text-xl">{RANK_MEDAL[row.rank]}</span>
+                      <span className="relative text-xl transition-transform group-hover:scale-110">
+                        {RANK_MEDAL[row.rank]}
+                      </span>
                     ) : (
                       <span
-                        className={`text-sm font-bold tabular-nums ${RANK_COLORS[row.rank] ?? "text-[rgba(200,168,75,0.40)]"}`}
+                        className={`relative text-sm font-bold tabular-nums ${RANK_COLORS[row.rank] ?? "text-[rgba(200,168,75,0.40)]"}`}
                       >
                         {row.rank}
                       </span>
@@ -165,7 +189,9 @@ export default function Leaderboard() {
                   </div>
 
                   {/* Avatar */}
-                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.05)]">
+                  <div
+                    className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-full border bg-[rgba(200,168,75,0.05)] transition-transform group-hover:scale-105 ${isTop3 ? "border-[rgba(200,168,75,0.45)] shadow-[0_0_10px_rgba(200,168,75,0.2)]" : "border-[rgba(200,168,75,0.20)]"}`}
+                  >
                     {row.avatarUrl ? (
                       <Image
                         src={row.avatarUrl}
@@ -204,7 +230,8 @@ export default function Leaderboard() {
 
                   {/* Value */}
                   <span
-                    className={`shrink-0 flex items-center gap-1 text-sm font-bold tabular-nums ${isTop3 ? (RANK_COLORS[row.rank] ?? "text-[#e6c96a]") : "text-[#e6c96a]"}`}
+                    key={`${row.jid}-${row.value}`}
+                    className={`number-tick shrink-0 flex items-center gap-1 text-sm font-bold tabular-nums ${isTop3 ? (RANK_COLORS[row.rank] ?? "text-[#e6c96a]") : "text-[#e6c96a]"}`}
                   >
                     {(metric === "ryo" || metric === "kitsu") && (
                       <CurrencyIcon type={metric} size={14} />
@@ -223,7 +250,7 @@ export default function Leaderboard() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-all hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
                 ← Prev
               </button>
@@ -234,7 +261,7 @@ export default function Leaderboard() {
                 type="button"
                 disabled={page >= (data?.totalPages ?? 1)}
                 onClick={() => setPage((p) => p + 1)}
-                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-all hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
                 Next →
               </button>

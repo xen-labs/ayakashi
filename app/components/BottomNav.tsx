@@ -3,40 +3,53 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home,
   LayoutDashboard,
   ShoppingBag,
-  Backpack,
-  Hammer,
+  Store,
   Layers,
+  Backpack,
+  CircleUserRound,
   MoreHorizontal,
 } from "lucide-react";
 import { useState } from "react";
 
-// Primary nav — 6 items (Home + 5 pages)
-// Cards takes the 6th slot over Ranks: it's core browsing content on
-// the same footing as Shop/Items, while Ranks is a page people check
-// occasionally rather than navigate to constantly — moved into More.
+// Primary nav — 6 items, no separate "Home" slot: for a logged-in user
+// Dashboard IS home (the marketing "/" page isn't something an
+// authenticated player navigates back to), so merging them frees a slot
+// instead of showing two landing-page entries side by side.
+//
+// Shop / Market / Profile are primary per design direction — Shop and
+// Market are both "spend or trade right now" loops (Shop = NPC catalog,
+// Market = player-to-player), Profile is identity/stats a player checks
+// constantly, not an occasional settings-style page. Cards stays primary
+// for the same reason noted before: core browsing content, same footing
+// as Shop, not a once-in-a-while check like Ranks.
+//
+// Craft/Upgrade/Bank-Vault moved OUT of primary (Craft was here before)
+// — these are all "manage what you've already built" pages, a different
+// mode of use than "browse or act right now." That's the same primary/
+// secondary split Ranks already followed; Craft just hadn't been sorted
+// into it yet.
 const PRIMARY_NAV = [
-  { href: "/", label: "Home", Icon: Home },
   { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/shop", label: "Shop", Icon: ShoppingBag },
-  { href: "/inventory", label: "Items", Icon: Backpack },
-  { href: "/craft", label: "Craft", Icon: Hammer },
+  { href: "/marketplace", label: "Market", Icon: Store },
   { href: "/cards", label: "Cards", Icon: Layers },
+  { href: "/inventory", label: "Items", Icon: Backpack },
+  { href: "/profile", label: "Profile", Icon: CircleUserRound },
 ];
 
 // Secondary nav — shown in overflow drawer
 const SECONDARY_NAV = [
-  { href: "/leaderboard", label: "Ranks" },
+  { href: "/craft", label: "Craft" },
   { href: "/upgrade", label: "Upgrade" },
   { href: "/bank-vault", label: "Bank/Vault" },
+  { href: "/leaderboard", label: "Ranks" },
   { href: "/trade", label: "Trade" },
   { href: "/loadout", label: "Loadout" },
   { href: "/decks", label: "Decks" },
   { href: "/players", label: "Players" },
   { href: "/cosmetics", label: "Cosmetics" },
-  { href: "/profile", label: "Profile" },
 ];
 
 export function BottomNav() {
@@ -55,11 +68,8 @@ export function BottomNav() {
       >
         <div className="mx-auto flex max-w-lg items-stretch">
           {PRIMARY_NAV.map(({ href, label, Icon }) => {
-            // "/" must be exact-match only — every path starts with "/"
             const active =
-              href === "/"
-                ? pathname === "/"
-                : pathname === href || pathname?.startsWith(href + "/");
+              pathname === href || pathname?.startsWith(href + "/");
             return (
               <Link
                 key={href}
@@ -121,7 +131,7 @@ export function BottomNav() {
             onClick={() => setMoreOpen(false)}
           />
           <div className="fixed bottom-16 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.20)] bg-[#0d0c00]/98 backdrop-blur-md">
-            <div className="mx-auto grid max-w-lg grid-cols-4 gap-0">
+            <div className="mx-auto grid max-w-lg grid-cols-3 gap-0">
               {SECONDARY_NAV.map(({ href, label }) => {
                 const active =
                   pathname === href || pathname?.startsWith(href + "/");

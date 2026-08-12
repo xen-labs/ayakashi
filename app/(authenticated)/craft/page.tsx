@@ -181,7 +181,7 @@ function RecipeCard({
           src={cardArt}
           emoji={outputEmoji}
           alt={outputLabel}
-          size={64}
+          size={84}
           rarity={recipe.outputRarity}
         />
         <div className="min-w-0 flex-1">
@@ -383,7 +383,7 @@ function CraftModal({
 
         {phase === "rolling" && (
           <>
-            <div className="relative flex h-28 w-28 items-center justify-center">
+            <div className="relative flex h-32 w-32 items-center justify-center">
               <div className="rune-spin absolute inset-0 rounded-full border-2 border-dashed border-[rgba(200,168,75,0.35)]" />
               <div className="rune-spin-reverse absolute inset-3 rounded-full border border-[rgba(200,168,75,0.20)]" />
               {modalArt ? (
@@ -391,7 +391,7 @@ function CraftModal({
                   src={modalArt}
                   emoji={outputEmoji}
                   alt={recipe.name}
-                  size={72}
+                  size={92}
                   rarity={recipe.outputRarity}
                   className="opacity-70"
                 />
@@ -412,18 +412,24 @@ function CraftModal({
 
         {phase === "success" && result && (
           <>
-            <div className="reveal-pop relative flex h-28 w-28 items-center justify-center">
+            <div className="reveal-pop relative flex h-36 w-36 items-center justify-center">
               <div className="reveal-glow-pulse absolute inset-0 rounded-full bg-[#c8a84b]/20 blur-xl" />
               {modalArt ? (
                 <ItemArt
                   src={modalArt}
                   emoji={outputEmoji}
                   alt={recipe.name}
-                  size={96}
+                  size={128}
                   rarity={recipe.outputRarity}
                 />
               ) : (
-                <span className="text-6xl">{outputEmoji || "✦"}</span>
+                <ItemArt
+                  src={recipe.webappImage ?? recipe.outputWebappImage}
+                  emoji={outputEmoji || "✦"}
+                  alt={recipe.outputDisplayName ?? recipe.name}
+                  size={96}
+                  rarity={recipe.outputRarity}
+                />
               )}
               {/* ember particles */}
               <span

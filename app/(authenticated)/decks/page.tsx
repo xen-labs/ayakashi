@@ -35,6 +35,50 @@ const RARITY_TEXT: Record<string, string> = {
   C: "text-[rgba(200,168,75,0.45)]",
 };
 
+// Small animated tile for deck slots and the card picker — same
+// fileExtension branching as CardTile.tsx (webm needs a real <video>
+// tag; next/image can't decode it and would strip gif animation), just
+// without the pointer-tilt effect since these are dense small grids.
+function DeckTileArt({
+  mediaUrl,
+  fileExtension,
+}: {
+  mediaUrl: string;
+  fileExtension: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  if (broken) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-lg opacity-40">
+        🃏
+      </div>
+    );
+  }
+  if (fileExtension === "webm") {
+    return (
+      <video
+        src={mediaUrl}
+        className="h-full w-full object-cover"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={mediaUrl}
+      alt=""
+      className="h-full w-full object-cover"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
 // ── Card picker modal ─────────────────────────────────────────────
 function CardPickerModal({
   onPick,
@@ -144,14 +188,12 @@ function CardPickerModal({
                     className={`group relative overflow-hidden rounded-md ${RARITY_RING[rarity]} bg-[rgba(200,168,75,0.03)] transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-40`}
                   >
                     {c.card?.mediaUrl ? (
-                      <Image
-                        src={c.card.mediaUrl}
-                        alt={c.card.name}
-                        width={100}
-                        height={140}
-                        className="aspect-[3/4] w-full object-cover"
-                        unoptimized
-                      />
+                      <div className="aspect-[3/4] w-full">
+                        <DeckTileArt
+                          mediaUrl={c.card.mediaUrl}
+                          fileExtension={c.card.fileExtension}
+                        />
+                      </div>
                     ) : (
                       <div className="flex aspect-[3/4] items-center justify-center text-2xl">
                         🃏
@@ -228,6 +270,14 @@ function DeckEditor({
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [cardMap, setCardMap] = useState<Record<string, CardInstance>>({});
+  // Press-and-hold-to-pick-up reordering: holding a filled slot "lifts"
+  // it (pickedUpPos), then tapping any other slot drops it there —
+  // swapping with whatever was in that slot if it was filled. No HTML5
+  // drag API (poor touch support) and no library — this is the same
+  // two-tap interaction pattern as a phone's home-screen icon reorder,
+  // which the target audience (mobile WhatsApp users) already knows.
+  const [pickedUpPos, setPickedUpPos] = useState<number | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const slots12 = Array.from({ length: 12 }, (_, i) =>
     slot.slots ? (slot.slots[i] ?? null) : null,
@@ -320,6 +370,62 @@ function DeckEditor({
     }
   };
 
+  // ── Pickup / drop ──
+  const startHold = (pos: number) => {
+    if (!slots12[pos] || busy) return;
+    holdTimer.current = setTimeout(() => {
+      setPickedUpPos(pos);
+      if (navigator.vibrate) navigator.vibrate(15); // tiny haptic tick, mirrors a native long-press
+    }, 380);
+  };
+  const cancelHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+  };
+
+  const handleTileTap = async (pos: number) => {
+    // Drop mode: any tap while something's picked up resolves the move,
+    // whether the target is the same slot (cancel), empty (move), or
+    // filled (swap).
+    if (pickedUpPos !== null) {
+      const fromPos = pickedUpPos;
+      setPickedUpPos(null);
+      if (fromPos === pos) return; // tapped the picked-up slot itself — cancel
+
+      const movingId = slots12[fromPos];
+      const targetId = slots12[pos];
+      if (!movingId) return;
+
+      setBusy(true);
+      try {
+        if (targetId) {
+          // Swap: move the target card out to the source slot first,
+          // then move the held card in — two calls, since the backend
+          // has no atomic swap endpoint, only position-explicit assign.
+          await assignCardToDeck(slot.slotIndex, {
+            position: fromPos,
+            instanceId: targetId,
+          });
+        } else {
+          await removeCardFromDeck(slot.slotIndex, fromPos);
+        }
+        await assignCardToDeck(slot.slotIndex, {
+          position: pos,
+          instanceId: movingId,
+        });
+        onRefresh();
+      } catch {
+        /* noop */
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    // Normal mode: tap a filled slot to remove, empty slot to open picker.
+    if (slots12[pos]) handleRemove(pos);
+    else setPickerPos(pos);
+  };
+
   return (
     <div className="craft-card flex flex-col gap-4 overflow-hidden rounded-xl">
       {/* Deck background — full-bleed strip if set, otherwise a quiet gradient */}
@@ -399,38 +505,58 @@ function DeckEditor({
       </div>
 
       <div className="flex flex-col gap-3 px-4 pb-4">
-        {/* 12-slot grid — larger, art-forward tiles */}
+        {pickedUpPos !== null && (
+          <p className="rounded-md border border-ayakashi-gold/40 bg-ayakashi-gold/10 px-3 py-2 text-center text-[11px] font-bold uppercase tracking-widest text-ayakashi-gold">
+            Card picked up — tap a slot to place it, or tap it again to cancel
+          </p>
+        )}
+
+        {/* 12-slot grid — larger, art-forward, animated tiles */}
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
           {slots12.map((instanceId, pos) => {
             const cardData = instanceId ? cardMap[instanceId] : null;
             const rarity = cardData?.card?.rarity ?? "C";
+            const isPickedUp = pickedUpPos === pos;
+            const isDropTarget = pickedUpPos !== null && pickedUpPos !== pos;
+
             return (
               <div key={pos} className="relative">
                 {instanceId ? (
                   <button
                     type="button"
-                    title="Tap to remove"
+                    title={
+                      isDropTarget
+                        ? "Tap to place here"
+                        : "Hold to move, tap to remove"
+                    }
                     disabled={busy}
-                    onClick={() => handleRemove(pos)}
-                    className={`group relative aspect-[3/4] w-full overflow-hidden rounded-md ${RARITY_RING[rarity]} bg-[rgba(200,168,75,0.06)] transition-transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-50`}
+                    onPointerDown={() => startHold(pos)}
+                    onPointerUp={cancelHold}
+                    onPointerLeave={cancelHold}
+                    onClick={() => handleTileTap(pos)}
+                    className={`group relative aspect-[3/4] w-full overflow-hidden rounded-md ${RARITY_RING[rarity]} bg-[rgba(200,168,75,0.06)] transition-all disabled:opacity-50 ${
+                      isPickedUp
+                        ? "-translate-y-1.5 opacity-60 ring-2 ring-ayakashi-gold"
+                        : isDropTarget
+                          ? "ring-2 ring-ayakashi-gold/50 hover:-translate-y-0.5"
+                          : "hover:-translate-y-0.5 active:scale-95"
+                    }`}
                   >
                     {cardData?.card?.mediaUrl ? (
-                      <Image
-                        src={cardData.card.mediaUrl}
-                        alt={cardData.card.name ?? "card"}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
-                        unoptimized
+                      <DeckTileArt
+                        mediaUrl={cardData.card.mediaUrl}
+                        fileExtension={cardData.card.fileExtension}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-lg">
                         🃏
                       </div>
                     )}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/70">
-                      <X className="h-4 w-4 text-red-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </div>
+                    {!isDropTarget && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/70">
+                        <X className="h-4 w-4 text-red-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </div>
+                    )}
                     {cardData?.card?.rarity && (
                       <span className="absolute bottom-0.5 right-0.5 text-[7px] font-bold text-white/90 drop-shadow">
                         {cardData.card.rarity}
@@ -440,10 +566,16 @@ function DeckEditor({
                 ) : (
                   <button
                     type="button"
-                    title="Assign card"
+                    title={
+                      pickedUpPos !== null ? "Tap to place here" : "Assign card"
+                    }
                     disabled={busy}
-                    onClick={() => setPickerPos(pos)}
-                    className="flex aspect-[3/4] w-full items-center justify-center rounded-md border border-dashed border-[rgba(200,168,75,0.20)] bg-transparent text-[rgba(200,168,75,0.25)] transition-all hover:border-ayakashi-gold/50 hover:text-ayakashi-gold/60 active:scale-95 disabled:opacity-50"
+                    onClick={() => handleTileTap(pos)}
+                    className={`flex aspect-[3/4] w-full items-center justify-center rounded-md border border-dashed bg-transparent transition-all active:scale-95 disabled:opacity-50 ${
+                      pickedUpPos !== null
+                        ? "border-ayakashi-gold/60 text-ayakashi-gold/70"
+                        : "border-[rgba(200,168,75,0.20)] text-[rgba(200,168,75,0.25)] hover:border-ayakashi-gold/50 hover:text-ayakashi-gold/60"
+                    }`}
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -454,7 +586,7 @@ function DeckEditor({
         </div>
 
         <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
-          {filledCount} / 12 slots filled
+          {filledCount} / 12 slots filled · hold a card to move it
         </p>
       </div>
 

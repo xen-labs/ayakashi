@@ -4,7 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { CircleUserRound, LogOut, Settings, HelpCircle } from "lucide-react";
+import {
+  CircleUserRound,
+  LogOut,
+  Settings,
+  HelpCircle,
+  ArrowUpCircle,
+  Trophy,
+} from "lucide-react";
 import { useCurrency } from "./CurrencyContext";
 import { AvatarWithFrame } from "./AvatarWithFrame";
 import { authLogout } from "../../lib/api";
@@ -12,12 +19,17 @@ import type { MeResponse } from "../../lib/api";
 
 const HIDDEN_ON = ["/profile", "/login", "/register"];
 
+// Mirrors BottomNav's primary/secondary split — Shop/Market are core
+// spend-or-trade loops, Inventory and Cards are core browsing. Upgrade
+// moved out (same "manage what you've built" bucket as Craft/Bank-Vault
+// on mobile) — reachable from the Profile dropdown or its own page link,
+// not a top-level rail item.
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/shop", label: "Shop" },
+  { href: "/marketplace", label: "Market" },
+  { href: "/cards", label: "Cards" },
   { href: "/inventory", label: "Inventory" },
-  { href: "/upgrade", label: "Upgrade" },
-  { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 function formatCoin(n: number | null | undefined): string {
@@ -199,6 +211,22 @@ export function TopBar({ user }: { user: MeResponse | null }) {
                   >
                     <CircleUserRound className="h-4 w-4 shrink-0" />
                     Profile
+                  </Link>
+                  <Link
+                    href="/upgrade"
+                    onClick={() => setProfileOpen(false)}
+                    className="topbar-dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors"
+                  >
+                    <ArrowUpCircle className="h-4 w-4 shrink-0" />
+                    Upgrade
+                  </Link>
+                  <Link
+                    href="/leaderboard"
+                    onClick={() => setProfileOpen(false)}
+                    className="topbar-dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors"
+                  >
+                    <Trophy className="h-4 w-4 shrink-0" />
+                    Leaderboard
                   </Link>
                   <Link
                     href="/settings"

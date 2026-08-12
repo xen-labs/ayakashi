@@ -71,10 +71,19 @@ export function PlayerSearch({
     setTotalPages(1);
   };
 
-  const ResultRow = ({ r }: { r: PlayerSearchResult }) => {
+  const ResultRow = ({
+    r,
+    index,
+  }: {
+    r: PlayerSearchResult;
+    index: number;
+  }) => {
     const inner = (
-      <div className="flex items-center gap-3 border-b border-[rgba(200,168,75,0.08)] px-3 py-2.5 last:border-0 transition-colors hover:bg-[rgba(200,168,75,0.05)]">
-        <div className="h-8 w-8 shrink-0 overflow-hidden border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.05)]">
+      <div
+        className="search-row-in group flex items-center gap-3 border-b border-[rgba(200,168,75,0.08)] px-3 py-2.5 transition-all last:border-0 hover:bg-[rgba(200,168,75,0.05)] hover:pl-4"
+        style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
+      >
+        <div className="h-8 w-8 shrink-0 overflow-hidden border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.05)] transition-transform group-hover:scale-105 group-hover:border-[rgba(200,168,75,0.45)]">
           {r.avatarUrl ? (
             <Image
               src={r.avatarUrl}
@@ -91,7 +100,7 @@ export function PlayerSearch({
           )}
         </div>
         <div className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-bold text-[#f0e6c8]">
+          <span className="truncate text-sm font-bold text-[#f0e6c8] transition-colors group-hover:text-[#e6c96a]">
             {r.displayName}
           </span>
           <span className="text-[10px] text-[rgba(200,168,75,0.40)]">
@@ -121,8 +130,10 @@ export function PlayerSearch({
   if (compact) {
     return (
       <div className="relative w-full">
-        <div className="flex items-center gap-2 border border-[rgba(200,168,75,0.25)] bg-black/40 px-3">
-          <Search className="h-3.5 w-3.5 shrink-0 text-[rgba(200,168,75,0.40)]" />
+        <div className="flex items-center gap-2 border border-[rgba(200,168,75,0.25)] bg-black/40 px-3 transition-all focus-within:border-[#c8a84b] focus-within:shadow-[0_0_10px_rgba(200,168,75,0.15)]">
+          <Search
+            className={`h-3.5 w-3.5 shrink-0 text-[rgba(200,168,75,0.40)] transition-colors ${loading ? "search-loading-ring rounded-full text-[#c8a84b]" : ""}`}
+          />
           <input
             type="text"
             value={query}
@@ -156,8 +167,8 @@ export function PlayerSearch({
                   No players found.
                 </p>
               )}
-            {results.map((r) => (
-              <ResultRow key={r.username} r={r} />
+            {results.map((r, i) => (
+              <ResultRow key={r.username} r={r} index={i} />
             ))}
           </div>
         )}
@@ -168,8 +179,10 @@ export function PlayerSearch({
   // ── Full-page mode ─────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 border border-[rgba(200,168,75,0.25)] bg-black/40 px-3">
-        <Search className="h-4 w-4 shrink-0 text-[rgba(200,168,75,0.40)]" />
+      <div className="flex items-center gap-2 border border-[rgba(200,168,75,0.25)] bg-black/40 px-3 transition-all focus-within:border-[#c8a84b] focus-within:shadow-[0_0_12px_rgba(200,168,75,0.18)]">
+        <Search
+          className={`h-4 w-4 shrink-0 text-[rgba(200,168,75,0.40)] transition-colors ${loading ? "search-loading-ring rounded-full text-[#c8a84b]" : ""}`}
+        />
         <input
           type="text"
           value={query}
@@ -181,7 +194,7 @@ export function PlayerSearch({
           <button
             type="button"
             onClick={clear}
-            className="text-[rgba(200,168,75,0.40)] hover:text-[#c8a84b]"
+            className="text-[rgba(200,168,75,0.40)] transition-transform hover:scale-110 hover:text-[#c8a84b]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -215,16 +228,19 @@ export function PlayerSearch({
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       {!loading && query.length >= 2 && results.length === 0 && !error && (
-        <p className="text-sm text-[rgba(200,168,75,0.40)]">
-          No players found for &quot;{query}&quot;.
-        </p>
+        <div className="flex flex-col items-center gap-2 py-6 text-center [animation:number-tick_0.2s_ease-out]">
+          <Search className="h-5 w-5 text-[rgba(200,168,75,0.25)]" />
+          <p className="text-sm text-[rgba(200,168,75,0.40)]">
+            No players found for &quot;{query}&quot;.
+          </p>
+        </div>
       )}
 
       {results.length > 0 && (
         <>
           <div className="form-card border">
-            {results.map((r) => (
-              <ResultRow key={r.username} r={r} />
+            {results.map((r, i) => (
+              <ResultRow key={r.username} r={r} index={i} />
             ))}
           </div>
 
@@ -234,7 +250,7 @@ export function PlayerSearch({
                 type="button"
                 disabled={page <= 1}
                 onClick={() => doSearch(query, page - 1)}
-                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-all hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
                 ← Prev
               </button>
@@ -245,7 +261,7 @@ export function PlayerSearch({
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => doSearch(query, page + 1)}
-                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed"
+                className="h-9 border border-[rgba(200,168,75,0.30)] px-5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-all hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               >
                 Next →
               </button>

@@ -22,6 +22,7 @@ import {
   searchPlayers,
   getInventoryCards,
   getInventory,
+  getMe,
   ApiResponseError,
 } from "../../../lib/api";
 import type {
@@ -39,14 +40,19 @@ function fmt(n: number) {
   return n.toLocaleString("en-US");
 }
 
-const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+const STATUS_BADGE: Record<
+  string,
+  { label: string; cls: string; pulse?: boolean }
+> = {
   pending: {
     label: "Pending",
     cls: "border-amber-500/40 text-amber-400 bg-amber-500/10",
+    pulse: true,
   },
   countered: {
     label: "Countered",
     cls: "border-blue-500/40 text-blue-400 bg-blue-500/10",
+    pulse: true,
   },
   accepted: {
     label: "Accepted",
@@ -67,13 +73,24 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 // ── Offer summary ─────────────────────────────────────────────────
-function OfferSummary({ offer, label }: { offer: TradeOffer; label: string }) {
+function OfferSummary({
+  offer,
+  label,
+  delay = 0,
+}: {
+  offer: TradeOffer;
+  label: string;
+  delay?: number;
+}) {
   const empty =
     offer.cardInstanceIds.length === 0 &&
     offer.materials.length === 0 &&
     !offer.currency;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div
+      className="trade-offer-in flex flex-col gap-1.5"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
         {label}
       </p>
@@ -105,15 +122,24 @@ function OfferSummary({ offer, label }: { offer: TradeOffer; label: string }) {
 }
 
 // ── Trade row ─────────────────────────────────────────────────────
-function TradeRow({ trade, onSelect }: { trade: Trade; onSelect: () => void }) {
+function TradeRow({
+  trade,
+  index,
+  onSelect,
+}: {
+  trade: Trade;
+  index: number;
+  onSelect: () => void;
+}) {
   const badge = STATUS_BADGE[trade.status] ?? STATUS_BADGE.pending;
   return (
     <button
       type="button"
       onClick={onSelect}
-      className="flex w-full items-start gap-3 border-b border-[rgba(200,168,75,0.08)] px-2 py-3 text-left transition-colors last:border-0 hover:bg-[rgba(200,168,75,0.04)]"
+      className="trade-row-in group flex w-full items-start gap-3 border-b border-[rgba(200,168,75,0.08)] px-2 py-3 text-left transition-colors last:border-0 hover:bg-[rgba(200,168,75,0.04)]"
+      style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
     >
-      <ArrowLeftRight className="mt-0.5 h-4 w-4 shrink-0 text-[rgba(200,168,75,0.40)]" />
+      <ArrowLeftRight className="trade-swap-icon mt-0.5 h-4 w-4 shrink-0 text-[rgba(200,168,75,0.40)] transition-colors group-hover:text-[#c8a84b]" />
       <div className="flex flex-1 flex-col gap-0.5 min-w-0">
         <p className="truncate text-sm font-bold text-[#f0e6c8]">
           {trade.initiator.displayName} → {trade.recipient.displayName}
@@ -128,7 +154,7 @@ function TradeRow({ trade, onSelect }: { trade: Trade; onSelect: () => void }) {
         </p>
       </div>
       <span
-        className={`shrink-0 border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.cls}`}
+        className={`shrink-0 border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.cls} ${badge.pulse ? "trade-status-pending" : ""}`}
       >
         {badge.label}
       </span>
@@ -139,12 +165,12 @@ function TradeRow({ trade, onSelect }: { trade: Trade; onSelect: () => void }) {
 // ── Trade detail modal ────────────────────────────────────────────
 function TradeDetailModal({
   tradeId,
-  myJid,
+  myUsername,
   onClose,
   onRefresh,
 }: {
   tradeId: string;
-  myJid: string;
+  myUsername: string;
   onClose: () => void;
   onRefresh: () => void;
 }) {
@@ -160,8 +186,18 @@ function TradeDetailModal({
       .catch(() => setError("Couldn't load trade."));
   }, [tradeId]);
 
-  const isInitiator = trade?.initiator.jid === myJid;
-  const isRecipient = trade?.recipient.jid === myJid;
+  // FIX: was comparing trade.initiator/recipient.jid against a myJid
+  // state that was never actually set anywhere (see TradePage below) —
+  // isInitiator/isRecipient were always false, so accept/decline/cancel
+  // never rendered. TradeSide has no jid the frontend can independently
+  // obtain (MeResponse/GET /me deliberately doesn't expose jid — see
+  // routes/me.ts), so this compares on username instead, which IS
+  // available from getMe(). TradeSide.username can be null for the
+  // OTHER party (unregistered players can still be traded with), but
+  // never for the logged-in viewer themselves — this page requires a
+  // session, so "me" always has a username.
+  const isInitiator = trade?.initiator.username === myUsername;
+  const isRecipient = trade?.recipient.username === myUsername;
   const active = trade?.status === "pending" || trade?.status === "countered";
 
   const act = async (fn: () => Promise<Trade>) => {
@@ -186,7 +222,7 @@ function TradeDetailModal({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-full max-w-md border border-[rgba(200,168,75,0.35)] bg-[#0d0c00] p-0 text-[#f0e6c8] outline-none backdrop:bg-black/80 backdrop:backdrop-blur-sm open:flex open:flex-col"
+      className="craft-modal-pop m-auto w-full max-w-md border border-[rgba(200,168,75,0.35)] bg-[#0d0c00] p-0 text-[#f0e6c8] outline-none backdrop:bg-black/80 backdrop:backdrop-blur-sm open:flex open:flex-col"
     >
       <div className="flex items-center justify-between border-b border-[rgba(200,168,75,0.15)] px-5 py-4">
         <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#c8a84b]">
@@ -236,7 +272,7 @@ function TradeDetailModal({
                 Status
               </span>
               <span
-                className={`border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${STATUS_BADGE[trade.status]?.cls ?? ""}`}
+                className={`border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${STATUS_BADGE[trade.status]?.cls ?? ""} ${STATUS_BADGE[trade.status]?.pulse ? "trade-status-pending" : ""}`}
               >
                 {STATUS_BADGE[trade.status]?.label ?? trade.status}
               </span>
@@ -247,10 +283,12 @@ function TradeDetailModal({
               <OfferSummary
                 offer={trade.initiator.offer}
                 label={`${trade.initiator.displayName} offers`}
+                delay={0}
               />
               <OfferSummary
                 offer={trade.recipient.offer}
                 label={`${trade.recipient.displayName} offers`}
+                delay={80}
               />
             </div>
 
@@ -463,7 +501,7 @@ function ProposeModal({
               <p className="text-xs text-[rgba(200,168,75,0.40)]">Searching…</p>
             )}
             <div className="flex flex-col gap-1">
-              {results.map((r) => (
+              {results.map((r, i) => (
                 <button
                   key={r.username}
                   type="button"
@@ -472,7 +510,8 @@ function ProposeModal({
                     setQuery(r.displayName);
                     setResults([]);
                   }}
-                  className="flex items-center gap-3 border border-[rgba(200,168,75,0.15)] px-3 py-2 text-left hover:border-[rgba(200,168,75,0.40)]"
+                  className="search-row-in flex items-center gap-3 border border-[rgba(200,168,75,0.15)] px-3 py-2 text-left transition-colors hover:border-[rgba(200,168,75,0.40)] hover:bg-[rgba(200,168,75,0.04)]"
+                  style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
                 >
                   <div>
                     <p className="text-sm font-bold text-[#f0e6c8]">
@@ -499,7 +538,7 @@ function ProposeModal({
                     key={c.instanceId}
                     type="button"
                     onClick={() => toggleCard(c.instanceId)}
-                    className={`relative overflow-hidden border text-left transition-all ${selectedCards.includes(c.instanceId) ? "border-[#c8a84b] ring-1 ring-[#c8a84b]/40" : "border-[rgba(200,168,75,0.20)]"}`}
+                    className={`relative overflow-hidden border text-left transition-all duration-150 ${selectedCards.includes(c.instanceId) ? "scale-[1.03] border-[#c8a84b] ring-1 ring-[#c8a84b]/40 shadow-[0_0_10px_rgba(200,168,75,0.25)]" : "border-[rgba(200,168,75,0.20)] hover:border-[rgba(200,168,75,0.40)]"}`}
                   >
                     <div className="flex h-16 items-center justify-center bg-[rgba(200,168,75,0.05)] text-xl">
                       {c.card?.mediaUrl ? (
@@ -664,22 +703,20 @@ export default function TradePage() {
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [proposing, setProposing] = useState(false);
-  // We need the current user's jid for action gating — use dashboard or
-  // derive from the trade list (any trade where initiator/recipient matches us)
-  const [myJid, setMyJid] = useState("");
+  // FIX: was myJid, a state that was never actually set anywhere in
+  // this file — see TradeDetailModal's comment above. TradeSide (and
+  // MeResponse) has no jid the frontend can compare against; username
+  // is what's actually available from getMe() and reliable for "me"
+  // specifically.
+  const [myUsername, setMyUsername] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await getTrades();
-      setTrades(res.trades);
-      // Derive our jid from the first trade we appear in
-      if (res.trades.length > 0) {
-        const t = res.trades[0];
-        // We'll set it lazily when the detail modal opens — for now leave empty
-        void t;
-      }
+      const [meRes, tradesRes] = await Promise.all([getMe(), getTrades()]);
+      setMyUsername(meRes.username);
+      setTrades(tradesRes.trades);
     } catch (err) {
       if (err instanceof ApiResponseError && err.status === 401) {
         router.push("/login");
@@ -730,14 +767,14 @@ export default function TradePage() {
   return (
     <>
       <section className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between [animation:shop-card-in_0.3s_ease-out_backwards]">
           <div className="section-header">
             <span className="section-header-text">Trade</span>
           </div>
           <button
             type="button"
             onClick={() => setProposing(true)}
-            className="flex items-center gap-1.5 border border-[#c8a84b] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black"
+            className="flex items-center gap-1.5 border border-[#c8a84b] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-all hover:bg-[#c8a84b] hover:text-black hover:shadow-[0_0_14px_rgba(200,168,75,0.3)] active:scale-95"
           >
             <Plus className="h-3.5 w-3.5" /> New Trade
           </button>
@@ -748,20 +785,24 @@ export default function TradePage() {
         {error && <p className="text-sm text-red-400">{error}</p>}
 
         {/* Active */}
-        <div>
+        <div className="[animation:shop-card-in_0.3s_ease-out_0.05s_backwards]">
           <h2 className="mb-3 font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">
             Active ({active.length})
           </h2>
           {active.length === 0 ? (
-            <p className="text-sm text-[rgba(200,168,75,0.40)]">
-              No active trades.
-            </p>
+            <div className="flex flex-col items-center gap-2 border border-dashed border-[rgba(200,168,75,0.15)] py-10 text-center">
+              <ArrowLeftRight className="h-5 w-5 text-[rgba(200,168,75,0.25)]" />
+              <p className="text-sm text-[rgba(200,168,75,0.40)]">
+                No active trades.
+              </p>
+            </div>
           ) : (
             <div className="form-card border">
-              {active.map((t) => (
+              {active.map((t, i) => (
                 <TradeRow
                   key={t._id}
                   trade={t}
+                  index={i}
                   onSelect={() => setSelectedId(t._id)}
                 />
               ))}
@@ -773,15 +814,16 @@ export default function TradePage() {
         {history.length > 0 && (
           <>
             <hr className="gold-rule" />
-            <div>
+            <div className="[animation:shop-card-in_0.3s_ease-out_0.1s_backwards]">
               <h2 className="mb-3 font-display text-xs font-bold uppercase tracking-[0.1em] text-[#c8a84b]">
                 History
               </h2>
               <div className="form-card border">
-                {history.map((t) => (
+                {history.map((t, i) => (
                   <TradeRow
                     key={t._id}
                     trade={t}
+                    index={i}
                     onSelect={() => setSelectedId(t._id)}
                   />
                 ))}
@@ -794,7 +836,7 @@ export default function TradePage() {
       {selectedId && (
         <TradeDetailModal
           tradeId={selectedId}
-          myJid={myJid}
+          myUsername={myUsername}
           onClose={() => setSelectedId(null)}
           onRefresh={load}
         />
