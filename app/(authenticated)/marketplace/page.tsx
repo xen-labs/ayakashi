@@ -1031,6 +1031,8 @@ export default function Marketplace() {
 
   const [myListings, setMyListings] = useState<MarketplaceListing[]>([]);
   const [myListingsLoading, setMyListingsLoading] = useState(false);
+  const [myListingsPage, setMyListingsPage] = useState(1);
+  const [myListingsTotalPages, setMyListingsTotalPages] = useState(1);
 
   const [activeListing, setActiveListing] = useState<MarketplaceListing | null>(
     null,
@@ -1072,41 +1074,44 @@ export default function Marketplace() {
   const loadMyListings = useCallback(async () => {
     setMyListingsLoading(true);
     try {
-      const res = await getMarketplaceListings({ page: 1 });
-      // The browse endpoint doesn't filter to "mine" server-side, so
-      // narrow client-side. This is fine at current marketplace scale
-      // (per-page cap of 24); if a seller ever has more than a page's
-      // worth of active listings this'll need a real seller filter on
-      // GET /marketplace, but that's a backend addition out of scope
-      // here.
-      // We don't actually know our own jid client-side, so instead we
-      // rely on the sell/cancel flow to track what we've listed this
-      // session, merged with anything already active.
-      setMyListings((prev) => {
-        const prevIds = new Set(prev.map((l) => l.instanceId));
-        return res.listings.filter((l) => prevIds.has(l.instanceId));
+      // FIX: this previously fetched the global unfiltered browse feed
+      // (page 1, no seller filter) and tried to narrow it down to
+      // "listings I know I created this session" by intersecting
+      // against its own prior in-memory state — which is empty on
+      // first load, so myListings was permanently stuck empty no
+      // matter what was actually listed. GET /marketplace?mine=true
+      // already exists server-side (marketplace.ts filters
+      // instanceFilter.ownerId to the authed player) — this just
+      // wasn't being used. Also now paginated instead of hardcoded to
+      // page 1, since a seller can have more than one page of listings.
+      const res = await getMarketplaceListings({
+        page: myListingsPage,
+        mine: true,
       });
+      setMyListings(res.listings);
+      setMyListingsTotalPages(res.totalPages);
+    } catch {
+      setMyListings([]);
     } finally {
       setMyListingsLoading(false);
     }
-  }, []);
+  }, [myListingsPage]);
 
   useEffect(() => {
     if (tab === "mine") loadMyListings();
   }, [tab, loadMyListings]);
 
   const handleCancelled = (instanceId: string) => {
+    // Optimistic — remove immediately rather than waiting on a refetch.
     setMyListings((prev) => prev.filter((l) => l.instanceId !== instanceId));
   };
 
   const handleListed = () => {
-    // We don't get the full listing object back from list — refresh
-    // the browse feed so the new listing shows up, and switch to the
-    // My Listings tab so the player can see it landed. A full refetch
-    // scoped to "mine" isn't possible without a seller filter (see
-    // loadMyListings' note above), so this is the honest UX given
-    // what the backend currently returns.
+    // Now that My Listings has a real mine=true fetch, refresh both
+    // feeds for real instead of the old "hope it's on page 1 of
+    // browse" guess.
     loadBrowse();
+    if (tab === "mine") loadMyListings();
   };
 
   return (
@@ -1277,11 +1282,40 @@ export default function Marketplace() {
         )}
 
         {tab === "mine" && (
-          <MyListings
-            listings={myListings}
-            loading={myListingsLoading}
-            onCancelled={handleCancelled}
-          />
+          <>
+            <MyListings
+              listings={myListings}
+              loading={myListingsLoading}
+              onCancelled={handleCancelled}
+            />
+            {myListingsTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={myListingsPage <= 1}
+                  onClick={() => setMyListingsPage((p) => Math.max(1, p - 1))}
+                  className="h-9 border border-[rgba(200,168,75,0.25)] px-4 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.6)] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <span className="text-xs text-[rgba(200,168,75,0.5)]">
+                  Page {myListingsPage} / {myListingsTotalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={myListingsPage >= myListingsTotalPages}
+                  onClick={() =>
+                    setMyListingsPage((p) =>
+                      Math.min(myListingsTotalPages, p + 1),
+                    )
+                  }
+                  className="h-9 border border-[rgba(200,168,75,0.25)] px-4 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.6)] transition-colors hover:border-[#c8a84b] hover:text-[#c8a84b] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

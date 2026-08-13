@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCurrency } from "./CurrencyContext";
 import { AvatarWithFrame } from "./AvatarWithFrame";
+import { NotificationBell } from "./NotificationBell";
 import { authLogout } from "../../lib/api";
 import type { MeResponse } from "../../lib/api";
 
@@ -170,6 +171,8 @@ export function TopBar({ user }: { user: MeResponse | null }) {
             <div className="topbar-divider h-5 w-px" aria-hidden="true" />
           </div>
         )}
+
+        {isAuthenticated && <NotificationBell />}
 
         {isAuthenticated && (
           <div className="relative" ref={dropdownRef}>

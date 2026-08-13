@@ -20,10 +20,9 @@ export class ApiResponseError extends Error {
 }
 
 // ── Core fetch wrapper ────────────────────────────────────────────
-// - Always sends credentials (httpOnly cookie auth)
-// - Parses the standard { error: { code, message } } error shape
-// - On 401 invalid_token / unauthenticated, refreshes once and retries
-// - If refresh also fails, throws so callers can redirect to /login
+
+let refreshPromise: Promise<void> | null = null;
+
 async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -43,30 +42,37 @@ async function apiFetch<T>(
     return res.json() as Promise<T>;
   }
 
-  let errorBody: { error: ApiError };
+  let errorBody: { error?: ApiError } | null = null;
   try {
     errorBody = await res.json();
-  } catch {
-    throw new ApiResponseError(res.status, {
-      code: "network_error",
-      message: `HTTP ${res.status}`,
-    });
-  }
+  } catch {}
 
   const apiErr = errorBody?.error ?? {
     code: "unknown_error",
-    message: "Something went wrong.",
+    message: `HTTP ${res.status}`,
   };
-
-  const isRecoverable =
-    res.status === 401 &&
-    (apiErr.code === "invalid_token" || apiErr.code === "unauthenticated");
+  const isRecoverable = res.status === 401;
 
   if (isRecoverable && !_isRetry) {
     try {
-      await apiFetch("/auth/refresh", { method: "POST" }, true);
+      if (!refreshPromise) {
+        refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+        })
+          .then((refreshRes) => {
+            if (!refreshRes.ok) throw new Error("Refresh failed");
+          })
+          .finally(() => {
+            refreshPromise = null;
+          });
+      }
+
+      await refreshPromise;
+
       return apiFetch<T>(path, init, true);
     } catch {
+      // If the refresh token is truly expired, throw the session_expired error
       throw new ApiResponseError(401, {
         code: "session_expired",
         message: "Your session expired. Please log in again.",
@@ -218,14 +224,40 @@ export interface DashboardResponse {
     streakWillContinueIfClaimedNow: boolean;
   };
   cardsOwned: number;
-  recentTransactions: DashboardTransaction[];
+  transactions: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    items: DashboardTransaction[];
+  };
   pendingFriendRequests: {
     count: number;
     requests: DashboardFriendRequest[];
   };
 }
 
-export const getDashboard = () => apiFetch<DashboardResponse>("/dashboard");
+export const getDashboard = (transactionsPage?: number) =>
+  apiFetch<DashboardResponse>(
+    transactionsPage && transactionsPage > 1
+      ? `/dashboard?transactionsPage=${transactionsPage}`
+      : "/dashboard",
+  );
+
+export interface ClaimDailyResponse {
+  ok: boolean;
+  remainingMs: number;
+  ryo: number;
+  kitsu: number;
+  bonusRyo: number;
+  bonusKitsu: number;
+  streak: number;
+  streakBroken: boolean;
+  milestoneLabel: string | null;
+}
+
+export const claimDailyReward = () =>
+  apiFetch<ClaimDailyResponse>("/dashboard/claim-daily", { method: "POST" });
 
 // ── Shop ───────────────────────────────────────────────────────────
 // GET /shop?section=items|rob_gear|defence_gear
@@ -421,8 +453,8 @@ export interface ToolStatus {
     ryo: number;
     materialQty: number;
     material: string;
+    extra: { itemId: string; qty: number; name: string }[] | null;
   } | null;
-  /** Set when level is 0 — route the player to Craft instead of Upgrade */
   craftRecipeId: string | null;
 }
 
@@ -750,7 +782,6 @@ export const executeCraft = (recipeId: string) =>
 // POST /bank/claim — claims interest previewed by bank.interestClaim
 // below; see routes/bank.ts. Deposit/withdraw/open live in bank.ts too
 // but aren't wired into the Bank & Vault page (not part of this pass).
-
 export interface BankVaultTransaction {
   id: string;
   action: string;
@@ -829,6 +860,32 @@ export interface BankVaultResponse {
 export const getBankVault = (page = 1) =>
   apiFetch<BankVaultResponse>(`/bank-vault?page=${page}`);
 
+export interface OpenBankResponse {
+  tier: number;
+  tierName: string;
+}
+export const openBankAccount = () =>
+  apiFetch<OpenBankResponse>("/bank/open", { method: "POST" });
+
+export interface BankDepositResponse {
+  tier: number;
+  cap: number;
+}
+export const depositBank = (amount: number) =>
+  apiFetch<BankDepositResponse>("/bank/deposit", {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+
+export interface BankWithdrawResponse {
+  withdrawn: number;
+}
+export const withdrawBank = (amount: number) =>
+  apiFetch<BankWithdrawResponse>("/bank/withdraw", {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+
 export interface ClaimBankInterestResponse {
   tier: number;
   amount: number;
@@ -881,7 +938,53 @@ export const removeCardFromDeck = (slotIndex: number, position: number) =>
     method: "DELETE",
   });
 
-// ── Trade ─────────────────────────────────────────────────────────
+// ── Notifications ─────────────────────────────────────────────────
+
+export type NotificationType =
+  | "marketplace_sale"
+  | "friend_request"
+  | "trade_offer";
+
+export interface MarketplaceSaleNotificationData {
+  instanceId: string;
+  cardId: string;
+  cardName: string;
+  price: number;
+  buyerId: string;
+  buyerName: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  read: boolean;
+  // Only marketplace_sale is populated with a known shape today —
+  // friend_request/trade_offer notifications aren't written by the
+  // backend yet (those still surface via dashboard's own
+  // pendingFriendRequests/pending-trades polling, not this system).
+  // Narrow further per-type here as those get wired up.
+  data: MarketplaceSaleNotificationData | Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  page: number;
+  totalPages: number;
+  total: number;
+  unreadCount: number;
+  items: AppNotification[];
+}
+
+export const getNotifications = (page?: number) =>
+  apiFetch<NotificationsResponse>(
+    page && page > 1 ? `/notifications?page=${page}` : "/notifications",
+  );
+
+export const markAllNotificationsRead = () =>
+  apiFetch<{ ok: boolean }>("/notifications/read-all", { method: "POST" });
+
+export const markNotificationRead = (id: string) =>
+  apiFetch<{ ok: boolean }>(`/notifications/${id}/read`, { method: "POST" });
 
 export type TradeCurrency = "ryo" | "kitsu";
 export type TradeStatus =

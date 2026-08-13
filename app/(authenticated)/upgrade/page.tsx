@@ -11,6 +11,7 @@ import {
   upgradeVault,
   repairVault,
   getDashboard,
+  getInventory,
   ApiResponseError,
 } from "../../../lib/api";
 import type {
@@ -166,11 +167,21 @@ function HealthBar({ value, max }: { value: number; max: number }) {
 // material warning) when the player can't currently afford the next
 // level, instead of showing the exact same static cost chip whether
 // affordable or not.
+//
+// [NEW] canAfford now folds in EVERY requirement — ryo, the base
+// material, AND every entry in nextLevelCost.extra (Gold Ingot + Cut
+// Diamond at Lv.2/Lv.3) — computed by the parent from live inventory
+// data, not just ryo. The cost chip below also renders each extra
+// requirement as its own segment, and turns red per-segment when that
+// specific item is short, so a player missing only diamond (say) can
+// see exactly which requirement is the blocker instead of a single
+// all-or-nothing red chip.
 function ToolCard({
   tool,
   index,
   hasCraftingTable,
   canAfford,
+  haveOf,
   onUpgrade,
   busy,
 }: {
@@ -178,6 +189,7 @@ function ToolCard({
   index: number;
   hasCraftingTable: boolean;
   canAfford: boolean;
+  haveOf: (itemId: string) => number;
   onUpgrade: (toolId: string) => void;
   busy: boolean;
 }) {
@@ -185,6 +197,13 @@ function ToolCard({
   const notCrafted = tool.level === 0;
   const canUpgrade = !tool.atMax && !locked && !busy && !notCrafted;
   const reliability = TOOL_RELIABILITY[tool.level];
+
+  const haveBaseMaterial = tool.nextLevelCost
+    ? haveOf(tool.nextLevelCost.material)
+    : 0;
+  const baseMaterialShort = tool.nextLevelCost
+    ? haveBaseMaterial < tool.nextLevelCost.materialQty
+    : false;
 
   return (
     <div
@@ -219,7 +238,7 @@ function ToolCard({
 
         {tool.nextLevelCost && !tool.atMax && !notCrafted && (
           <div
-            className={`flex items-center gap-3 rounded-md border px-3 py-2 text-xs transition-colors ${
+            className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2 text-xs transition-colors ${
               canAfford
                 ? "border-[rgba(200,168,75,0.15)] bg-white/[0.02] text-[rgba(200,168,75,0.65)]"
                 : "chip-short border-red-500/35 bg-red-500/5 text-red-300/80"
@@ -230,9 +249,22 @@ function ToolCard({
               {formatNumber(tool.nextLevelCost.ryo)}
             </span>
             <span className="text-[rgba(200,168,75,0.30)]">+</span>
-            <span className="truncate">
+            <span
+              className={`truncate ${baseMaterialShort ? "text-red-300" : ""}`}
+            >
               ×{tool.nextLevelCost.materialQty} {tool.nextLevelCost.material}
             </span>
+            {tool.nextLevelCost.extra?.map((e) => {
+              const short = haveOf(e.itemId) < e.qty;
+              return (
+                <span key={e.itemId} className="flex items-center gap-1">
+                  <span className="text-[rgba(200,168,75,0.30)]">+</span>
+                  <span className={`truncate ${short ? "text-red-300" : ""}`}>
+                    ×{e.qty} {e.name}
+                  </span>
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -365,6 +397,10 @@ export default function Upgrade() {
 
   const [toolsData, setToolsData] = useState<UpgradeToolsResponse | null>(null);
   const [dashData, setDashData] = useState<DashboardResponse | null>(null);
+  // [NEW] itemId -> quantity, built from GET /inventory. This is what
+  // makes real affordability (base material + every extra material)
+  // possible on this page — previously only ryo was ever checked.
+  const [inventoryQty, setInventoryQty] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyTool, setBusyTool] = useState<string | null>(null);
@@ -381,12 +417,18 @@ export default function Upgrade() {
     setLoading(true);
     setError("");
     try {
-      const [tools, dash] = await Promise.all([
+      const [tools, dash, inventory] = await Promise.all([
         getUpgradeTools(),
         getDashboard(),
+        getInventory(),
       ]);
       setToolsData(tools);
       setDashData(dash);
+      const qty: Record<string, number> = {};
+      for (const item of inventory.items) {
+        qty[item.itemId] = item.quantity;
+      }
+      setInventoryQty(qty);
     } catch (err) {
       if (err instanceof ApiResponseError && err.status === 401) {
         router.push("/login");
@@ -401,6 +443,13 @@ export default function Upgrade() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // [NEW] Single lookup used by both the affordability calc below and the
+  // ToolCard's per-segment short-material highlighting.
+  const haveOf = useCallback(
+    (itemId: string) => inventoryQty[itemId] ?? 0,
+    [inventoryQty],
+  );
 
   const showFail = (title: string, detail: string) =>
     setResult({ phase: "fail", title, detail });
@@ -573,9 +622,18 @@ export default function Upgrade() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {toolsData?.tools.map((tool, i) => {
-              const affordable = tool.nextLevelCost
+              // [CHANGED] Was ryo-only. Now folds in the base material AND
+              // every entry in nextLevelCost.extra (Gold Ingot + Cut
+              // Diamond) against live inventory quantities, so the button
+              // and cost chip actually reflect whether the upgrade will
+              // succeed — not just whether the player can afford the ryo
+              // half of it.
+              const cost = tool.nextLevelCost;
+              const affordable = cost
                 ? dashData != null &&
-                  dashData.currency.ryo >= tool.nextLevelCost.ryo
+                  dashData.currency.ryo >= cost.ryo &&
+                  haveOf(cost.material) >= cost.materialQty &&
+                  (cost.extra ?? []).every((e) => haveOf(e.itemId) >= e.qty)
                 : true;
               return (
                 <ToolCard
@@ -584,6 +642,7 @@ export default function Upgrade() {
                   index={i}
                   hasCraftingTable={toolsData.hasCraftingTable}
                   canAfford={affordable}
+                  haveOf={haveOf}
                   onUpgrade={handleToolUpgrade}
                   busy={busyTool === tool.tool}
                 />

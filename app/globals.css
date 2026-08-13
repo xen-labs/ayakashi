@@ -157,21 +157,14 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.2rem;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 35% 35%,
-    #2a2000 0%,
-    #0d0d00 60%,
-    #000 100%
-  );
-  border: 2px solid #c8a84b;
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  background: linear-gradient(155deg, #2a2000 0%, #0d0d00 60%, #000 100%);
+  border: 1px solid rgba(200, 168, 75, 0.4);
   box-shadow:
-    0 0 0 4px rgba(200, 168, 75, 0.12),
-    0 0 0 8px rgba(200, 168, 75, 0.05),
-    0 8px 32px rgba(0, 0, 0, 0.8),
-    inset 0 1px 0 rgba(200, 168, 75, 0.25);
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(200, 168, 75, 0.2);
   position: relative;
 }
 
@@ -179,8 +172,8 @@ body {
   content: "";
   position: absolute;
   inset: 4px;
-  border-radius: 50%;
-  border: 1px solid rgba(200, 168, 75, 0.3);
+  border-radius: 6px;
+  border: 1px solid rgba(200, 168, 75, 0.15);
   pointer-events: none;
 }
 
@@ -967,4 +960,337 @@ dialog::backdrop {
 }
 .search-loading-ring {
   animation: search-pulse-ring 1.6s ease-in-out infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PREMIUM SURFACE SYSTEM — dashboard / bank-vault / leaderboard
+   A step up from .form-card: layered glass depth, an animated
+   conic-gradient border that slowly drifts (not spins — restrained,
+   ambient), and a hover state that lifts with real dimensional
+   shadow rather than just a border-color swap. Built as an addition,
+   not a replacement — .form-card stays exactly as-is everywhere else.
+   ══════════════════════════════════════════════════════════════════ */
+
+.glass-panel {
+  position: relative;
+  background:
+    linear-gradient(
+      155deg,
+      rgba(200, 168, 75, 0.06) 0%,
+      rgba(10, 8, 0, 0.85) 35%
+    ),
+    rgba(8, 7, 0, 0.9);
+  border: 1px solid rgba(200, 168, 75, 0.16);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 20px 60px -20px rgba(0, 0, 0, 0.9);
+  transition:
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(200, 168, 75, 0.4);
+  transform: translateY(-3px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 30px 70px -20px rgba(0, 0, 0, 0.95),
+    0 0 40px -10px rgba(200, 168, 75, 0.15);
+}
+
+/* Slow-drifting conic gradient ring — a single soft highlight orbits
+   the border over ~8s. Applied via a pseudo-element mask so the panel
+   content itself never needs its own border-image trickery. Opt-in
+   (.glass-panel-aura) since it costs a bit more paint than a plain
+   glass-panel and isn't needed on every card, only the ones meant to
+   feel like the page's centerpiece. */
+@keyframes aura-drift {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.glass-panel-aura {
+  isolation: isolate;
+}
+.glass-panel-aura::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(230, 201, 106, 0.7) 15deg,
+    transparent 45deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: aura-drift 8s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Ambient background glow orbs — large, soft, barely-there radial
+   blooms that drift very slowly. Sits behind page content at a low
+   z-index; two staggered orbs read as atmosphere, not decoration you
+   consciously notice. Respects prefers-reduced-motion by simply not
+   animating (still renders as a static soft glow). */
+@keyframes ambient-drift-a {
+  0%,
+  100% {
+    transform: translate(-8%, -6%) scale(1);
+  }
+  50% {
+    transform: translate(4%, 8%) scale(1.15);
+  }
+}
+@keyframes ambient-drift-b {
+  0%,
+  100% {
+    transform: translate(6%, 4%) scale(1);
+  }
+  50% {
+    transform: translate(-6%, -10%) scale(1.1);
+  }
+}
+.ambient-glow-a {
+  position: absolute;
+  width: 60vw;
+  height: 60vw;
+  max-width: 640px;
+  max-height: 640px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(200, 168, 75, 0.1), transparent 70%);
+  filter: blur(40px);
+  animation: ambient-drift-a 18s ease-in-out infinite;
+  pointer-events: none;
+}
+.ambient-glow-b {
+  position: absolute;
+  width: 50vw;
+  height: 50vw;
+  max-width: 520px;
+  max-height: 520px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(230, 201, 106, 0.08),
+    transparent 70%
+  );
+  filter: blur(40px);
+  animation: ambient-drift-b 22s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient-glow-a,
+  .ambient-glow-b,
+  .glass-panel-aura::before {
+    animation: none;
+  }
+}
+
+/* Big glowing stat figure — the "hero number" treatment for wallet
+   balances, level, streak counts. Text-shadow bloom plus a subtle
+   entrance. Distinct from .coin-medallion-value (which is sized for a
+   fixed 88px medallion) — this scales with its container. */
+@keyframes stat-glow-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    text-shadow: 0 0 0 rgba(200, 168, 75, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    text-shadow: 0 0 24px rgba(200, 168, 75, 0.35);
+  }
+}
+.stat-glow {
+  animation: stat-glow-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  text-shadow: 0 0 24px rgba(200, 168, 75, 0.35);
+}
+
+/* Progress bar — animated shimmer sweep across the fill, on top of
+   the existing solid-fill bars used elsewhere. Opt-in via
+   .progress-fill-shimmer on the fill element. */
+@keyframes progress-shimmer-sweep {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+.progress-fill-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.35) 48%,
+    rgba(255, 255, 255, 0.5) 52%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: progress-shimmer-sweep 2.2s ease-in-out infinite;
+}
+
+/* Icon badge — the circular icon container used for section headers
+   throughout the redesign (bank, vault, flame, etc.) Consistent ring +
+   inner glow so every page's badges match without repeating the same
+   long className string everywhere. */
+.icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(200, 168, 75, 0.25);
+  background:
+    radial-gradient(
+      circle at 50% 30%,
+      rgba(200, 168, 75, 0.18),
+      transparent 70%
+    ),
+    rgba(0, 0, 0, 0.5);
+  color: #c8a84b;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3) inset;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.icon-badge-danger {
+  border-color: rgba(220, 80, 80, 0.4);
+  background:
+    radial-gradient(
+      circle at 50% 30%,
+      rgba(220, 80, 80, 0.18),
+      transparent 70%
+    ),
+    rgba(0, 0, 0, 0.5);
+  color: #f87171;
+}
+
+/* Page-level content stagger — apply to a container's direct children
+   via nth-child delay in the component (Tailwind arbitrary values) or
+   just drop .stagger-in directly on each element with an inline
+   animation-delay. Kept generic/reusable rather than one-off per
+   page. */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.stagger-in {
+  animation: stagger-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Sharp, borderless transaction/ledger row amount — replaces the
+   boxed pill treatment (border + rounded-md pill) that read as busy
+   across a long list. Just weight + color + a tick-in on mount. */
+.ledger-amount-positive {
+  color: #4ade80;
+  text-shadow: 0 0 16px rgba(74, 222, 128, 0.35);
+}
+.ledger-amount-negative {
+  color: #f87171;
+  text-shadow: 0 0 16px rgba(248, 113, 113, 0.3);
+}
+
+@keyframes ledger-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.ledger-row-in {
+  animation: ledger-row-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Bank / Vault — deposit/withdraw pulse, repair alert breathing ── */
+@keyframes vault-pulse-danger {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 80, 80, 0);
+  }
+  50% {
+    box-shadow: 0 0 24px 2px rgba(220, 80, 80, 0.25);
+  }
+}
+.vault-danger-breathe {
+  animation: vault-pulse-danger 2.2s ease-in-out infinite;
+}
+
+@keyframes coin-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+.coin-float {
+  animation: coin-float 3.5s ease-in-out infinite;
+}
+
+/* ── Leaderboard — podium 3D pedestal, crown glint, rank-up flash ─── */
+@keyframes podium-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.podium-rise {
+  animation: podium-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes crown-glint {
+  0%,
+  90%,
+  100% {
+    filter: brightness(1) drop-shadow(0 0 6px rgba(255, 215, 0, 0.4));
+  }
+  95% {
+    filter: brightness(1.6) drop-shadow(0 0 14px rgba(255, 215, 0, 0.8));
+  }
+}
+.crown-glint {
+  animation: crown-glint 3.5s ease-in-out infinite;
+}
+
+@keyframes rank-row-glow-sweep {
+  0% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 150% 0;
+  }
+}
+.rank-row-first {
+  background-image: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 215, 0, 0.08) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  animation: rank-row-glow-sweep 4s ease-in-out infinite;
 }

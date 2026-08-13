@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   X,
@@ -698,10 +698,17 @@ function ProposeModal({
 // ── Main page ──────────────────────────────────────────────────────
 export default function TradePage() {
   const router = useRouter();
+  // Supports deep-linking a specific trade via /trade?open=<id> — used
+  // by the dashboard's pending-trade-offer notification so "Review"
+  // opens straight into that trade's detail dialog instead of just
+  // landing on the list and making the player find it themselves.
+  const searchParams = useSearchParams();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    searchParams.get("open"),
+  );
   const [proposing, setProposing] = useState(false);
   // FIX: was myJid, a state that was never actually set anywhere in
   // this file — see TradeDetailModal's comment above. TradeSide (and
