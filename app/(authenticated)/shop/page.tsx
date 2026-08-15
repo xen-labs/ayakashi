@@ -590,6 +590,11 @@ export default function Shop() {
   const [tab, setTab] = useState<ShopSection>("items");
   const [listings, setListings] = useState<ShopListing[]>([]);
   const [ownedItemIds, setOwnedItemIds] = useState<Set<string>>(new Set());
+  // Frame ownership lives in inventory.cosmetics.frames (frameId), not
+  // ownedItemIds — frames aren't inventory items. Kept in its own set
+  // rather than merged into ownedItemIds so the two id spaces (item
+  // registry ids vs. Frame _ids) never collide.
+  const [ownedFrameIds, setOwnedFrameIds] = useState<Set<string>>(new Set());
   // Player level isn't returned by /shop or /inventory today — level
   // gating still works because the backend enforces it on purchase and
   // returns a level_too_low error either way. If you later expose the
@@ -611,6 +616,7 @@ export default function Shop() {
       ]);
       setListings(shopRes.listings);
       setOwnedItemIds(new Set(invRes.ownedItemIds));
+      setOwnedFrameIds(new Set(invRes.cosmetics.frames.map((f) => f.frameId)));
     } catch (err) {
       if (err instanceof ApiResponseError && err.status === 401) {
         router.push("/login");
@@ -642,6 +648,12 @@ export default function Shop() {
     playerLevel < item.minLevel;
 
   const openModal = (item: ShopListing) => {
+    if (item.kind === "frame") {
+      if (ownedFrameIds.has(item.itemId)) return;
+      if (isLocked(item)) return;
+      setModalState({ item, maxQty: 1 });
+      return;
+    }
     const isOneOfAKind =
       ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
     if (isOneOfAKind && ownedItemIds.has(item.itemId)) return;
@@ -664,7 +676,9 @@ export default function Shop() {
         currency,
         quantity,
       });
-      if (
+      if (modalState.item.kind === "frame") {
+        setOwnedFrameIds((prev) => new Set(prev).add(modalState.item.itemId));
+      } else if (
         ONE_OF_A_KIND.has(modalState.item.itemId) ||
         modalState.item.durability === "permanent"
       ) {
@@ -771,9 +785,12 @@ export default function Shop() {
             </div>
           )}
           {visibleListings.map((item, i) => {
-            const isOneOfAKind =
-              ONE_OF_A_KIND.has(item.itemId) || item.durability === "permanent";
-            const alreadyOwned = isOneOfAKind && ownedItemIds.has(item.itemId);
+            const alreadyOwned =
+              item.kind === "frame"
+                ? ownedFrameIds.has(item.itemId)
+                : (ONE_OF_A_KIND.has(item.itemId) ||
+                    item.durability === "permanent") &&
+                  ownedItemIds.has(item.itemId);
             return (
               <ItemCard
                 key={item.itemId}

@@ -1,299 +1,91 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, FormEvent } from "react";
-import { PasswordField } from "../components/PasswordField";
 import { EmberField } from "../components/EmberField";
-import { authLogin, getHomeStats, ApiResponseError } from "../../lib/api";
 
-const BOT_NUMBER = process.env.NEXT_PUBLIC_BOT_NUMBER ?? "919999999999";
-const FORGOT_WA_URL = `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent("recover")}`;
+// ── Config ─────────────────────────────────────────────────────────
+// NEXT_PUBLIC_BOT_NUMBER must be set in .env.local / Vercel env vars —
+// password recovery is DM-only (unlike registration, which happens via
+// a .reg command in the hub group, so it doesn't need a bot number).
+const BOT_NUMBER = process.env.NEXT_PUBLIC_BOT_NUMBER;
+const PREFILL_TEXT = "recover";
+const WA_URL = BOT_NUMBER
+  ? `https://wa.me/${BOT_NUMBER}?text=${encodeURIComponent(PREFILL_TEXT)}`
+  : null;
 
-interface FormData {
-  username: string;
-  password: string;
-  rememberMe: boolean;
-}
-const INITIAL: FormData = { username: "", password: "", rememberMe: false };
-interface FieldErrors {
-  username?: string;
-  password?: string;
-}
-
-export default function Login() {
-  const router = useRouter();
-  const [form, setForm] = useState<FormData>(INITIAL);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [globalError, setGlobalError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [playerCount, setPlayerCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    getHomeStats()
-      .then((res) => setPlayerCount(res.totalPlayers))
-      .catch(() => null);
-  }, []);
-
-  const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
-    setGlobalError("");
-  };
-
-  const validate = (): FieldErrors | null => {
-    const errors: FieldErrors = {};
-    if (!form.username.trim()) errors.username = "Username is required.";
-    if (!form.password) errors.password = "Password is required.";
-    return Object.keys(errors).length ? errors : null;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setGlobalError("");
-    setFieldErrors({});
-    const clientErrors = validate();
-    if (clientErrors) {
-      setFieldErrors(clientErrors);
-      return;
-    }
-    setLoading(true);
-    try {
-      await authLogin({
-        username: form.username.trim().toLowerCase(),
-        password: form.password,
-        rememberMe: form.rememberMe,
-      });
-      router.push("/dashboard");
-    } catch (err) {
-      if (err instanceof ApiResponseError) {
-        const { code, message, issues } = err.error;
-        if (code === "validation_error" && issues?.length) {
-          const mapped: FieldErrors = {};
-          for (const issue of issues) {
-            const field = issue.path[0] as keyof FieldErrors;
-            if (field === "username" || field === "password")
-              mapped[field] = issue.message;
-          }
-          setFieldErrors(mapped);
-          return;
-        }
-        if (code === "invalid_credentials") {
-          setGlobalError("Invalid username or password.");
-          return;
-        }
-        if (code === "account_locked") {
-          setGlobalError(
-            message ?? "Too many failed attempts. Please try again later.",
-          );
-          return;
-        }
-        setGlobalError(message ?? "Login failed. Please try again.");
-      } else {
-        setGlobalError("Something went wrong. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
+// ── Page ───────────────────────────────────────────────────────────
+export default function ForgotPassword() {
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-10 sm:px-6 lg:px-8">
-      {/* ambient gold glow */}
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-10 sm:px-6">
       <div className="pointer-events-none fixed left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[120px]" />
-      <EmberField count={12} />
+      <EmberField count={14} />
 
-      <section className="relative z-10 grid w-full max-w-5xl gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-        {/* ── Left: branding ── */}
-        <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
-          <Link
-            href="/"
-            className="stagger-in text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
-          >
-            ← Back
-          </Link>
-
-          <Image
-            src="/brand/logo.png?v=transparent-1"
-            alt="Ayakashi"
-            width={80}
-            height={80}
-            className="logo-entrance h-auto w-20"
-            priority
-            unoptimized
-          />
-
-          <div className="stagger-in" style={{ animationDelay: "0.15s" }}>
-            <h1 className="font-display text-3xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-4xl md:text-5xl">
-              Welcome Back
-            </h1>
-            <div className="mt-2 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent lg:w-full lg:max-w-[200px]" />
-          </div>
-
-          <p
-            className="stagger-in max-w-sm text-sm leading-7 text-[#a89880]"
-            style={{ animationDelay: "0.25s" }}
-          >
-            Sign in to access your card collection, live auctions, guild events,
-            and WhatsApp-linked rewards.
-          </p>
-
-          {/* Live player count — quiet social proof, only shown once loaded */}
-          {playerCount !== null && (
-            <div
-              className="stagger-in flex items-center gap-2 text-xs text-[rgba(200,168,75,0.5)]"
-              style={{ animationDelay: "0.35s" }}
-            >
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#c8a84b] opacity-60" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#c8a84b]" />
-              </span>
-              <span>
-                {playerCount.toLocaleString("en-US")} players in the network
-              </span>
-            </div>
-          )}
-
-          <p
-            className="stagger-in text-xs text-[rgba(200,168,75,0.35)] uppercase tracking-[0.15em]"
-            style={{ animationDelay: "0.4s" }}
-          >
-            ✦ &nbsp; Ayakashi &nbsp; ✦
-          </p>
-        </div>
-
-        {/* ── Right: form ── */}
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className="form-card stagger-in w-full border p-6 sm:p-8"
-          style={{ animationDelay: "0.2s" }}
+      <section className="form-card stagger-in relative z-10 flex w-full max-w-md flex-col items-center border p-6 text-center sm:p-8">
+        <Link
+          href="/login"
+          className="stagger-in mb-8 self-start text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
         >
-          {/* form header */}
-          <div className="mb-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[rgba(200,168,75,0.3)]" />
-            <span className="font-display text-xs font-bold uppercase tracking-[0.2em] text-[#c8a84b]">
-              Sign In
-            </span>
-            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[rgba(200,168,75,0.3)]" />
-          </div>
+          ← Back to login
+        </Link>
 
-          <div className="grid gap-5">
-            {/* Username */}
-            <label className="grid gap-2">
-              <span className="font-ui text-xs font-semibold uppercase tracking-[0.15em] text-[rgba(200,168,75,0.7)]">
-                Username
-              </span>
-              <input
-                type="text"
-                name="username"
-                value={form.username}
-                onChange={(e) => set("username", e.target.value)}
-                required
-                autoComplete="username"
-                placeholder="xenkai"
-                maxLength={20}
-                autoFocus
-                className="form-input form-input-glow h-12 border px-4 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
-              />
-              {fieldErrors.username && (
-                <p className="text-xs text-red-400">{fieldErrors.username}</p>
-              )}
-            </label>
+        <Image
+          src="/brand/logo.png?v=transparent-1"
+          alt="Ayakashi"
+          width={80}
+          height={80}
+          className="logo-entrance mb-6 h-auto w-16"
+          priority
+          unoptimized
+        />
 
-            {/* Password */}
-            <div className="grid gap-2">
-              <PasswordField
-                label="Password"
-                name="password"
-                value={form.password}
-                onChange={(v) => set("password", v)}
-                required
-              />
-              {fieldErrors.password && (
-                <p className="text-xs text-red-400">{fieldErrors.password}</p>
-              )}
-            </div>
-          </div>
+        <h1
+          className="stagger-in font-display mb-3 text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl"
+          style={{ animationDelay: "0.15s" }}
+        >
+          Forgot Password?
+        </h1>
+        <div
+          className="stagger-in mb-6 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent"
+          style={{ animationDelay: "0.2s" }}
+        />
 
-          {/* Remember + forgot */}
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                name="rememberMe"
-                checked={form.rememberMe}
-                onChange={(e) => set("rememberMe", e.target.checked)}
-                className="h-4 w-4 cursor-pointer accent-[#c8a84b]"
-              />
-              <span className="text-xs text-[rgba(200,168,75,0.5)]">
-                Remember me
-              </span>
-            </label>
-            <a
-              href={FORGOT_WA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-medium text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
-            >
-              Forgot password?
-            </a>
-          </div>
+        <p
+          className="stagger-in mb-10 text-sm leading-7 text-[#a89880]"
+          style={{ animationDelay: "0.25s" }}
+        >
+          No worries. Message our WhatsApp bot and it will send you a secure
+          link to reset your password.
+        </p>
 
-          {globalError && (
-            <p
-              className="mt-4 border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-400"
-              role="alert"
-            >
-              {globalError}
-            </p>
-          )}
+        {/* Primary CTA — opens WhatsApp DM to the bot for recovery.
+            Falls back to the hub group if the bot number isn't
+            configured, so the button is never a dead link. */}
+        <a
+          href={WA_URL ?? process.env.NEXT_PUBLIC_WA_HUB_URL ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="brush-btn brush-btn-ember stagger-in flex w-full items-center justify-center gap-2"
+          style={{ animationDelay: "0.35s" }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-5 w-5 shrink-0"
+            aria-hidden="true"
+          >
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+          </svg>
+          Continue via WhatsApp
+        </a>
 
-          {/* Submit — brush stroke button */}
-          <div className="mt-6 flex justify-center">
-            <button
-              type="submit"
-              disabled={loading}
-              className="brush-btn brush-btn-glint w-56 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg
-                    className="h-3.5 w-3.5 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    />
-                  </svg>
-                  Signing In…
-                </span>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </div>
-
-          <p className="mt-5 text-center text-xs text-[rgba(200,168,75,0.35)]">
-            No account?{" "}
-            <span className="text-[rgba(200,168,75,0.55)]">
-              Run <span className="font-mono text-[#c8a84b]">.register</span> in
-              WhatsApp.
-            </span>
-          </p>
-        </form>
+        <p
+          className="stagger-in mt-6 text-xs text-[rgba(200,168,75,0.35)]"
+          style={{ animationDelay: "0.45s" }}
+        >
+          This opens WhatsApp with a pre-filled message to our bot.
+          <br />
+          The bot will reply with a link — tap it to set your new password.
+        </p>
       </section>
     </main>
   );

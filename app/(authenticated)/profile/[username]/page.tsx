@@ -12,7 +12,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Heart,
-  Lock,
   ArrowLeft,
   UserPlus,
   UserCheck,
@@ -40,7 +39,7 @@ import {
 import type {
   ProfileResponse,
   ProfileCardItem,
-  DeckSlot,
+  DeckSlotCard as DeckSlotCardData,
   CosmeticUpload,
   FriendStatus,
 } from "../../../../lib/api";
@@ -149,64 +148,214 @@ function FriendButton({
   );
 }
 
-// ── Deck slot card ────────────────────────────────────────────────
-function DeckSlotCard({ slot }: { slot: DeckSlot }) {
-  if (slot.state === "locked") {
+// ── Rarity colors — for the animated per-slot card art border ───────
+const RARITY_COLORS: Record<string, string> = {
+  C: "border-[rgba(200,168,75,0.15)] text-[rgba(200,168,75,0.5)]",
+  R: "border-[rgba(120,200,150,0.35)] text-[#7fd39c]",
+  SR: "border-[rgba(90,160,230,0.4)] text-[#6fb2f0]",
+  SSR: "border-[rgba(190,110,230,0.45)] text-[#c98af0]",
+  UR: "border-[rgba(230,180,60,0.55)] text-[#f0c445]",
+};
+
+// ── One card slot inside the big deck view — renders real animated
+// media (video for webm, plain <img> for gif/static so animation
+// actually plays; next/image can strip GIF animation and can't
+// decode webm at all — same convention CardTile.tsx already uses).
+//
+// [CHANGED — this pass] Filled slots no longer sit inside a bordered
+// rectangle matching the empty-slot styling — per product decision,
+// an occupied slot should read as "a card floating on the deck art,"
+// not "a card inside a UI box." Only EMPTY slots keep the dashed
+// border + "+" placeholder, since those genuinely need a boundary to
+// communicate "tappable empty space" against a busy background image.
+// Filled cards get drop-shadow for depth instead of a border/bg, plus
+// a press/hover lift so picking one up feels tactile — active: (not
+// just hover:) since this is a touch surface first.
+function DeckCardSlot({
+  card,
+  index,
+}: {
+  card: DeckSlotCardData | null;
+  index: number;
+}) {
+  const isVideo = card?.mediaType === "video";
+
+  if (!card) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[rgba(200,168,75,0.15)] p-4 text-center opacity-40">
-        <Lock className="h-5 w-5 text-[rgba(200,168,75,0.40)]" />
-        <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-          Locked
-        </span>
+      <div
+        className="deck-slot-in relative aspect-[3/4] overflow-hidden rounded-md border border-dashed border-[rgba(200,168,75,0.25)] bg-black/45 backdrop-blur-[1px]"
+        style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
+      >
+        <div className="flex h-full w-full items-center justify-center text-[rgba(200,168,75,0.30)]">
+          <span className="text-2xl">+</span>
+        </div>
       </div>
     );
   }
-  if (slot.state === "empty") {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[rgba(200,168,75,0.20)] p-4 text-center opacity-50">
-        <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-          Empty Deck
-        </span>
-      </div>
-    );
-  }
+
   return (
-    <div className="craft-card flex flex-col gap-2 overflow-hidden rounded-xl p-3">
-      {slot.backgroundUrl ? (
-        <div className="relative -m-3 mb-0 h-20 w-[calc(100%+1.5rem)] overflow-hidden">
+    <div
+      className="deck-slot-in deck-card-lift relative aspect-[3/4] overflow-hidden rounded-md"
+      style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
+    >
+      {isVideo ? (
+        <video
+          src={card.thumbUrl}
+          className="h-full w-full rounded-md object-cover"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={card.thumbUrl}
+          alt={card.name}
+          className="h-full w-full rounded-md object-cover"
+          loading="lazy"
+        />
+      )}
+      <span
+        className={`absolute left-1 top-1 rounded-sm border bg-black/70 px-1 py-0.5 text-[8px] font-bold uppercase tracking-widest ${RARITY_COLORS[card.rarity] ?? RARITY_COLORS.C}`}
+      >
+        {card.rarity}
+      </span>
+    </div>
+  );
+}
+
+// ── Big deck view — one deck at a time, animated card slots, arrows
+// to switch between unlocked decks. Locked decks are excluded from
+// the switchable set entirely — nothing to arrow into for a slot the
+// player hasn't unlocked yet.
+function BigDeckView({
+  deckSection,
+  isOwnProfile,
+}: {
+  deckSection: ProfileResponse["deck"];
+  isOwnProfile: boolean;
+}) {
+  const unlockedDecks = deckSection.slots.filter((s) => s.state !== "locked");
+  const [index, setIndex] = useState(() =>
+    Math.max(
+      0,
+      unlockedDecks.findIndex((s) => s.state === "active"),
+    ),
+  );
+  const [direction, setDirection] = useState<"left" | "right">("right");
+
+  if (unlockedDecks.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+        No decks yet.
+      </p>
+    );
+  }
+
+  const current = unlockedDecks[Math.min(index, unlockedDecks.length - 1)];
+
+  const goPrev = () => {
+    setDirection("left");
+    setIndex((i) => (i - 1 + unlockedDecks.length) % unlockedDecks.length);
+  };
+  const goNext = () => {
+    setDirection("right");
+    setIndex((i) => (i + 1) % unlockedDecks.length);
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {unlockedDecks.length > 1 && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={goPrev}
+            aria-label="Previous deck"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
+            Deck {index + 1} / {unlockedDecks.length}
+          </span>
+          <button
+            type="button"
+            onClick={goNext}
+            aria-label="Next deck"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      <div
+        key={current.slotIndex}
+        className={`relative overflow-hidden rounded-xl border form-card ${
+          direction === "right" ? "deck-switch-in-right" : "deck-switch-in-left"
+        }`}
+      >
+        {/* [CHANGED — this pass] Background now fills the ENTIRE card
+            area (absolute inset-0, behind everything), not just a
+            96px strip above the grid — per product decision, the
+            player's chosen art should show in full behind the cards,
+            not get cropped to a thin banner. A two-layer gradient
+            sits on top: a broad top-to-bottom fade so the deck name
+            stays legible over busy art, PLUS a heavier vignette at
+            all four edges so the card grid — which now sits directly
+            on the image, no separate background panel below it —
+            keeps enough contrast to read clearly no matter how bright
+            or busy the source art is. Falls back to a plain dark
+            panel (no image layer at all) when the deck has no
+            background set. */}
+        {current.backgroundUrl ? (
           <Image
-            src={slot.backgroundUrl}
+            src={current.backgroundUrl}
             alt=""
             fill
             className="object-cover"
             unoptimized
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+        ) : (
+          <div className="absolute inset-0 bg-[#0d0c08]" />
+        )}
+        {/* Top-to-bottom fade, keeps the deck name legible */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/85 via-black/35 to-black/70" />
+        {/* Edge vignette, keeps the card grid legible against bright/
+            busy art at the sides and bottom where the linear fade
+            above is weakest */}
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_60px_28px_rgba(0,0,0,0.65)]" />
+
+        <div className="relative z-10 px-4 pt-4">
+          <p className="font-display text-sm font-bold text-[#f0e6c8] drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+            {current.deckName ?? `Deck ${current.slotIndex + 1}`}
+          </p>
         </div>
-      ) : (
-        <div className="-m-3 mb-0 flex h-20 w-[calc(100%+1.5rem)] items-center justify-center bg-[rgba(200,168,75,0.04)] text-2xl opacity-30">
-          🃏
+
+        <div className="relative z-10 grid grid-cols-4 gap-3 p-4">
+          {current.state === "active" && current.resolvedSlots
+            ? current.resolvedSlots.map((card, i) => (
+                <DeckCardSlot key={i} card={card} index={i} />
+              ))
+            : Array.from({ length: 12 }).map((_, i) => (
+                <DeckCardSlot key={i} card={null} index={i} />
+              ))}
         </div>
-      )}
-      <p
-        className={`truncate text-xs font-bold text-[#f0e6c8] ${slot.backgroundUrl ? "-mt-6 relative z-10" : ""}`}
-      >
-        {slot.deckName ?? `Deck ${slot.slotIndex + 1}`}
-      </p>
-      <div className="flex flex-wrap items-center gap-1">
-        {Array.from({ length: 12 }).map((_, i) => {
-          const filled = slot.slots ? slot.slots[i] !== null : false;
-          return (
-            <div
-              key={i}
-              className={`h-3 w-2 rounded-sm border ${filled ? "border-ayakashi-gold bg-ayakashi-gold/30" : "border-[rgba(200,168,75,0.15)] bg-transparent"}`}
-            />
-          );
-        })}
+
+        {current.state === "empty" && (
+          <p className="relative z-10 pb-4 text-center text-xs text-[rgba(200,168,75,0.55)] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+            {isOwnProfile
+              ? "This deck is empty — head to Manage Decks to add cards."
+              : "This deck is empty."}
+          </p>
+        )}
+
+        <p className="relative z-10 pb-4 text-center text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.55)] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+          {current.filledSlotCount ?? 0} / {deckSection.deckSize} cards
+        </p>
       </div>
-      <span className="text-[10px] text-[rgba(200,168,75,0.40)]">
-        {slot.filledSlotCount ?? 0} / 12 cards
-      </span>
     </div>
   );
 }
@@ -720,8 +869,18 @@ export default function ProfilePage({
             type="button"
             disabled={!identity.isOwnProfile}
             onClick={() => identity.isOwnProfile && setQuickSheet("avatar")}
-            className={`group relative block rounded-full ring-4 ring-[#0a0a0a] ${identity.isOwnProfile ? "cursor-pointer" : "cursor-default"}`}
+            className={`group relative block rounded-full ${identity.isOwnProfile ? "cursor-pointer" : "cursor-default"}`}
           >
+            {/* [FIXED — this pass] Was `ring-4 ring-[#0a0a0a]` here — a
+                solid dark separator ring meant to visually inset the
+                avatar into the banner behind it. That's fine against
+                the OLD hardcoded default frame, but now that a
+                player's real equipped frame renders here (see
+                AvatarWithFrame's frameSrc below), the frame art IS the
+                visual boundary — the extra ring sat just outside it
+                and read as a second, redundant frame. Removed; the
+                equipped frame (or default frame, for players with none
+                equipped) is the only ring now. */}
             <AvatarWithFrame
               avatarSrc={
                 identity.avatarUrl ??
@@ -862,21 +1021,10 @@ export default function ProfilePage({
         >
           {/* Decks panel */}
           <div className="w-full shrink-0 snap-start px-0.5">
-            {deck.slots.every((s) => s.state === "locked") ? (
-              <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                No decks yet.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {deck.slots
-                  .filter(
-                    (s) => !(s.state === "locked" && !identity.isOwnProfile),
-                  )
-                  .map((slot) => (
-                    <DeckSlotCard key={slot.slotIndex} slot={slot} />
-                  ))}
-              </div>
-            )}
+            <BigDeckView
+              deckSection={deck}
+              isOwnProfile={identity.isOwnProfile}
+            />
             {identity.isOwnProfile && (
               <Link
                 href="/decks"

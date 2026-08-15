@@ -10,8 +10,12 @@ import type { LotteryPool } from "../../lib/api";
  * Shows the prize pool and top placements per draw. Silently renders
  * nothing if the fetch fails or comes back empty, so it never leaves a
  * broken-looking section on the homepage.
+ *
+ * @param limit Max draws to render. Defaults to 6 (unchanged behavior
+ *   for any existing caller that doesn't pass one). The homepage
+ *   passes limit={3} — both logged-in and logged-out.
  */
-export function LotteryTicker() {
+export function LotteryTicker({ limit = 6 }: { limit?: number }) {
   const [pools, setPools] = useState<LotteryPool[] | null>(null);
 
   useEffect(() => {
@@ -23,7 +27,7 @@ export function LotteryTicker() {
   if (pools === null) {
     return (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2].map((i) => (
+        {Array.from({ length: Math.min(limit, 3) }, (_, i) => (
           <div
             key={i}
             className="form-card h-32 animate-pulse border p-5 opacity-40"
@@ -37,7 +41,7 @@ export function LotteryTicker() {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {pools.slice(0, 6).map((pool, i) => {
+      {pools.slice(0, limit).map((pool, i) => {
         const top =
           pool.winners.find((w) => w.placement === 1) ?? pool.winners[0];
         const date = new Date(pool.resolvedAt);

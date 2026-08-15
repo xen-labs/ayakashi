@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,6 +8,7 @@ import { getLeaderboard, ApiResponseError } from "../../../lib/api";
 import type { LeaderboardMetric, LeaderboardResponse } from "../../../lib/api";
 import { AvatarWithFrame } from "../../components/AvatarWithFrame";
 import { CurrencyIcon } from "../../components/CurrencyIcon";
+import { FireSpinner } from "../../components/FireSpinner";
 
 type LeaderboardRow = LeaderboardResponse["items"][number];
 type PodiumRow = LeaderboardRow & { formattedValue: string };
@@ -57,19 +57,23 @@ const PODIUM_CONFIG: Record<
     height: "h-28 sm:h-36",
     order: "order-2",
     delay: "300ms",
-    avatarSize: 76,
+    // [CHANGED] 76 -> 95, per feedback that podium avatars read too
+    // small. Kept the champion : runner-up ratio close to the
+    // original (~1.32:1 vs ~1.27:1) so rank 1 still reads as clearly
+    // the biggest rather than all three suddenly looking similar.
+    avatarSize: 95,
   },
   2: {
     height: "h-20 sm:h-28",
     order: "order-1",
     delay: "150ms",
-    avatarSize: 60,
+    avatarSize: 72,
   },
   3: {
     height: "h-16 sm:h-20",
     order: "order-3",
     delay: "150ms",
-    avatarSize: 60,
+    avatarSize: 72,
   },
 };
 
@@ -80,58 +84,69 @@ function formatValue(value: number, metric: LeaderboardMetric): string {
   return value.toLocaleString("en-US");
 }
 
-function RowAvatar({
-  row,
-  size,
-  ring,
-}: {
-  row: LeaderboardRow;
-  size: number;
-  ring?: boolean;
-}) {
+function RowAvatar({ row, size }: { row: LeaderboardRow; size: number }) {
+  // [FIXED — this pass] Previously only composed AvatarWithFrame (with
+  // a hardcoded default frame) when avatarUrl was MISSING — a row with
+  // a real avatar rendered a bare <Image> in a manually-drawn gold
+  // ring, showing no actual equipped frame at all. Now always goes
+  // through AvatarWithFrame with the row's real avatarUrl/frameUrl
+  // (both resolved server-side in leaderboard.ts), falling back to the
+  // defaults only when the row itself has none.
+  //
+  // [CHANGED] The old manual ring/border wrapper (and its `ring` prop)
+  // is gone per product decision — a player's real equipped frame is
+  // now the only ring shown, rather than layering a generic UI ring
+  // behind/around it. AvatarWithFrame's frame image renders ~1.35x
+  // larger than innerSize (see that component's own comment), so
+  // innerSize is sized down here to size/1.35 to make the FRAME's
+  // outer edge land on `size`, not the inner avatar circle — otherwise
+  // rank-1's frame would visibly overflow its podium slot.
   return (
-    <div
-      className={`relative shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.05)] ${
-        ring
-          ? "border-2 border-[rgba(200,168,75,0.5)] shadow-[0_0_20px_rgba(200,168,75,0.35)]"
-          : "border border-[rgba(200,168,75,0.20)]"
-      }`}
-      style={{ width: size, height: size }}
-    >
-      {row.avatarUrl ? (
-        <Image
-          src={row.avatarUrl}
-          alt={row.displayName}
-          width={size}
-          height={size}
-          className="h-full w-full object-cover"
-          unoptimized
-        />
-      ) : (
-        <AvatarWithFrame
-          avatarSrc="/user-profile/user-profile/default-avatar.webp"
-          frameSrc="/user-profile/user-profile/default-avatar-frame.webp"
-          innerSize={Math.round(size * 0.6)}
-        />
-      )}
-    </div>
+    <AvatarWithFrame
+      avatarSrc={
+        row.avatarUrl || "/user-profile/user-profile/default-avatar.webp"
+      }
+      frameSrc={
+        row.frameUrl || "/user-profile/user-profile/default-avatar-frame.webp"
+      }
+      innerSize={Math.round(size / 1.35)}
+      alt={row.displayName}
+    />
   );
 }
 
 // ── Podium — top 3, staged like an awards ceremony ──────────────────
+// [NEW] Rank 1 gets two extra always-on ambient layers behind/around
+// the avatar: a dashed rune ring drifting one direction (14s) and a
+// two-point "comet + trailing spark" pair orbiting the other direction
+// (6s). The periods are deliberately mismatched (6s vs 14s share no
+// short common cycle) so the whole thing keeps looking slightly
+// different lap to lap instead of reading as one obvious spinning
+// sprite — the kind of ambient motion that rewards someone who just
+// sits and watches the page for a few seconds, rather than a one-shot
+// flourish that plays once on load and goes still.
 function Podium({ rows }: { rows: PodiumRow[] }) {
   const byRank = new Map<number, PodiumRow>(rows.map((r) => [r.rank, r]));
   const ranks = [1, 2, 3].filter((r) => byRank.has(r));
   if (ranks.length === 0) return null;
 
   return (
-    <div className="glass-panel glass-panel-aura relative flex flex-col items-center gap-0 overflow-hidden rounded-2xl border px-4 pb-0 pt-8 sm:px-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[rgba(200,168,75,0.08)] to-transparent" />
+    <div className="glass-panel glass-panel-aura relative flex flex-col items-center gap-0 overflow-visible rounded-2xl border px-4 pb-0 pt-9 sm:px-8 sm:pt-10">
+      {/* [FIXED — this pass] The panel was overflow-hidden with only
+          pt-4 above a crown sitting at -top-7/-top-8 (i.e. ~28-32px
+          above the avatar) — the rounded top edge + hidden overflow
+          clipped the crown's tip. Switched to overflow-visible (nothing
+          else in this card relies on clipping — the gradient below is
+          purely additive) and gave the panel enough top padding
+          (pt-9/pt-10) that the crown has real room even before the
+          overflow fix, so it's not depending on either change alone. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 rounded-t-2xl bg-gradient-to-b from-[rgba(200,168,75,0.10)] to-transparent" />
 
       <div className="relative flex w-full items-end justify-center gap-3 sm:gap-6">
         {ranks.map((rank) => {
           const row = byRank.get(rank)!;
           const cfg = PODIUM_CONFIG[rank];
+          const isChampion = rank === 1;
           return (
             <div
               key={row.jid}
@@ -140,11 +155,80 @@ function Podium({ rows }: { rows: PodiumRow[] }) {
             >
               {/* Avatar + crown/medal */}
               <div className="relative flex flex-col items-center">
-                {rank === 1 && (
-                  <Crown
-                    className="crown-glint absolute -top-6 h-6 w-6 text-[#FFD700] sm:-top-7 sm:h-7 sm:w-7"
-                    fill="currentColor"
-                  />
+                {isChampion && (
+                  <>
+                    {/* [CHANGED] Crown sized down (h-7/w-7 -> h-5/w-5,
+                        sm:h-8/w-8 -> sm:h-6/w-6) to make room for the
+                        larger avatar below it without the two crowding
+                        each other. */}
+                    <Crown
+                      className="crown-glint absolute -top-6 h-5 w-5 text-[#FFD700] sm:-top-7 sm:h-6 sm:w-6"
+                      fill="currentColor"
+                    />
+                    {/* Rising embers — random-feeling x-offset/delay/
+                        duration per spark, drifting straight up and
+                        fading. No geometric ring, nothing traces a
+                        visible line. */}
+                    <span className="leader-champion-embers">
+                      <span
+                        style={
+                          {
+                            "--ember-x": "20%",
+                            "--ember-drift": "-8px",
+                            "--ember-delay": "0s",
+                            "--ember-duration": "3.1s",
+                          } as React.CSSProperties
+                        }
+                      />
+                      <span
+                        style={
+                          {
+                            "--ember-x": "68%",
+                            "--ember-drift": "10px",
+                            "--ember-delay": "0.9s",
+                            "--ember-duration": "3.6s",
+                          } as React.CSSProperties
+                        }
+                      />
+                      <span
+                        style={
+                          {
+                            "--ember-x": "42%",
+                            "--ember-drift": "-4px",
+                            "--ember-delay": "1.7s",
+                            "--ember-duration": "2.9s",
+                          } as React.CSSProperties
+                        }
+                      />
+                      <span
+                        style={
+                          {
+                            "--ember-x": "85%",
+                            "--ember-drift": "6px",
+                            "--ember-delay": "2.4s",
+                            "--ember-duration": "3.3s",
+                          } as React.CSSProperties
+                        }
+                      />
+                      <span
+                        style={
+                          {
+                            "--ember-x": "8%",
+                            "--ember-drift": "9px",
+                            "--ember-delay": "3.2s",
+                            "--ember-duration": "3.8s",
+                          } as React.CSSProperties
+                        }
+                      />
+                    </span>
+                    {/* [REMOVED — this pass] .leader-champion-comet used
+                        to render here: a bright dot with a trailing
+                        box-shadow streak, animated in an orbital path
+                        via comet-streak. Per explicit feedback ("the
+                        straight line that moves in kinda circular
+                        motion... remove that") — the embers above are
+                        the only champion-only ambient effect left. */}
+                  </>
                 )}
                 <span
                   className="leader-podium-glow"
@@ -152,7 +236,7 @@ function Podium({ rows }: { rows: PodiumRow[] }) {
                     { "--podium-color": RANK_GLOW[rank] } as React.CSSProperties
                   }
                 />
-                <RowAvatar row={row} size={cfg.avatarSize} ring />
+                <RowAvatar row={row} size={cfg.avatarSize} />
                 <span className="absolute -bottom-1.5 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-black bg-[#0d0c00] text-sm">
                   {RANK_MEDAL[rank]}
                 </span>
@@ -292,25 +376,7 @@ export default function Leaderboard() {
 
         {loading ? (
           <div className="flex min-h-[40vh] items-center justify-center">
-            <svg
-              className="h-8 w-8 animate-spin text-ayakashi-gold"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              />
-            </svg>
+            <FireSpinner size={32} />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center gap-4 py-10 text-center">
@@ -348,8 +414,15 @@ export default function Leaderboard() {
                 return (
                   <div
                     key={row.jid}
-                    className={`leader-row-in group flex items-center gap-3 border-b border-[rgba(200,168,75,0.08)] px-2 py-3 transition-all last:border-0 hover:bg-[rgba(200,168,75,0.04)] ${isTop3 ? "rank-row-first" : ""}`}
-                    style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
+                    className={`leader-row-in group flex items-center gap-3 overflow-hidden border-b border-[rgba(200,168,75,0.08)] px-2 py-3 transition-all last:border-0 hover:bg-[rgba(200,168,75,0.04)] ${isTop3 ? "rank-row-glow" : ""}`}
+                    style={
+                      {
+                        animationDelay: `${Math.min(i, 12) * 30}ms`,
+                        ...(isTop3
+                          ? { "--row-glow-color": RANK_GLOW[row.rank] }
+                          : {}),
+                      } as React.CSSProperties
+                    }
                   >
                     {/* Rank */}
                     <div className="relative w-8 shrink-0 text-center">
@@ -376,7 +449,7 @@ export default function Leaderboard() {
                       )}
                     </div>
 
-                    <RowAvatar row={row} size={36} ring={isTop3} />
+                    <RowAvatar row={row} size={36} />
 
                     {/* Name + username */}
                     <div className="flex min-w-0 flex-1 flex-col gap-0">

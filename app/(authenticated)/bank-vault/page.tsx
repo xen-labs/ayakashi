@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Landmark,
   Home as HomeIcon,
@@ -88,6 +89,130 @@ function FillBar({ value, max }: { value: number; max: number }) {
         className="h-full rounded-full bg-ayakashi-gold transition-all duration-700"
         style={{ width: `${pct}%` }}
       />
+    </div>
+  );
+}
+
+// ── Bank hero panel — points at /assets/webapp/vault/bank.webp (same
+// asset the Upgrade page's Bank card uses — one shared file, one shared
+// concept). Falls back to the icon + ray-sweep/coin-drift treatment via
+// onError so nothing breaks before that file exists. ──────────────────
+function BankHero() {
+  const [broken, setBroken] = useState(false);
+  return (
+    <div className="hero-panel group relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-t-xl border-b border-[rgba(200,168,75,0.15)] bg-[radial-gradient(circle_at_50%_40%,rgba(200,168,75,0.14),transparent_70%)]">
+      {!broken && (
+        <Image
+          src="/assets/webapp/vault/bank.webp"
+          alt="Bank"
+          fill
+          className="relative z-10 object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+          unoptimized
+          onError={() => setBroken(true)}
+        />
+      )}
+      {broken && (
+        <>
+          <div className="hero-ray-sweep absolute inset-0 opacity-40" />
+          <div className="coin-float relative flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)] transition-transform duration-500 group-hover:scale-110">
+            <Landmark className="h-9 w-9 text-ayakashi-gold" />
+          </div>
+          <span
+            className="coin-drift absolute left-[22%] top-[65%] text-lg opacity-70"
+            style={{ animationDelay: "0s" }}
+          >
+            🪙
+          </span>
+          <span
+            className="coin-drift absolute right-[24%] top-[70%] text-sm opacity-60"
+            style={{ animationDelay: "1.1s" }}
+          >
+            🪙
+          </span>
+          <span
+            className="coin-drift absolute left-[48%] top-[75%] text-xs opacity-50"
+            style={{ animationDelay: "2.2s" }}
+          >
+            🪙
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Vault hero panel — points at /assets/webapp/vault/home_vault.webp,
+// swapping to home_vault_critical.webp when vault health is low (same
+// two files the Upgrade page's Vault card uses). Unowned vault stays
+// icon-only dimmed/locked since there's nothing to show yet. ──────────
+function VaultHero({ critical, owned }: { critical: boolean; owned: boolean }) {
+  const [broken, setBroken] = useState(false);
+  const [criticalBroken, setCriticalBroken] = useState(false);
+
+  if (!owned) {
+    return (
+      <div className="relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-t-xl border-b border-[rgba(200,168,75,0.12)] bg-[rgba(200,168,75,0.03)] opacity-50">
+        <HomeIcon className="h-12 w-12 text-[rgba(200,168,75,0.30)]" />
+      </div>
+    );
+  }
+
+  const useCriticalImg = critical && !criticalBroken;
+  const imgSrc = useCriticalImg
+    ? "/assets/webapp/vault/home_vault_critical.webp"
+    : "/assets/webapp/vault/home_vault.webp";
+  const imgIsBroken = useCriticalImg ? false : broken;
+
+  return (
+    <div
+      className={`hero-panel group relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-t-xl border-b transition-colors duration-500 ${
+        critical
+          ? "border-red-500/25 bg-[radial-gradient(circle_at_50%_40%,rgba(220,60,60,0.16),transparent_70%)] vault-danger-breathe"
+          : "border-[rgba(200,168,75,0.15)] bg-[radial-gradient(circle_at_50%_40%,rgba(200,168,75,0.14),transparent_70%)]"
+      }`}
+    >
+      {!imgIsBroken && (
+        <Image
+          src={imgSrc}
+          alt="Home Vault"
+          fill
+          className={`relative z-10 object-cover transition-transform duration-500 group-hover:scale-[1.05] ${critical ? "brightness-90" : ""}`}
+          unoptimized
+          onError={() =>
+            useCriticalImg ? setCriticalBroken(true) : setBroken(true)
+          }
+        />
+      )}
+      {critical && (
+        <div className="pointer-events-none absolute inset-0 z-20 bg-red-500/10" />
+      )}
+      {imgIsBroken && (
+        <div
+          className={`hero-ray-sweep absolute inset-0 opacity-40 ${critical ? "hero-ray-sweep-danger" : ""}`}
+        />
+      )}
+      {imgIsBroken && (
+        <div
+          className={`relative flex h-20 w-20 items-center justify-center rounded-full border transition-transform duration-500 group-hover:scale-110 ${
+            critical
+              ? "border-red-500/40 bg-black/50 shadow-[0_0_30px_rgba(220,60,60,0.30)] reveal-glow-pulse"
+              : "border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)]"
+          }`}
+        >
+          <HomeIcon
+            className={`h-9 w-9 ${critical ? "text-red-400" : "text-ayakashi-gold"}`}
+          />
+        </div>
+      )}
+      {critical && (
+        <>
+          <span className="vault-spark absolute left-[30%] top-[35%] z-20 h-1 w-1 rounded-full bg-red-400" />
+          <span
+            className="vault-spark absolute right-[28%] top-[55%] z-20 h-1 w-1 rounded-full bg-red-400"
+            style={{ animationDelay: "0.6s" }}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -400,293 +525,300 @@ export default function BankVaultPage() {
         </div>
 
         {/* ── Bank ── */}
-        <div className="form-card flex flex-col gap-5 rounded-xl border p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(200,168,75,0.30)] bg-black/50 text-ayakashi-gold">
-              <Landmark className="h-5 w-5" />
-            </div>
-            <div className="flex-1">
-              <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#f0e6c8]">
-                Bank
-              </h2>
-              <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-                Safe storage · never robbable
-              </p>
-            </div>
-            {bank.tier > 0 && (
-              <span className="shrink-0 rounded border border-ayakashi-gold/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold">
-                Tier {bank.tier}
-              </span>
-            )}
-          </div>
-
-          {bank.tier === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <Lock className="h-6 w-6 text-[rgba(200,168,75,0.35)]" />
-              <p className="text-xs text-[rgba(200,168,75,0.45)]">
-                You don't have a bank account yet.
-              </p>
-              <button
-                type="button"
-                disabled={busy === "open"}
-                onClick={handleOpenBank}
-                className="rounded-md border border-ayakashi-gold px-5 py-2 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-50"
-              >
-                {busy === "open" ? "Opening…" : "Open Bank Account"}
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-end justify-between">
-                  <span className="font-display text-3xl font-bold tabular-nums text-[#e6c96a]">
-                    {fmt(bank.balance)}
-                  </span>
-                  <span className="text-xs text-[rgba(200,168,75,0.40)]">
-                    of {fmt(bank.cap)} cap
-                  </span>
-                </div>
-                <FillBar value={bank.balance} max={bank.cap} />
+        <div className="vault-card-in form-card flex flex-col overflow-hidden rounded-xl border">
+          <BankHero />
+          <div className="flex flex-col gap-5 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(200,168,75,0.30)] bg-black/50 text-ayakashi-gold">
+                <Landmark className="h-5 w-5" />
               </div>
+              <div className="flex-1">
+                <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#f0e6c8]">
+                  Bank
+                </h2>
+                <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
+                  Safe storage · never robbable
+                </p>
+              </div>
+              {bank.tier > 0 && (
+                <span className="shrink-0 rounded border border-ayakashi-gold/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold">
+                  Tier {bank.tier}
+                </span>
+              )}
+            </div>
 
-              {/* Interest claim — the live, animated centerpiece */}
-              <div
-                className={`flex items-center justify-between gap-3 rounded-lg border p-4 transition-all ${
-                  bank.interestClaim.available
-                    ? "border-green-500/40 bg-green-500/5"
-                    : "border-[rgba(200,168,75,0.15)] bg-black/30"
-                } ${claimPulse ? "reveal-pop" : ""}`}
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles
-                    className={`h-5 w-5 ${bank.interestClaim.available ? "text-green-400 reveal-glow-pulse" : "text-[rgba(200,168,75,0.35)]"}`}
-                  />
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
-                      Interest · {bank.interestClaim.ratePercent}%
+            {bank.tier === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-4 text-center">
+                <Lock className="h-6 w-6 text-[rgba(200,168,75,0.35)]" />
+                <p className="text-xs text-[rgba(200,168,75,0.45)]">
+                  You don't have a bank account yet.
+                </p>
+                <button
+                  type="button"
+                  disabled={busy === "open"}
+                  onClick={handleOpenBank}
+                  className="rounded-md border border-ayakashi-gold px-5 py-2 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-50"
+                >
+                  {busy === "open" ? "Opening…" : "Open Bank Account"}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-end justify-between">
+                    <span className="font-display text-3xl font-bold tabular-nums text-[#e6c96a]">
+                      {fmt(bank.balance)}
                     </span>
-                    <span className="text-sm font-bold text-[#f0e6c8]">
-                      {bank.interestClaim.available
-                        ? `+${fmt(bank.interestClaim.projectedAmount)} ryo ready`
-                        : `Next: ${fmtMs(interestRemaining)}`}
+                    <span className="text-xs text-[rgba(200,168,75,0.40)]">
+                      of {fmt(bank.cap)} cap
                     </span>
                   </div>
+                  <FillBar value={bank.balance} max={bank.cap} />
                 </div>
-                <button
-                  type="button"
-                  disabled={!bank.interestClaim.available || busy === "claim"}
-                  onClick={handleClaimInterest}
-                  className="shrink-0 rounded-md border border-green-500/50 bg-green-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-green-400 transition-colors hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.15)] disabled:bg-transparent disabled:text-[rgba(200,168,75,0.25)]"
-                >
-                  {busy === "claim" ? "Claiming…" : "Claim"}
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+                {/* Interest claim — the live, animated centerpiece */}
+                <div
+                  className={`flex items-center justify-between gap-3 rounded-lg border p-4 transition-all ${
+                    bank.interestClaim.available
+                      ? "border-green-500/40 bg-green-500/5"
+                      : "border-[rgba(200,168,75,0.15)] bg-black/30"
+                  } ${claimPulse ? "reveal-pop" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Sparkles
+                      className={`h-5 w-5 ${bank.interestClaim.available ? "text-green-400 reveal-glow-pulse" : "text-[rgba(200,168,75,0.35)]"}`}
+                    />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
+                        Interest · {bank.interestClaim.ratePercent}%
+                      </span>
+                      <span className="text-sm font-bold text-[#f0e6c8]">
+                        {bank.interestClaim.available
+                          ? `+${fmt(bank.interestClaim.projectedAmount)} ryo ready`
+                          : `Next: ${fmtMs(interestRemaining)}`}
+                      </span>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setDepositOpen((v) => !v);
-                      setWithdrawOpen(false);
-                    }}
-                    className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
+                    disabled={!bank.interestClaim.available || busy === "claim"}
+                    onClick={handleClaimInterest}
+                    className="shrink-0 rounded-md border border-green-500/50 bg-green-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-green-400 transition-colors hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.15)] disabled:bg-transparent disabled:text-[rgba(200,168,75,0.25)]"
                   >
-                    <ArrowDownToLine className="h-3.5 w-3.5" /> Deposit
+                    {busy === "claim" ? "Claiming…" : "Claim"}
                   </button>
-                  {depositOpen && (
-                    <div className="mt-3">
-                      <AmountPanel
-                        max={balances.pocketRyo}
-                        onSubmit={handleDeposit}
-                        submitLabel="Confirm Deposit"
-                        busy={busy === "deposit"}
-                        accent="gold"
-                      />
-                    </div>
-                  )}
                 </div>
-                <div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDepositOpen((v) => !v);
+                        setWithdrawOpen(false);
+                      }}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
+                    >
+                      <ArrowDownToLine className="h-3.5 w-3.5" /> Deposit
+                    </button>
+                    {depositOpen && (
+                      <div className="mt-3">
+                        <AmountPanel
+                          max={balances.pocketRyo}
+                          onSubmit={handleDeposit}
+                          submitLabel="Confirm Deposit"
+                          busy={busy === "deposit"}
+                          accent="gold"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWithdrawOpen((v) => !v);
+                        setDepositOpen(false);
+                      }}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.30)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                    >
+                      <ArrowUpFromLine className="h-3.5 w-3.5" /> Withdraw
+                    </button>
+                    {withdrawOpen && (
+                      <div className="mt-3">
+                        <AmountPanel
+                          max={bank.balance}
+                          onSubmit={handleWithdraw}
+                          submitLabel="Confirm Withdraw"
+                          busy={busy === "withdraw"}
+                          accent="red"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {!bank.isMaxTier && bank.nextTierCost != null && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setWithdrawOpen((v) => !v);
-                      setDepositOpen(false);
-                    }}
-                    className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.30)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                    disabled={busy === "upgradeBank"}
+                    onClick={handleUpgradeBank}
+                    className="flex h-10 items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.25)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:opacity-50"
                   >
-                    <ArrowUpFromLine className="h-3.5 w-3.5" /> Withdraw
+                    <CurrencyIcon type="ryo" size={14} /> Upgrade Bank —{" "}
+                    {fmt(bank.nextTierCost)}
                   </button>
-                  {withdrawOpen && (
-                    <div className="mt-3">
-                      <AmountPanel
-                        max={bank.balance}
-                        onSubmit={handleWithdraw}
-                        submitLabel="Confirm Withdraw"
-                        busy={busy === "withdraw"}
-                        accent="red"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {!bank.isMaxTier && bank.nextTierCost != null && (
-                <button
-                  type="button"
-                  disabled={busy === "upgradeBank"}
-                  onClick={handleUpgradeBank}
-                  className="flex h-10 items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.25)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:opacity-50"
-                >
-                  <CurrencyIcon type="ryo" size={14} /> Upgrade Bank —{" "}
-                  {fmt(bank.nextTierCost)}
-                </button>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── Home Vault ── */}
         <div
-          className={`form-card flex flex-col gap-5 rounded-xl border p-5 transition-colors ${vaultCritical ? "border-red-500/30" : ""}`}
+          className={`vault-card-in form-card flex flex-col overflow-hidden rounded-xl border transition-colors ${vaultCritical ? "border-red-500/30" : ""}`}
+          style={{ animationDelay: "90ms" }}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-black/50 ${
-                vaultCritical
-                  ? "border-red-500/40 text-red-400"
-                  : "border-[rgba(200,168,75,0.30)] text-ayakashi-gold"
-              }`}
-            >
-              <HomeIcon className="h-5 w-5" />
+          <VaultHero critical={vaultCritical} owned={homeVault.owned} />
+          <div className="flex flex-col gap-5 p-5">
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-black/50 ${
+                  vaultCritical
+                    ? "border-red-500/40 text-red-400"
+                    : "border-[rgba(200,168,75,0.30)] text-ayakashi-gold"
+                }`}
+              >
+                <HomeIcon className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#f0e6c8]">
+                  Home Vault
+                </h2>
+                <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
+                  Higher yield · can be robbed
+                </p>
+              </div>
+              {homeVault.owned && (
+                <span className="shrink-0 rounded border border-ayakashi-gold/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold">
+                  Tier {homeVault.tier}
+                </span>
+              )}
             </div>
-            <div className="flex-1">
-              <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#f0e6c8]">
-                Home Vault
-              </h2>
-              <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-                Higher yield · can be robbed
-              </p>
-            </div>
-            {homeVault.owned && (
-              <span className="shrink-0 rounded border border-ayakashi-gold/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold">
-                Tier {homeVault.tier}
-              </span>
+
+            {!homeVault.owned ? (
+              <div className="flex flex-col items-center gap-3 py-4 text-center">
+                <Lock className="h-6 w-6 text-[rgba(200,168,75,0.35)]" />
+                <p className="text-xs text-[rgba(200,168,75,0.45)]">
+                  {homeVault.purchaseInfo.description}
+                </p>
+                <div className="flex items-center gap-1.5 text-sm font-bold text-[#e6c96a]">
+                  <CurrencyIcon
+                    type={homeVault.purchaseInfo.currency}
+                    size={16}
+                  />
+                  {fmt(homeVault.purchaseInfo.price)}
+                </div>
+                <a
+                  href="/shop"
+                  className="rounded-md border border-ayakashi-gold px-5 py-2 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
+                >
+                  Go to Shop
+                </a>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-end justify-between">
+                      <span className="text-lg font-bold tabular-nums text-[#e6c96a]">
+                        {fmt(homeVault.balances.ryo)}
+                      </span>
+                      <span className="text-[10px] text-[rgba(200,168,75,0.40)]">
+                        / {fmt(homeVault.caps.ryo)}
+                      </span>
+                    </div>
+                    <FillBar
+                      value={homeVault.balances.ryo}
+                      max={homeVault.caps.ryo}
+                    />
+                    <span className="text-[9px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
+                      Ryo
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-end justify-between">
+                      <span className="text-lg font-bold tabular-nums text-[#e6c96a]">
+                        {fmt(homeVault.balances.kitsu)}
+                      </span>
+                      <span className="text-[10px] text-[rgba(200,168,75,0.40)]">
+                        / {fmt(homeVault.caps.kitsu)}
+                      </span>
+                    </div>
+                    <FillBar
+                      value={homeVault.balances.kitsu}
+                      max={homeVault.caps.kitsu}
+                    />
+                    <span className="text-[9px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
+                      Kitsu
+                    </span>
+                  </div>
+                </div>
+
+                {/* Health — the standout visual, mirrors Upgrade page's treatment */}
+                <div className="flex flex-col gap-1.5 rounded-md border border-[rgba(200,168,75,0.12)] bg-black/30 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
+                      Vault Health
+                    </span>
+                    <span
+                      className={`text-xs font-bold tabular-nums ${vaultCritical ? "text-red-400" : "text-[#e6c96a]"}`}
+                    >
+                      {homeVault.health.current} / {homeVault.health.max}
+                    </span>
+                  </div>
+                  <HealthBar
+                    value={homeVault.health.current}
+                    max={homeVault.health.max}
+                  />
+                  {homeVault.vulnerabilityBonusPercent > 0 && (
+                    <p className="flex items-center gap-1.5 text-[10px] text-red-400">
+                      <ShieldAlert className="h-3 w-3" /> +
+                      {homeVault.vulnerabilityBonusPercent}% rob success chance
+                      against you
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {homeVault.repair.needed && (
+                    <button
+                      type="button"
+                      disabled={busy === "repair"}
+                      onClick={handleRepair}
+                      className="flex h-10 items-center justify-center gap-2 rounded-md border border-red-500/50 bg-red-500/10 text-xs font-bold uppercase tracking-widest text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      <Wrench className="h-3.5 w-3.5" />
+                      Repair — {fmt(homeVault.repair.ryoCost)} ryo +{" "}
+                      {homeVault.repair.material.quantity}×{" "}
+                      {homeVault.repair.material.displayName}
+                    </button>
+                  )}
+                  {!homeVault.isMaxTier && homeVault.nextTierCost != null && (
+                    <button
+                      type="button"
+                      disabled={busy === "upgradeVault"}
+                      onClick={handleUpgradeVault}
+                      className="flex h-10 items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.25)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:opacity-50"
+                    >
+                      <CurrencyIcon type="ryo" size={14} /> Upgrade Vault —{" "}
+                      {fmt(homeVault.nextTierCost)}
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </div>
-
-          {!homeVault.owned ? (
-            <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <Lock className="h-6 w-6 text-[rgba(200,168,75,0.35)]" />
-              <p className="text-xs text-[rgba(200,168,75,0.45)]">
-                {homeVault.purchaseInfo.description}
-              </p>
-              <div className="flex items-center gap-1.5 text-sm font-bold text-[#e6c96a]">
-                <CurrencyIcon
-                  type={homeVault.purchaseInfo.currency}
-                  size={16}
-                />
-                {fmt(homeVault.purchaseInfo.price)}
-              </div>
-              <a
-                href="/shop"
-                className="rounded-md border border-ayakashi-gold px-5 py-2 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
-              >
-                Go to Shop
-              </a>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-end justify-between">
-                    <span className="text-lg font-bold tabular-nums text-[#e6c96a]">
-                      {fmt(homeVault.balances.ryo)}
-                    </span>
-                    <span className="text-[10px] text-[rgba(200,168,75,0.40)]">
-                      / {fmt(homeVault.caps.ryo)}
-                    </span>
-                  </div>
-                  <FillBar
-                    value={homeVault.balances.ryo}
-                    max={homeVault.caps.ryo}
-                  />
-                  <span className="text-[9px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
-                    Ryo
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-end justify-between">
-                    <span className="text-lg font-bold tabular-nums text-[#e6c96a]">
-                      {fmt(homeVault.balances.kitsu)}
-                    </span>
-                    <span className="text-[10px] text-[rgba(200,168,75,0.40)]">
-                      / {fmt(homeVault.caps.kitsu)}
-                    </span>
-                  </div>
-                  <FillBar
-                    value={homeVault.balances.kitsu}
-                    max={homeVault.caps.kitsu}
-                  />
-                  <span className="text-[9px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
-                    Kitsu
-                  </span>
-                </div>
-              </div>
-
-              {/* Health — the standout visual, mirrors Upgrade page's treatment */}
-              <div className="flex flex-col gap-1.5 rounded-md border border-[rgba(200,168,75,0.12)] bg-black/30 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
-                    Vault Health
-                  </span>
-                  <span
-                    className={`text-xs font-bold tabular-nums ${vaultCritical ? "text-red-400" : "text-[#e6c96a]"}`}
-                  >
-                    {homeVault.health.current} / {homeVault.health.max}
-                  </span>
-                </div>
-                <HealthBar
-                  value={homeVault.health.current}
-                  max={homeVault.health.max}
-                />
-                {homeVault.vulnerabilityBonusPercent > 0 && (
-                  <p className="flex items-center gap-1.5 text-[10px] text-red-400">
-                    <ShieldAlert className="h-3 w-3" /> +
-                    {homeVault.vulnerabilityBonusPercent}% rob success chance
-                    against you
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {homeVault.repair.needed && (
-                  <button
-                    type="button"
-                    disabled={busy === "repair"}
-                    onClick={handleRepair}
-                    className="flex h-10 items-center justify-center gap-2 rounded-md border border-red-500/50 bg-red-500/10 text-xs font-bold uppercase tracking-widest text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
-                  >
-                    <Wrench className="h-3.5 w-3.5" />
-                    Repair — {fmt(homeVault.repair.ryoCost)} ryo +{" "}
-                    {homeVault.repair.material.quantity}×{" "}
-                    {homeVault.repair.material.displayName}
-                  </button>
-                )}
-                {!homeVault.isMaxTier && homeVault.nextTierCost != null && (
-                  <button
-                    type="button"
-                    disabled={busy === "upgradeVault"}
-                    onClick={handleUpgradeVault}
-                    className="flex h-10 items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.25)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:opacity-50"
-                  >
-                    <CurrencyIcon type="ryo" size={14} /> Upgrade Vault —{" "}
-                    {fmt(homeVault.nextTierCost)}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
         </div>
 
         <hr className="gold-rule" />

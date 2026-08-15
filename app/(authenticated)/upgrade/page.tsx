@@ -59,11 +59,65 @@ function ItemArt({
   src?: string;
   emoji: string;
   alt: string;
-  frame?: "card" | "thumb";
+  frame?: "card" | "thumb" | "chip" | "ingredient";
 }) {
   const [broken, setBroken] = useState(false);
   const showImg = src && !broken;
   const isThumb = frame === "thumb";
+  const isChip = frame === "chip";
+  const isIngredient = frame === "ingredient";
+
+  // Small inline badge for cost-strip material icons — sized to sit next
+  // to a "×N Name" label rather than stand alone like the thumb frame.
+  if (isChip) {
+    return (
+      <span className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm">
+        {showImg ? (
+          <Image
+            src={src}
+            alt={alt}
+            width={16}
+            height={16}
+            className="h-4 w-4 object-contain"
+            unoptimized
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <span aria-hidden className="text-[13px] leading-none">
+            {emoji}
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  // [NEW] Ingredient slot — the old 16px "chip" badge was too small to
+  // actually read as ingredient art, just decorative dust next to a wall
+  // of text. This is a real square tile (44px) with its own bordered
+  // frame and glow-on-hover, sized to sit inside a labeled slot rather
+  // than inline in a sentence — see the redesigned cost section below.
+  if (isIngredient) {
+    return (
+      <div className="group/ing relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[rgba(200,168,75,0.20)] bg-black/40 shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover/slot:scale-105">
+        {showImg ? (
+          <Image
+            src={src}
+            alt={alt}
+            width={44}
+            height={44}
+            className="h-9 w-9 object-contain drop-shadow-[0_2px_6px_rgba(200,168,75,0.4)]"
+            unoptimized
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <span aria-hidden className="text-2xl leading-none">
+            {emoji}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden bg-[rgba(200,168,75,0.04)] ${
@@ -162,34 +216,35 @@ function HealthBar({ value, max }: { value: number; max: number }) {
 // Rebuilt on craft-card + item-card-lift (the same hover-lift/shadow
 // combo shop and inventory already use) instead of the generic
 // form-card, plus a shop-card-in staggered entrance so the three tool
-// cards animate in rather than just appearing. The cost row now
-// pulses red (chip-short-pulse, borrowed from craft's insufficient-
-// material warning) when the player can't currently afford the next
-// level, instead of showing the exact same static cost chip whether
-// affordable or not.
+// cards animate in rather than just appearing.
 //
-// [NEW] canAfford now folds in EVERY requirement — ryo, the base
-// material, AND every entry in nextLevelCost.extra (Gold Ingot + Cut
-// Diamond at Lv.2/Lv.3) — computed by the parent from live inventory
-// data, not just ryo. The cost chip below also renders each extra
-// requirement as its own segment, and turns red per-segment when that
-// specific item is short, so a player missing only diamond (say) can
-// see exactly which requirement is the blocker instead of a single
-// all-or-nothing red chip.
+// [CHANGED — this pass] Ingredient tray replaces the old inline cost
+// chip: ryo and each material now get their own bordered 44px slot
+// (ItemArt's new `frame="ingredient"`) instead of a 16px icon buried in
+// a wall of "×N Name" text. Each slot pulses red independently
+// (chip-short-pulse) when that specific requirement — ryo via the new
+// haveRyo prop, or a material via haveOf — is short, so a player missing
+// only diamond (say) sees exactly which slot is the blocker instead of
+// one all-or-nothing red chip. Dropped the parent-computed `canAfford`
+// prop since nothing in this component read it anymore once shortfall
+// moved to per-slot checks — the upgrade button's disabled state was
+// never gated on affordability either before or after this pass (only
+// atMax/locked/busy/notCrafted — see canUpgrade below); that's
+// unchanged, unrelated pre-existing behavior.
 function ToolCard({
   tool,
   index,
   hasCraftingTable,
-  canAfford,
   haveOf,
+  haveRyo,
   onUpgrade,
   busy,
 }: {
   tool: ToolStatus;
   index: number;
   hasCraftingTable: boolean;
-  canAfford: boolean;
   haveOf: (itemId: string) => number;
+  haveRyo: number;
   onUpgrade: (toolId: string) => void;
   busy: boolean;
 }) {
@@ -237,35 +292,70 @@ function ToolCard({
         </div>
 
         {tool.nextLevelCost && !tool.atMax && !notCrafted && (
-          <div
-            className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2 text-xs transition-colors ${
-              canAfford
-                ? "border-[rgba(200,168,75,0.15)] bg-white/[0.02] text-[rgba(200,168,75,0.65)]"
-                : "chip-short border-red-500/35 bg-red-500/5 text-red-300/80"
-            }`}
-          >
-            <span className="flex items-center gap-1 whitespace-nowrap">
-              <CurrencyIcon type="ryo" size={14} />{" "}
-              {formatNumber(tool.nextLevelCost.ryo)}
-            </span>
-            <span className="text-[rgba(200,168,75,0.30)]">+</span>
-            <span
-              className={`flex items-center gap-1 truncate ${baseMaterialShort ? "text-red-300" : ""}`}
+          <div className="flex flex-wrap gap-2">
+            {/* Ryo — its own slot so the currency reads as an ingredient
+                too, not a separate inline prefix bolted onto the row. */}
+            <div
+              className={`flex flex-col items-center gap-1 rounded-lg border px-2.5 py-2 transition-colors ${
+                haveRyo >= tool.nextLevelCost.ryo
+                  ? "border-[rgba(200,168,75,0.20)] bg-white/[0.02]"
+                  : "chip-short border-red-500/35 bg-red-500/5"
+              }`}
             >
-              <span aria-hidden>{tool.nextLevelCost.materialEmoji}</span>×
-              {tool.nextLevelCost.materialQty} {tool.nextLevelCost.materialName}
-            </span>
+              <span className="flex h-11 w-11 items-center justify-center">
+                <CurrencyIcon type="ryo" size={30} />
+              </span>
+              <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-[rgba(200,168,75,0.75)]">
+                {formatNumber(tool.nextLevelCost.ryo)}
+              </span>
+            </div>
+
+            {/* Base material — real 44px art in its own bordered slot,
+                qty/name underneath, instead of a 16px inline icon buried
+                in a sentence. */}
+            <div
+              className={`group/slot flex flex-col items-center gap-1 rounded-lg border px-2.5 py-2 transition-colors ${
+                baseMaterialShort
+                  ? "chip-short border-red-500/35 bg-red-500/5"
+                  : "border-[rgba(200,168,75,0.20)] bg-white/[0.02]"
+              }`}
+            >
+              <ItemArt
+                src={tool.nextLevelCost.materialWebappImage}
+                emoji={tool.nextLevelCost.materialEmoji}
+                alt={tool.nextLevelCost.materialName}
+                frame="ingredient"
+              />
+              <span
+                className={`max-w-[72px] truncate text-[11px] font-bold ${baseMaterialShort ? "text-red-300" : "text-[rgba(200,168,75,0.75)]"}`}
+              >
+                ×{tool.nextLevelCost.materialQty}
+              </span>
+            </div>
+
             {tool.nextLevelCost.extra?.map((e) => {
               const short = haveOf(e.itemId) < e.qty;
               return (
-                <span key={e.itemId} className="flex items-center gap-1">
-                  <span className="text-[rgba(200,168,75,0.30)]">+</span>
+                <div
+                  key={e.itemId}
+                  className={`group/slot flex flex-col items-center gap-1 rounded-lg border px-2.5 py-2 transition-colors ${
+                    short
+                      ? "chip-short border-red-500/35 bg-red-500/5"
+                      : "border-[rgba(200,168,75,0.20)] bg-white/[0.02]"
+                  }`}
+                >
+                  <ItemArt
+                    src={e.webappImage}
+                    emoji={e.emoji}
+                    alt={e.name}
+                    frame="ingredient"
+                  />
                   <span
-                    className={`flex items-center gap-1 truncate ${short ? "text-red-300" : ""}`}
+                    className={`max-w-[72px] truncate text-[11px] font-bold ${short ? "text-red-300" : "text-[rgba(200,168,75,0.75)]"}`}
                   >
-                    <span aria-hidden>{e.emoji}</span>×{e.qty} {e.name}
+                    ×{e.qty}
                   </span>
-                </span>
+                </div>
               );
             })}
           </div>
@@ -302,45 +392,67 @@ function ToolCard({
 }
 
 // ── Bank hero panel — same full-bleed aspect-square language the tool
-// art gets, but built from icon + animated gold rays/coin drift instead
-// of a static image (no bank/vault registry art exists to point at).
-// A slow radial sweep behind the vault icon plus 3 drifting coin glyphs
-// gives the panel real presence without needing an asset. ─────────────
+// art gets. Points at /assets/webapp/vault/bank.webp (drop the file in
+// public/assets/webapp/vault/ to light it up) — same convention as
+// itemRegistry.ts's items/ and craftRecipes.ts's rituals/ folders. Falls
+// back to the icon + animated gold rays/coin drift treatment (no broken-
+// image box) until that file exists. ───────────────────────────────────
 function BankHero() {
+  const [broken, setBroken] = useState(false);
   return (
     <div className="hero-panel group relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden border-b border-[rgba(200,168,75,0.15)] bg-[radial-gradient(circle_at_50%_40%,rgba(200,168,75,0.14),transparent_70%)]">
-      <div className="hero-ray-sweep absolute inset-0 opacity-40" />
-      <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)] transition-transform duration-500 group-hover:scale-110">
-        <Landmark className="h-9 w-9 text-ayakashi-gold" />
-      </div>
-      {/* drifting coin glyphs */}
-      <span
-        className="coin-drift absolute left-[22%] top-[65%] text-lg opacity-70"
-        style={{ animationDelay: "0s" }}
-      >
-        🪙
-      </span>
-      <span
-        className="coin-drift absolute right-[24%] top-[70%] text-sm opacity-60"
-        style={{ animationDelay: "1.1s" }}
-      >
-        🪙
-      </span>
-      <span
-        className="coin-drift absolute left-[48%] top-[75%] text-xs opacity-50"
-        style={{ animationDelay: "2.2s" }}
-      >
-        🪙
-      </span>
+      {!broken && (
+        <Image
+          src="/assets/webapp/vault/bank.webp"
+          alt="Bank"
+          fill
+          className="relative z-10 object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+          unoptimized
+          onError={() => setBroken(true)}
+        />
+      )}
+      {broken && (
+        <>
+          <div className="hero-ray-sweep absolute inset-0 opacity-40" />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)] transition-transform duration-500 group-hover:scale-110">
+            <Landmark className="h-9 w-9 text-ayakashi-gold" />
+          </div>
+          {/* drifting coin glyphs */}
+          <span
+            className="coin-drift absolute left-[22%] top-[65%] text-lg opacity-70"
+            style={{ animationDelay: "0s" }}
+          >
+            🪙
+          </span>
+          <span
+            className="coin-drift absolute right-[24%] top-[70%] text-sm opacity-60"
+            style={{ animationDelay: "1.1s" }}
+          >
+            🪙
+          </span>
+          <span
+            className="coin-drift absolute left-[48%] top-[75%] text-xs opacity-50"
+            style={{ animationDelay: "2.2s" }}
+          >
+            🪙
+          </span>
+        </>
+      )}
     </div>
   );
 }
 
-// ── Vault hero panel — mirrors BankHero's scale, swaps the calm gold
-// sweep for a tenser look when the vault is critical: red pulse instead
-// of gold, faint crack lines fading in. Unowned vault gets a dimmed,
-// locked treatment instead of either. ──────────────────────────────────
+// ── Vault hero panel — mirrors BankHero's scale. Points at
+// /assets/webapp/vault/home_vault.webp normally, and
+// /assets/webapp/vault/home_vault_critical.webp when health is low (drop
+// both in public/assets/webapp/vault/ — the critical variant is optional,
+// falls back to the normal image with a red overlay if only one exists).
+// Unowned vault stays icon-only (dimmed, locked) since there's nothing to
+// upgrade toward showing yet. ─────────────────────────────────────────
 function VaultHero({ critical, owned }: { critical: boolean; owned: boolean }) {
+  const [broken, setBroken] = useState(false);
+  const [criticalBroken, setCriticalBroken] = useState(false);
+
   if (!owned) {
     return (
       <div className="relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden border-b border-[rgba(200,168,75,0.12)] bg-[rgba(200,168,75,0.03)] opacity-50">
@@ -348,6 +460,16 @@ function VaultHero({ critical, owned }: { critical: boolean; owned: boolean }) {
       </div>
     );
   }
+
+  // Prefer the dedicated critical image; if it 404s, fall back to the
+  // normal vault image (still with the red ray-sweep/overlay below) so a
+  // missing critical-only asset never means a blank panel.
+  const useCriticalImg = critical && !criticalBroken;
+  const imgSrc = useCriticalImg
+    ? "/assets/webapp/vault/home_vault_critical.webp"
+    : "/assets/webapp/vault/home_vault.webp";
+  const imgIsBroken = useCriticalImg ? false : broken;
+
   return (
     <div
       className={`hero-panel group relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden border-b transition-colors duration-500 ${
@@ -356,25 +478,46 @@ function VaultHero({ critical, owned }: { critical: boolean; owned: boolean }) {
           : "border-[rgba(200,168,75,0.15)] bg-[radial-gradient(circle_at_50%_40%,rgba(200,168,75,0.14),transparent_70%)]"
       }`}
     >
-      <div
-        className={`hero-ray-sweep absolute inset-0 opacity-40 ${critical ? "hero-ray-sweep-danger" : ""}`}
-      />
-      <div
-        className={`relative flex h-20 w-20 items-center justify-center rounded-full border transition-transform duration-500 group-hover:scale-110 ${
-          critical
-            ? "border-red-500/40 bg-black/50 shadow-[0_0_30px_rgba(220,60,60,0.30)]"
-            : "border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)]"
-        } ${critical ? "reveal-glow-pulse" : ""}`}
-      >
-        <Home
-          className={`h-9 w-9 ${critical ? "text-red-400" : "text-ayakashi-gold"}`}
+      {!imgIsBroken && (
+        <Image
+          src={imgSrc}
+          alt="Home Vault"
+          fill
+          className={`relative z-10 object-cover transition-transform duration-500 group-hover:scale-[1.05] ${critical ? "brightness-90" : ""}`}
+          unoptimized
+          onError={() =>
+            useCriticalImg ? setCriticalBroken(true) : setBroken(true)
+          }
         />
-      </div>
+      )}
+      {/* critical red wash sits above the image (if any) so the danger
+          state always reads even when using the normal vault art */}
+      {critical && (
+        <div className="pointer-events-none absolute inset-0 z-20 bg-red-500/10" />
+      )}
+      {imgIsBroken && (
+        <>
+          <div
+            className={`hero-ray-sweep absolute inset-0 opacity-40 ${critical ? "hero-ray-sweep-danger" : ""}`}
+          />
+          <div
+            className={`relative flex h-20 w-20 items-center justify-center rounded-full border transition-transform duration-500 group-hover:scale-110 ${
+              critical
+                ? "border-red-500/40 bg-black/50 shadow-[0_0_30px_rgba(220,60,60,0.30)]"
+                : "border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)]"
+            } ${critical ? "reveal-glow-pulse" : ""}`}
+          >
+            <Home
+              className={`h-9 w-9 ${critical ? "text-red-400" : "text-ayakashi-gold"}`}
+            />
+          </div>
+        </>
+      )}
       {critical && (
         <>
-          <span className="vault-spark absolute left-[30%] top-[35%] h-1 w-1 rounded-full bg-red-400" />
+          <span className="vault-spark absolute left-[30%] top-[35%] z-20 h-1 w-1 rounded-full bg-red-400" />
           <span
-            className="vault-spark absolute right-[28%] top-[55%] h-1 w-1 rounded-full bg-red-400"
+            className="vault-spark absolute right-[28%] top-[55%] z-20 h-1 w-1 rounded-full bg-red-400"
             style={{ animationDelay: "0.6s" }}
           />
         </>
@@ -706,33 +849,18 @@ export default function Upgrade() {
             )}
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {toolsData?.tools.map((tool, i) => {
-              // [CHANGED] Was ryo-only. Now folds in the base material AND
-              // every entry in nextLevelCost.extra (Gold Ingot + Cut
-              // Diamond) against live inventory quantities, so the button
-              // and cost chip actually reflect whether the upgrade will
-              // succeed — not just whether the player can afford the ryo
-              // half of it.
-              const cost = tool.nextLevelCost;
-              const affordable = cost
-                ? dashData != null &&
-                  dashData.currency.ryo >= cost.ryo &&
-                  haveOf(cost.material) >= cost.materialQty &&
-                  (cost.extra ?? []).every((e) => haveOf(e.itemId) >= e.qty)
-                : true;
-              return (
-                <ToolCard
-                  key={tool.tool}
-                  tool={tool}
-                  index={i}
-                  hasCraftingTable={toolsData.hasCraftingTable}
-                  canAfford={affordable}
-                  haveOf={haveOf}
-                  onUpgrade={handleToolUpgrade}
-                  busy={busyTool === tool.tool}
-                />
-              );
-            })}
+            {toolsData?.tools.map((tool, i) => (
+              <ToolCard
+                key={tool.tool}
+                tool={tool}
+                index={i}
+                hasCraftingTable={toolsData.hasCraftingTable}
+                haveOf={haveOf}
+                haveRyo={dashData?.currency.ryo ?? 0}
+                onUpgrade={handleToolUpgrade}
+                busy={busyTool === tool.tool}
+              />
+            ))}
           </div>
         </div>
 

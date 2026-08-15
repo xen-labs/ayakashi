@@ -8,10 +8,10 @@ import {
   ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
-  Flame,
   Landmark,
   Home as HomeIcon,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import {
   getDashboard,
@@ -62,6 +62,88 @@ function useCountdown(remainingMs: number) {
     return () => clearInterval(t);
   }, [ms > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   return ms;
+}
+
+// ── Streak pips — a lit segment per recent claimed day (last 7,
+// capped), entrance-lit in sequence rather than appearing all at once.
+// Beyond 7 shows a "+N" overflow instead of an unreadable row.
+//
+// [CHANGED — this pass] Previously rendered 7 separate 🔥 emoji glyphs
+// side by side — flat, and visually noisy at a full 7-day streak (see
+// feedback: "why so many flames"). Also can't reuse FlameVideo here
+// (real screen-blended video footage) since seven simultaneous
+// autoplaying <video> elements in one row is a real performance/
+// battery cost for something this small and repeated. Redesigned as
+// solid gold-lit pill segments instead — same "growing streak = filled
+// track" language the Upgrade page's tool-level pips already use, and
+// the header's FlameVideo above already establishes "flame = this
+// card," so the pips don't need to re-illustrate fire individually to
+// read as a streak.
+function StreakPips({ streak }: { streak: number }) {
+  const shown = Math.min(streak, 7);
+  const overflow = streak - shown;
+  if (streak <= 0) return null;
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      {Array.from({ length: shown }).map((_, i) => (
+        <span
+          key={i}
+          className="streak-pip-in h-1.5 w-3.5 rounded-full bg-gradient-to-r from-[#e6a23c] to-[#e6c96a] shadow-[0_0_4px_rgba(230,180,60,0.55)]"
+          style={{ animationDelay: `${i * 70}ms` }}
+          aria-hidden
+        />
+      ))}
+      {overflow > 0 && (
+        <span className="text-[10px] font-bold text-[rgba(200,168,75,0.45)]">
+          +{overflow}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Flame video — real footage (screen-blended, so its solid-black
+// background disappears against any dark card) instead of the 🔥 emoji.
+// `loop` for the idle "ready to claim" state, non-looping `burst` for
+// the moment a claim actually lands. Falls back to the emoji if video
+// can't play (autoplay blocked, format unsupported, or the file simply
+// isn't there yet) so the card never shows a blank gap.
+function FlameVideo({
+  variant,
+  className,
+  play = true,
+}: {
+  variant: "loop" | "burst";
+  className?: string;
+  play?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src =
+    variant === "loop"
+      ? "/assets/webapp/fx/flame_daily_claim_loop.webm"
+      : "/assets/webapp/fx/flame_daily_claim_burst.webm";
+
+  if (failed || !play) {
+    return (
+      <span className={`leading-none ${className ?? ""}`} aria-hidden>
+        🔥
+      </span>
+    );
+  }
+
+  return (
+    <video
+      key={variant}
+      className={`flame-video pointer-events-none object-contain ${className ?? ""}`}
+      src={src}
+      autoPlay
+      muted
+      playsInline
+      loop={variant === "loop"}
+      onError={() => setFailed(true)}
+      aria-hidden
+    />
+  );
 }
 
 // ── Currency chip — flat, no medallion/frame, just a clean stat block ──
@@ -313,7 +395,12 @@ export default function Dashboard() {
       const result = await claimDailyReward();
       if (result.ok) {
         setClaimBurst(true);
-        setTimeout(() => setClaimBurst(false), 900);
+        // [FIXED — this pass] was 900ms, cutting off mid-flare partway
+        // through the ~1.6s burst video added this pass — matched to the
+        // clip's actual length (see flame_daily_claim_burst.webm) plus a
+        // small tail so the flame has time to fully die down before the
+        // overlay unmounts.
+        setTimeout(() => setClaimBurst(false), 1700);
         setClaimMessage(
           result.milestoneLabel ??
             `+${result.ryo + result.bonusRyo} ryo, +${result.kitsu + result.bonusKitsu} kitsu`,
@@ -447,13 +534,16 @@ export default function Dashboard() {
       )}
 
       {/* ── Wallet — pocket only, bank shown as a secondary line, no medallion frames ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 [animation:shop-card-in_0.35s_ease-out_backwards] sm:gap-4">
         <CurrencyChip type="ryo" label="Ryo" value={fmt(currency.ryo)} />
         <CurrencyChip type="kitsu" label="Kitsu" value={fmt(currency.kitsu)} />
       </div>
 
       {/* ── Bank + Vault glance — thin summary, deep-links to the real management page ── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div
+        className="grid grid-cols-1 gap-3 [animation:shop-card-in_0.35s_ease-out_backwards] sm:grid-cols-2"
+        style={{ animationDelay: "60ms" }}
+      >
         <Link
           href="/bank-vault"
           className="form-card flex items-center gap-3 border p-4 transition-colors hover:border-ayakashi-gold/40"
@@ -516,7 +606,7 @@ export default function Dashboard() {
 
       {/* ── Progression + Daily Claim ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="form-card flex flex-col gap-4 border p-5">
+        <div className="vault-card-in form-card flex flex-col gap-4 border p-5">
           <h2 className="font-display text-xs font-bold uppercase tracking-widest text-ayakashi-gold">
             Progression
           </h2>
@@ -555,34 +645,72 @@ export default function Dashboard() {
         </div>
 
         <div
-          className={`form-card flex flex-col gap-4 border p-5 transition-all ${claimBurst ? "reveal-pop" : ""}`}
+          className={`vault-card-in form-card relative flex flex-col gap-4 overflow-hidden border p-5 transition-all ${claimBurst ? "reveal-pop" : ""} ${dailyClaim.available ? "claim-card-ready" : ""}`}
+          style={{ animationDelay: "90ms" }}
         >
+          {/* one-shot flare on a successful claim — sits above everything,
+              ignores clicks, and unmounts itself once the burst window
+              closes so it never lingers as a stray looping video. */}
+          {claimBurst && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+              <FlameVideo variant="burst" className="h-40 w-32" />
+            </div>
+          )}
           <h2 className="flex items-center gap-2 font-display text-xs font-bold uppercase tracking-widest text-ayakashi-gold">
-            <Flame
-              className={`h-3.5 w-3.5 ${claimBurst ? "reveal-glow-pulse text-green-400" : ""}`}
-            />{" "}
+            <span
+              className={`relative inline-flex h-5 w-4 items-center justify-center ${
+                dailyClaim.available ? "claim-flame-bounce" : "opacity-60"
+              }`}
+            >
+              <FlameVideo variant="loop" className="h-5 w-4" />
+            </span>
             Daily Claim
           </h2>
           <div
-            className={`flex items-center justify-between rounded-md border p-4 transition-colors ${
+            className={`relative flex items-center justify-between overflow-hidden rounded-md border p-4 transition-colors ${
               dailyClaim.available
                 ? "border-green-500/30 bg-green-500/5"
                 : "border-[rgba(200,168,75,0.12)] bg-black/30"
             }`}
           >
-            <div className="flex flex-col gap-1">
+            {/* ember particles drifting behind the streak number when
+                claimable — same visual family as the craft/upgrade
+                reveal moments, so "ready to claim" reads as an event
+                across the whole app, not just here. */}
+            {dailyClaim.available && (
+              <>
+                <span
+                  className="ember-particle absolute bottom-2 left-6 h-1 w-1 rounded-full bg-[#e6c96a]"
+                  style={{ animationDelay: "0s" }}
+                />
+                <span
+                  className="ember-particle absolute bottom-2 left-16 h-1 w-1 rounded-full bg-[#e6c96a]"
+                  style={{ animationDelay: "0.5s" }}
+                />
+                <span
+                  className="ember-particle absolute bottom-2 left-28 h-1 w-1 rounded-full bg-[#e6c96a]"
+                  style={{ animationDelay: "1s" }}
+                />
+              </>
+            )}
+            <div className="relative flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
                 Streak
               </span>
-              <span className="text-xl font-bold text-[#e6c96a]">
+              <span className="flex items-center gap-1.5 text-xl font-bold text-[#e6c96a]">
                 {dailyClaim.currentStreak} days
               </span>
+              {/* streak-day pips — a lit flame per recent day, same
+                  filled/unfilled pip language LevelPips uses on the
+                  Upgrade page, so a growing streak visually reads like
+                  leveling up a tool. */}
+              <StreakPips streak={dailyClaim.currentStreak} />
             </div>
             <button
               type="button"
               onClick={handleClaimDaily}
               disabled={!dailyClaim.available || claiming}
-              className={`rounded-md border px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed ${
+              className={`relative shrink-0 rounded-md border px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed ${
                 dailyClaim.available
                   ? "border-green-500/40 bg-green-500/10 text-green-400 hover:bg-green-500/20"
                   : "border-[rgba(200,168,75,0.20)] text-[rgba(200,168,75,0.40)]"
@@ -596,13 +724,14 @@ export default function Dashboard() {
             </button>
           </div>
           {claimMessage && (
-            <p className="rounded-md border border-[rgba(200,168,75,0.20)] bg-black/30 py-2 text-center text-xs text-[#e6c96a]">
+            <p className="claim-message-in flex items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.20)] bg-black/30 py-2 text-center text-xs text-[#e6c96a]">
+              <Sparkles className="spark-burst h-3.5 w-3.5 text-[#e6c96a]" />
               {claimMessage}
             </p>
           )}
           {!dailyClaim.streakWillContinueIfClaimedNow &&
             !dailyClaim.available && (
-              <p className="rounded-md border border-red-500/30 bg-red-500/10 py-2 text-center text-[10px] uppercase tracking-widest text-red-400">
+              <p className="reveal-glow-pulse rounded-md border border-red-500/30 bg-red-500/10 py-2 text-center text-[10px] uppercase tracking-widest text-red-400">
                 Streak at risk — claim soon
               </p>
             )}

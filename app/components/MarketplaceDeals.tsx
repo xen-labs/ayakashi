@@ -29,8 +29,14 @@ const RARITY_LABEL: Record<CatalogCardRarity, string> = {
  * listings, sorted to surface the most eye-catching cards first
  * (highest rarity, then newest). Silently renders nothing on failure
  * or empty results.
+ *
+ * @param limit Max listings to render. Defaults to 10 (unchanged
+ *   behavior for any existing caller that doesn't pass one, e.g. the
+ *   full /marketplace page preview). The homepage passes limit={3} —
+ *   both logged-in and logged-out — so it reads as a teaser rather
+ *   than a full scrollable strip.
  */
-export function MarketplaceDeals() {
+export function MarketplaceDeals({ limit = 10 }: { limit?: number }) {
   const [listings, setListings] = useState<MarketplaceListing[] | null>(null);
 
   useEffect(() => {
@@ -42,7 +48,7 @@ export function MarketplaceDeals() {
   if (listings === null) {
     return (
       <div className="flex gap-4 overflow-hidden">
-        {[0, 1, 2, 3].map((i) => (
+        {Array.from({ length: Math.min(limit, 4) }, (_, i) => (
           <div
             key={i}
             className="form-card h-64 w-40 shrink-0 animate-pulse border opacity-40"
@@ -56,7 +62,7 @@ export function MarketplaceDeals() {
 
   return (
     <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2">
-      {listings.slice(0, 10).map((listing, i) => {
+      {listings.slice(0, limit).map((listing, i) => {
         const card = listing.card;
         const ringClass = card
           ? RARITY_RING[card.rarity]

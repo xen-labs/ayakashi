@@ -9,6 +9,7 @@ import { PasswordField } from "../components/PasswordField";
 import { TosModal } from "../components/TosModal";
 import { BackToWhatsApp } from "../components/BackToWhatsApp";
 import { EmberField } from "../components/EmberField";
+import { FireSpinner } from "../components/FireSpinner";
 import { CurrencyIcon } from "../components/CurrencyIcon";
 import { useCountUp } from "../hooks/useCountUp";
 import {
@@ -342,7 +343,7 @@ function RegisterInner() {
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              className="brush-btn brush-btn-glint w-52"
+              className="brush-btn brush-btn-ember w-52"
             >
               Go to Dashboard
             </button>
@@ -436,27 +437,7 @@ function RegisterInner() {
                   className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
                   aria-hidden="true"
                 >
-                  {avail.status === "checking" && (
-                    <svg
-                      className="h-4 w-4 animate-spin text-[rgba(200,168,75,0.6)]"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      />
-                    </svg>
-                  )}
+                  {avail.status === "checking" && <FireSpinner size={16} />}
                   {avail.status === "available" && (
                     <svg
                       className="h-4 w-4 text-green-400"
@@ -620,29 +601,11 @@ function RegisterInner() {
                   );
                 })()
               }
-              className="brush-btn brush-btn-glint w-56 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="brush-btn brush-btn-ember w-56 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <svg
-                    className="h-3.5 w-3.5 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    />
-                  </svg>
+                  <FireSpinner size={14} variant="dark" />
                   Creating Account…
                 </span>
               ) : (

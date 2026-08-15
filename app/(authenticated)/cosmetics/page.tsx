@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, Trash2, Check, AlertCircle, Info, X } from "lucide-react";
+import { Upload, Trash2, Check, AlertCircle, Info } from "lucide-react";
 import {
   getCosmeticUploads,
   uploadCosmetic,
@@ -15,6 +15,7 @@ import type {
   CosmeticUpload,
   OwnedFrameItem,
 } from "../../../lib/api";
+import { FireSpinner } from "../../components/FireSpinner";
 
 // ── constants matching the backend ───────────────────────────────
 // cosmeticUpload.ts: MAX_FILE_BYTES = 32MB, ALLOWED_MIMETYPES = png/jpeg/webp/gif
@@ -23,6 +24,14 @@ import type {
 // ONE_OF_A_KIND_ITEM_IDS) that permanently unlocks animated uploads
 // for that slot, not a per-upload consumable credit.
 // Static (single frame) is always free.
+//
+// [CHANGED] Banking model is now fixed at exactly one static slot +
+// one animated slot per cosmetic type (avatar/banner) — not a scrollable
+// upload history. Uploading a new file of either kind REPLACES whatever
+// was banked for that kind; the OTHER kind's banked upload is left
+// alone, which is what lets a player toggle between "my static" and
+// "my animated" without re-uploading either. See cosmeticUpload.ts's
+// header for the matching backend change.
 const MAX_MB = 32;
 const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 const DECK_SLOT_COUNT = 5;
@@ -80,121 +89,109 @@ function RulesPill({
   );
 }
 
-// ── Upload thumbnail — tap-to-open action sheet instead of hover ────
-function UploadThumb({
+// ── Kind slot card — one fixed card for "static" or "animated" ──────
+// Replaces the old scrollable upload-history grid: there are now at
+// most two banked uploads per cosmetic slot (one static, one animated),
+// so each gets its own fixed card instead of a variable-length list.
+function KindSlotCard({
+  kind,
   upload,
   aspectRatio,
-  onSelect,
-}: {
-  upload: CosmeticUpload;
-  aspectRatio: "square" | "banner";
-  onSelect: () => void;
-}) {
-  const h = aspectRatio === "banner" ? "h-16" : "h-20";
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`group relative overflow-hidden rounded-md border text-left transition-all active:scale-95 ${
-        upload.isEquipped
-          ? "border-ayakashi-gold ring-1 ring-ayakashi-gold/40"
-          : "border-[rgba(200,168,75,0.20)] hover:border-[rgba(200,168,75,0.45)]"
-      }`}
-    >
-      <div className={`relative w-full ${h} bg-[rgba(200,168,75,0.04)]`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={upload.url}
-          alt={upload.kind}
-          className="h-full w-full object-cover"
-        />
-      </div>
-
-      {upload.isEquipped && (
-        <div className="absolute right-0 top-0 rounded-bl-md bg-ayakashi-gold px-1 py-0.5">
-          <Check className="h-2.5 w-2.5 text-black" />
-        </div>
-      )}
-      {upload.kind === "animated" && (
-        <div className="absolute left-0 top-0 rounded-br-md bg-purple-600/90 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-widest text-white">
-          GIF
-        </div>
-      )}
-      <p className="truncate px-1 py-0.5 text-[8px] text-[rgba(200,168,75,0.35)]">
-        {new Date(upload.createdAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        })}
-      </p>
-    </button>
-  );
-}
-
-// ── Action sheet — equip/delete, works identically on tap or click ──
-function ActionSheet({
-  upload,
-  aspectRatio,
-  onClose,
+  locked,
+  lockedReason,
+  uploading,
+  onUploadClick,
   onEquip,
   onDelete,
 }: {
-  upload: CosmeticUpload;
+  kind: "static" | "animated";
+  upload: CosmeticUpload | null;
   aspectRatio: "square" | "banner";
-  onClose: () => void;
+  locked?: boolean;
+  lockedReason?: string;
+  uploading: boolean;
+  onUploadClick: () => void;
   onEquip: () => void;
   onDelete: () => void;
 }) {
+  const h = aspectRatio === "banner" ? "h-20" : "h-24";
+  const label = kind === "animated" ? "Animated" : "Static";
+
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
+      className={`flex flex-col gap-2 rounded-md border p-2.5 ${
+        upload?.isEquipped
+          ? "border-ayakashi-gold ring-1 ring-ayakashi-gold/40"
+          : "border-[rgba(200,168,75,0.20)]"
+      } ${locked ? "opacity-50" : ""}`}
     >
-      <div
-        className="craft-modal-pop form-card w-full max-w-sm rounded-t-2xl border p-5 sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-widest text-ayakashi-gold">
-            {upload.isEquipped ? "Currently Equipped" : "Manage Upload"}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[rgba(200,168,75,0.45)] hover:text-ayakashi-gold"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div
-          className={`mb-4 w-full overflow-hidden rounded-md border border-[rgba(200,168,75,0.20)] ${aspectRatio === "banner" ? "aspect-[3/1]" : "aspect-square max-w-[160px]"} mx-auto`}
+      <div className="flex items-center justify-between">
+        <span
+          className={`text-[10px] font-bold uppercase tracking-widest ${
+            kind === "animated"
+              ? "text-purple-400"
+              : "text-[rgba(200,168,75,0.55)]"
+          }`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {label}
+        </span>
+        {upload?.isEquipped && (
+          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-ayakashi-gold">
+            <Check className="h-2.5 w-2.5" /> Equipped
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`relative w-full ${h} overflow-hidden rounded-md bg-[rgba(200,168,75,0.04)]`}
+      >
+        {upload ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={upload.url}
-            alt={upload.kind}
+            alt={label}
             className="h-full w-full object-cover"
           />
-        </div>
+        ) : (
+          <div className="flex h-full items-center justify-center text-[10px] text-[rgba(200,168,75,0.30)]">
+            {locked ? (lockedReason ?? "Locked") : "Not set"}
+          </div>
+        )}
+      </div>
 
-        <div className="flex gap-3">
-          {!upload.isEquipped && (
-            <button
-              type="button"
-              onClick={onEquip}
-              className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
-            >
-              <Check className="h-4 w-4" /> Equip
-            </button>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          disabled={uploading || locked}
+          onClick={onUploadClick}
+          className="flex h-8 flex-1 items-center justify-center gap-1 rounded-md border border-[rgba(200,168,75,0.30)] text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.75)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {uploading ? (
+            <FireSpinner size={12} />
+          ) : (
+            <Upload className="h-3 w-3" />
           )}
+          {upload ? "Replace" : "Upload"}
+        </button>
+        {upload && !upload.isEquipped && (
+          <button
+            type="button"
+            onClick={onEquip}
+            className="flex h-8 flex-1 items-center justify-center gap-1 rounded-md border border-ayakashi-gold text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
+          >
+            <Check className="h-3 w-3" /> Use
+          </button>
+        )}
+        {upload && (
           <button
             type="button"
             onClick={onDelete}
-            className={`flex h-11 items-center justify-center gap-2 rounded-md border border-red-500/50 text-xs font-bold uppercase tracking-widest text-red-400 transition-colors hover:bg-red-500/10 ${upload.isEquipped ? "flex-1" : "flex-1"}`}
+            aria-label={`Delete ${label.toLowerCase()}`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-red-500/40 text-red-400 transition-colors hover:bg-red-500/10"
           >
-            <Trash2 className="h-4 w-4" /> Delete
+            <Trash2 className="h-3 w-3" />
           </button>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -214,11 +211,15 @@ function SlotPanel({
 }) {
   const [uploads, setUploads] = useState<CosmeticUpload[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  // Tracked per-kind so uploading a static file doesn't disable the
+  // animated card's button (and vice versa) while it's in flight.
+  const [uploadingKind, setUploadingKind] = useState<
+    "static" | "animated" | null
+  >(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
-  const [sheetTarget, setSheetTarget] = useState<CosmeticUpload | null>(null);
   const [passUnlocked, setPassUnlocked] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const staticFileRef = useRef<HTMLInputElement>(null);
+  const animatedFileRef = useRef<HTMLInputElement>(null);
   const passItem =
     slot !== "deckBackground"
       ? PASS_INFO[slot as "avatar" | "banner"]?.itemId
@@ -259,7 +260,16 @@ function SlotPanel({
     return () => clearTimeout(t);
   }, [toast]);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // deckBackground has no animated tier at all — the deck card render
+  // is a static composite regardless (see cosmeticUpload.ts's header),
+  // so any GIF uploaded there is silently flattened server-side. Only
+  // avatar/banner get the static+animated two-card layout below.
+  const supportsAnimated = slot !== "deckBackground";
+
+  const handleFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    intendedKind: "static" | "animated",
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
@@ -269,10 +279,16 @@ function SlotPanel({
       return;
     }
 
-    setUploading(true);
+    setUploadingKind(intendedKind);
     try {
       const res = await uploadCosmetic(slot, file, slotIndex);
-      setToast({ msg: "Uploaded and equipped!", ok: true });
+      setToast({
+        msg:
+          res.kind === "animated"
+            ? "Animated upload equipped!"
+            : "Static upload equipped!",
+        ok: true,
+      });
       // An animated upload only succeeds if the pass was owned — a
       // successful static upload proves nothing about pass ownership.
       if (res.kind === "animated") setPassUnlocked(true);
@@ -289,6 +305,8 @@ function SlotPanel({
           msg = "Unsupported file type. Use PNG, JPEG, WEBP, or GIF.";
         } else if (err.error.code === "file_too_large") {
           msg = `File is too large. Maximum size is ${MAX_MB}MB.`;
+        } else if (err.error.code === "animation_too_long") {
+          msg = err.error.message;
         } else {
           msg = err.error.message || msg;
         }
@@ -297,7 +315,7 @@ function SlotPanel({
       }
       setToast({ msg, ok: false });
     } finally {
-      setUploading(false);
+      setUploadingKind(null);
     }
   };
 
@@ -305,7 +323,6 @@ function SlotPanel({
     try {
       await equipCosmetic({ slot, uploadId: u.id, slotIndex });
       setToast({ msg: "Equipped!", ok: true });
-      setSheetTarget(null);
       await load();
     } catch (err) {
       setToast({
@@ -318,48 +335,34 @@ function SlotPanel({
   const handleDelete = async (u: CosmeticUpload) => {
     try {
       await deleteCosmeticUpload(u.id);
-      setSheetTarget(null);
       await load();
     } catch {
       setToast({ msg: "Couldn't delete — try again.", ok: false });
     }
   };
 
+  const staticUpload = uploads.find((u) => u.kind === "static") ?? null;
+  const animatedUpload = uploads.find((u) => u.kind === "animated") ?? null;
   const equippedUpload = uploads.find((u) => u.isEquipped);
 
   return (
     <div className="form-card flex flex-col gap-4 rounded-xl border p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="font-display text-sm font-bold uppercase tracking-[0.1em] text-ayakashi-gold">
-            {label}
-          </h2>
-          {equippedUpload && (
-            <p className="text-[10px] text-[rgba(200,168,75,0.40)]">
-              Currently equipped:{" "}
-              {equippedUpload.kind === "animated" ? "✨ animated" : "static"}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-          className="flex shrink-0 items-center gap-1.5 rounded-md border border-ayakashi-gold px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-40"
-        >
-          <Upload className="h-3.5 w-3.5" />
-          {uploading ? "Uploading…" : "Upload"}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept={ACCEPTED}
-          className="hidden"
-          onChange={handleFile}
-        />
+      <div className="flex flex-col gap-0.5">
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.1em] text-ayakashi-gold">
+          {label}
+        </h2>
+        {equippedUpload && (
+          <p className="text-[10px] text-[rgba(200,168,75,0.40)]">
+            Currently equipped:{" "}
+            {equippedUpload.kind === "animated" ? "✨ animated" : "static"}
+          </p>
+        )}
       </div>
 
-      <RulesPill passItem={passItem} unlocked={passUnlocked} />
+      <RulesPill
+        passItem={supportsAnimated ? passItem : undefined}
+        unlocked={passUnlocked}
+      />
 
       {toast && (
         <button
@@ -381,58 +384,57 @@ function SlotPanel({
       )}
 
       {loading ? (
-        <div className="flex h-20 items-center justify-center">
-          <svg
-            className="h-5 w-5 animate-spin text-ayakashi-gold"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            />
-          </svg>
-        </div>
-      ) : uploads.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <Upload className="h-6 w-6 text-[rgba(200,168,75,0.25)]" />
-          <p className="text-xs text-[rgba(200,168,75,0.35)]">
-            No uploads yet. Upload an image to get started.
-          </p>
+        <div className="flex h-24 items-center justify-center">
+          <FireSpinner size={28} />
         </div>
       ) : (
         <div
-          className={`grid gap-2 ${aspectRatio === "banner" ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-3 sm:grid-cols-5"}`}
+          className={`grid gap-2.5 ${supportsAnimated ? "grid-cols-2" : "grid-cols-1"}`}
         >
-          {uploads.map((u) => (
-            <UploadThumb
-              key={u.id}
-              upload={u}
+          <KindSlotCard
+            kind="static"
+            upload={staticUpload}
+            aspectRatio={aspectRatio}
+            uploading={uploadingKind === "static"}
+            onUploadClick={() => staticFileRef.current?.click()}
+            onEquip={() => staticUpload && handleEquip(staticUpload)}
+            onDelete={() => staticUpload && handleDelete(staticUpload)}
+          />
+          {supportsAnimated && (
+            <KindSlotCard
+              kind="animated"
+              upload={animatedUpload}
               aspectRatio={aspectRatio}
-              onSelect={() => setSheetTarget(u)}
+              locked={!passUnlocked && !animatedUpload}
+              lockedReason={passItem ? `Needs ${passItem}` : "Locked"}
+              uploading={uploadingKind === "animated"}
+              onUploadClick={() => animatedFileRef.current?.click()}
+              onEquip={() => animatedUpload && handleEquip(animatedUpload)}
+              onDelete={() => animatedUpload && handleDelete(animatedUpload)}
             />
-          ))}
+          )}
         </div>
       )}
 
-      {sheetTarget && (
-        <ActionSheet
-          upload={sheetTarget}
-          aspectRatio={aspectRatio}
-          onClose={() => setSheetTarget(null)}
-          onEquip={() => handleEquip(sheetTarget)}
-          onDelete={() => handleDelete(sheetTarget)}
-        />
-      )}
+      {/* Both file inputs accept the same mimetypes — the backend is
+          the real source of truth for which kind an upload becomes
+          (via sharp's page count), these two buttons just express
+          intent so the "locked" state on the animated card can gate
+          the animated button specifically. */}
+      <input
+        ref={staticFileRef}
+        type="file"
+        accept={ACCEPTED}
+        className="hidden"
+        onChange={(e) => handleFile(e, "static")}
+      />
+      <input
+        ref={animatedFileRef}
+        type="file"
+        accept={ACCEPTED}
+        className="hidden"
+        onChange={(e) => handleFile(e, "animated")}
+      />
     </div>
   );
 }
@@ -516,25 +518,7 @@ function FrameSection() {
 
       {loading ? (
         <div className="flex h-20 items-center justify-center">
-          <svg
-            className="h-5 w-5 animate-spin text-ayakashi-gold"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            />
-          </svg>
+          <FireSpinner size={24} />
         </div>
       ) : frames.length === 0 ? (
         <p className="py-6 text-center text-xs text-[rgba(200,168,75,0.35)]">

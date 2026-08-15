@@ -153,9 +153,11 @@ export interface MeResponse {
   displayName: string;
   age: number;
   avatarUrl: string | null;
-  /** Not yet resolved to an image URL frontend-side — see TopBar. */
   frameId: string | null;
+  frameUrl: string | null;
+  frameIsAnimated: boolean;
 }
+
 export const getMe = () => apiFetch<MeResponse>("/me");
 
 export const authLogout = () =>
@@ -518,6 +520,8 @@ export interface LeaderboardRow {
   username: string | null;
   displayName: string;
   avatarUrl: string | null;
+  frameUrl: string | null;
+  frameIsAnimated: boolean;
   value: number;
   level?: number;
 }
@@ -600,6 +604,14 @@ export interface ProfileCardItem {
 
 export type DeckSlotState = "active" | "empty" | "locked";
 
+export interface DeckSlotCard {
+  instanceId: string;
+  name: string;
+  rarity: string;
+  thumbUrl: string;
+  mediaType: string;
+}
+
 export interface DeckSlot {
   slotIndex: number;
   state: DeckSlotState;
@@ -607,6 +619,7 @@ export interface DeckSlot {
   backgroundUrl?: string | null;
   filledSlotCount?: number;
   slots?: (string | null)[];
+  resolvedSlots?: (DeckSlotCard | null)[];
 }
 
 export type FriendStatus =

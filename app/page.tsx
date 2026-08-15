@@ -11,6 +11,7 @@ import { BottomNav } from "./components/BottomNav";
 import { EmberField } from "./components/EmberField";
 import { LotteryTicker } from "./components/LotteryTicker";
 import { MarketplaceDeals } from "./components/MarketplaceDeals";
+import { FireSpinner } from "./components/FireSpinner";
 import { getMe, getHomeStats } from "../lib/api";
 import type { MeResponse, HomeStatsResponse } from "../lib/api";
 
@@ -41,19 +42,6 @@ const FEATURES = [
     title: "Marketplace",
     body: "Trade cards and currency with other players in the open marketplace.",
     href: "/marketplace",
-  },
-  {
-    icon: (
-      <>
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </>
-    ),
-    title: "Guilds",
-    body: "Form or join guilds, compete in events, and climb the leaderboard together.",
-    href: "/guilds",
   },
   {
     icon: (
@@ -180,294 +168,258 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const BOT_URL = `https://wa.me/${process.env.NEXT_PUBLIC_BOT_NUMBER ?? "919999999999"}?text=register`;
+  // Registration happens via a .reg / .register command typed inside
+  // the Ayakashi hub group — not a DM to a bot number.
+  const HUB_URL = process.env.NEXT_PUBLIC_WA_HUB_URL ?? "#";
 
   if (!authChecked)
     return (
       <main className="relative flex min-h-dvh items-center justify-center bg-[#0a0a0a]">
-        <svg
-          className="h-8 w-8 animate-spin text-ayakashi-gold"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-          />
-        </svg>
+        <FireSpinner size={40} />
       </main>
     );
 
-  // ── Logged-in ──
-  // No footer/credits here — a signed-in user is mid-session, not
-  // browsing the marketing page, so the community/credits block would
-  // just be clutter between the feature grid and the bottom nav.
-  if (loggedIn && user)
-    return (
-      <CurrencyProvider>
-        <div className="min-h-dvh bg-[#0a0a0a]">
-          <TopBar user={user} />
-          <main className="relative z-10 pb-16">
-            <section className="px-4 pt-10 sm:px-6 lg:px-8">
-              <div className="mx-auto w-full max-w-5xl flex flex-col gap-2">
-                <h1 className="font-display stagger-in text-xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-2xl">
-                  Welcome back,{" "}
-                  <span className="text-[#c8a84b]">{user.displayName}</span>
-                </h1>
-                <p
-                  className="font-ui stagger-in text-xs uppercase tracking-[0.12em] text-[rgba(200,168,75,0.40)]"
-                  style={{ animationDelay: "0.1s" }}
-                >
-                  Here&apos;s what&apos;s happening across Ayakashi.
-                </p>
-                <div
-                  className="stagger-in mt-1 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent"
-                  style={{ animationDelay: "0.15s" }}
-                />
-              </div>
-            </section>
+  // [CHANGED — this pass] Logged-in and logged-out visitors now share
+  // ONE layout/hero instead of two separate page trees — per explicit
+  // product decision, the homepage is the same experience for everyone;
+  // logged-out users simply don't get TopBar's authenticated affordances
+  // (nav links, currency, avatar dropdown — TopBar itself branches on
+  // `user` for that) or BottomNav. Only the hero's greeting/CTA block
+  // and the presence of BottomNav/Footer differ below.
+  return (
+    <CurrencyProvider>
+      <main className="relative bg-[#0a0a0a]">
+        {/* ambient radial glow + embers — shared background treatment */}
+        <div className="pointer-events-none fixed left-1/2 top-1/2 h-[min(70vw,560px)] w-[min(70vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[140px]" />
+        <EmberField count={20} />
 
-            {/* Marketplace deals — quick hits into a live economy */}
-            <section className="px-4 pt-10 sm:px-6 lg:px-8">
-              <div className="mx-auto w-full max-w-5xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#f0e6c8]">
-                    Marketplace Deals
-                  </h2>
+        <TopBar user={user} />
+
+        <section className="relative z-10 flex flex-col items-center justify-between px-4 pb-16 pt-10 sm:px-6 lg:px-8">
+          <div className="flex w-full flex-1 items-center justify-center">
+            <div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
+              <Image
+                src="/brand/ayakashi-gold-mark.svg"
+                alt="Ayakashi"
+                width={160}
+                height={160}
+                className="logo-entrance h-auto w-24 sm:w-32 lg:w-40"
+                priority
+                unoptimized
+              />
+
+              <div className="stagger-in" style={{ animationDelay: "0.15s" }}>
+                <h1 className="font-display text-4xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-5xl lg:text-7xl">
+                  {loggedIn && user ? (
+                    <>
+                      Welcome back,{" "}
+                      <span className="text-[#c8a84b]">{user.displayName}</span>
+                    </>
+                  ) : (
+                    "Ayakashi"
+                  )}
+                </h1>
+                {/* gold underline accent */}
+                <div className="mx-auto mt-3 h-px w-32 bg-gradient-to-r from-transparent via-[#c8a84b] to-transparent" />
+              </div>
+
+              <p
+                className="font-ui stagger-in max-w-xl text-sm leading-7 text-[#a89880] sm:text-base"
+                style={{ animationDelay: "0.25s" }}
+              >
+                {loggedIn
+                  ? "Here's what's happening across Ayakashi."
+                  : "Experience the ultimate Web Companion for the Next-Gen WhatsApp AI. Collect cards, trade in live auctions, and summon your destiny."}
+              </p>
+
+              {loggedIn ? (
+                <div
+                  className="stagger-in flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+                  style={{ animationDelay: "0.35s" }}
+                >
+                  <Link href="/shop" className="brush-btn brush-btn-ember w-52">
+                    Visit Shop
+                  </Link>
                   <Link
                     href="/marketplace"
-                    className="font-ui text-xs font-semibold text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
+                    className="brush-btn brush-btn-ember w-52"
                   >
-                    Browse all →
+                    Marketplace
                   </Link>
                 </div>
-                <MarketplaceDeals />
-              </div>
-            </section>
+              ) : (
+                <>
+                  <div
+                    className="stagger-in flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+                    style={{ animationDelay: "0.35s" }}
+                  >
+                    <a
+                      href={HUB_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="brush-btn brush-btn-ember w-52"
+                    >
+                      Get Started
+                    </a>
+                    <a
+                      href={process.env.NEXT_PUBLIC_WA_CHANNEL_URL ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="brush-btn brush-btn-ember w-52"
+                    >
+                      Join WhatsApp
+                    </a>
+                  </div>
 
-            {/* Recent lottery draws */}
-            <section className="px-4 pt-10 sm:px-6 lg:px-8">
-              <div className="mx-auto w-full max-w-5xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#f0e6c8]">
-                    Recent Lottery Draws
-                  </h2>
-                </div>
-                <LotteryTicker />
-              </div>
-            </section>
-
-            <FeatureGrid loggedIn />
-          </main>
-          <BottomNav />
-        </div>
-      </CurrencyProvider>
-    );
-
-  // ── Logged-out ──
-  return (
-    <main className="relative bg-[#0a0a0a]">
-      {/* ambient radial glow */}
-      <div className="pointer-events-none fixed left-1/2 top-1/2 h-[min(70vw,560px)] w-[min(70vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[140px]" />
-      <EmberField count={20} />
-
-      <section className="relative z-10 flex min-h-dvh flex-col items-center justify-between px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-        <div className="flex flex-1 w-full items-center justify-center">
-          <div className="flex w-full max-w-3xl flex-col items-center text-center gap-6">
-            <Image
-              src="/brand/logo.png?v=transparent-1"
-              alt="Ayakashi"
-              width={160}
-              height={160}
-              className="logo-entrance h-auto w-24 sm:w-32 lg:w-40"
-              priority
-              unoptimized
-            />
-
-            <div className="stagger-in" style={{ animationDelay: "0.15s" }}>
-              <h1 className="font-display text-4xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-5xl lg:text-7xl">
-                Ayakashi
-              </h1>
-              {/* gold underline accent */}
-              <div className="mx-auto mt-3 h-px w-32 bg-gradient-to-r from-transparent via-[#c8a84b] to-transparent" />
+                  <p
+                    className="font-ui stagger-in text-xs text-[rgba(200,168,75,0.40)]"
+                    style={{ animationDelay: "0.45s" }}
+                  >
+                    Already have an account?{" "}
+                    <Link
+                      href="/login"
+                      className="text-[rgba(200,168,75,0.70)] transition-colors hover:text-[#c8a84b]"
+                    >
+                      Log in →
+                    </Link>
+                  </p>
+                </>
+              )}
             </div>
+          </div>
 
-            <p
-              className="font-ui stagger-in max-w-xl text-sm leading-7 text-[#a89880] sm:text-base"
-              style={{ animationDelay: "0.25s" }}
-            >
-              Experience the ultimate Web Companion for the Next-Gen WhatsApp
-              AI. Collect cards, trade in live auctions, and summon your
-              destiny.
-            </p>
-
-            <div
-              className="stagger-in flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
-              style={{ animationDelay: "0.35s" }}
-            >
-              <a
-                href={BOT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="brush-btn brush-btn-glint w-52"
-              >
-                Get Started
-              </a>
-              <a
-                href="https://whatsapp.com/channel/0029VbCUyYDJUM2hhDyMld2w"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="brush-btn w-52"
-              >
-                Join WhatsApp
-              </a>
+          {/* Stats bar — live from /home/stats, shown to everyone */}
+          <div
+            className="w-full border-t footer-bar px-4 py-5"
+            style={{
+              opacity: statsOpacity,
+              transition: "opacity 0.05s linear",
+            }}
+            aria-hidden={statsOpacity === 0}
+          >
+            <div className="mx-auto grid max-w-xl grid-cols-3 gap-3 text-center">
+              {homeStats ? (
+                <>
+                  {[
+                    { value: homeStats.totalPlayers, label: "Players" },
+                    {
+                      value: homeStats.totalCardsClaimed,
+                      label: "Cards Claimed",
+                    },
+                    {
+                      value: homeStats.totalCardsInCatalog,
+                      label: "In Catalog",
+                    },
+                  ].map(({ value, label }) => (
+                    <div key={label}>
+                      <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
+                        {value >= 1_000_000
+                          ? `${(value / 1_000_000).toFixed(1)}M`
+                          : value >= 1_000
+                            ? `${(value / 1_000).toFixed(1)}K`
+                            : value.toLocaleString("en-US")}
+                      </h3>
+                      <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                /* Fallback animated counters while loading */
+                <>
+                  {[
+                    {
+                      target: 10,
+                      suffix: "K+",
+                      label: "Players",
+                      duration: 1200,
+                    },
+                    {
+                      target: 10,
+                      suffix: "M+",
+                      label: "Cards Claimed",
+                      duration: 1400,
+                    },
+                    {
+                      target: 500,
+                      suffix: "+",
+                      label: "In Catalog",
+                      duration: 1000,
+                    },
+                  ].map(({ target, suffix, label, duration }) => (
+                    <div key={label}>
+                      <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
+                        <AnimatedCounter
+                          target={target}
+                          suffix={suffix}
+                          duration={duration}
+                        />
+                      </h3>
+                      <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
+          </div>
+        </section>
 
-            <p
-              className="font-ui stagger-in text-xs text-[rgba(200,168,75,0.40)]"
-              style={{ animationDelay: "0.45s" }}
-            >
-              Already have an account?{" "}
+        {/* Marketplace deals — shown to everyone, capped at 3 as a teaser */}
+        <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="mb-10 flex flex-col items-center gap-4 text-center">
+              <div className="section-header">
+                <span className="section-header-text">Marketplace</span>
+              </div>
+              <h2 className="font-display text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl">
+                Live Deals Right Now
+              </h2>
+              <p className="font-ui max-w-md text-xs leading-6 text-[#a89880]">
+                Real listings from real players, trading this very moment.
+              </p>
+            </div>
+            <MarketplaceDeals limit={3} />
+            <div className="mt-6 flex justify-center">
               <Link
-                href="/login"
-                className="text-[rgba(200,168,75,0.70)] transition-colors hover:text-[#c8a84b]"
+                href="/marketplace"
+                className="font-ui text-xs font-semibold text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
               >
-                Log in →
+                Browse all →
               </Link>
-            </p>
-          </div>
-        </div>
-
-        {/* Stats bar — live from /home/stats */}
-        <div
-          className="w-full border-t footer-bar px-4 py-5"
-          style={{ opacity: statsOpacity, transition: "opacity 0.05s linear" }}
-          aria-hidden={statsOpacity === 0}
-        >
-          <div className="mx-auto grid max-w-xl grid-cols-3 gap-3 text-center">
-            {homeStats ? (
-              <>
-                {[
-                  { value: homeStats.totalPlayers, label: "Players" },
-                  {
-                    value: homeStats.totalCardsClaimed,
-                    label: "Cards Claimed",
-                  },
-                  { value: homeStats.totalCardsInCatalog, label: "In Catalog" },
-                ].map(({ value, label }) => (
-                  <div key={label}>
-                    <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
-                      {value >= 1_000_000
-                        ? `${(value / 1_000_000).toFixed(1)}M`
-                        : value >= 1_000
-                          ? `${(value / 1_000).toFixed(1)}K`
-                          : value.toLocaleString("en-US")}
-                    </h3>
-                    <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">
-                      {label}
-                    </p>
-                  </div>
-                ))}
-              </>
-            ) : (
-              /* Fallback animated counters while loading */
-              <>
-                {[
-                  {
-                    target: 10,
-                    suffix: "K+",
-                    label: "Players",
-                    duration: 1200,
-                  },
-                  {
-                    target: 10,
-                    suffix: "M+",
-                    label: "Cards Claimed",
-                    duration: 1400,
-                  },
-                  {
-                    target: 500,
-                    suffix: "+",
-                    label: "In Catalog",
-                    duration: 1000,
-                  },
-                ].map(({ target, suffix, label, duration }) => (
-                  <div key={label}>
-                    <h3 className="font-display text-2xl font-bold text-[#e6c96a] sm:text-3xl">
-                      <AnimatedCounter
-                        target={target}
-                        suffix={suffix}
-                        duration={duration}
-                      />
-                    </h3>
-                    <p className="font-ui mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)]">
-                      {label}
-                    </p>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Marketplace deals — proof the economy is alive before signup */}
-      <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-5xl">
-          <div className="stagger-in mb-10 flex flex-col items-center gap-4">
-            <div className="section-header">
-              <span className="section-header-text">Marketplace</span>
             </div>
-            <h2 className="font-display text-center text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl">
-              Live Deals Right Now
-            </h2>
-            <p className="font-ui max-w-md text-center text-xs leading-6 text-[#a89880]">
-              Real listings from real players, trading this very moment.
-            </p>
           </div>
-          <MarketplaceDeals />
-          <div className="mt-6 flex justify-center">
-            <a
-              href={BOT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-ui text-xs font-semibold text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
-            >
-              Join to start trading →
-            </a>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Recent lottery draws — proof rewards are real and frequent */}
-      <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-5xl">
-          <div className="stagger-in mb-10 flex flex-col items-center gap-4">
-            <div className="section-header">
-              <span className="section-header-text">Lottery</span>
+        {/* Recent lottery draws — shown to everyone, capped at 3 */}
+        <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="mb-10 flex flex-col items-center gap-4 text-center">
+              <div className="section-header">
+                <span className="section-header-text">Lottery</span>
+              </div>
+              <h2 className="font-display text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl">
+                Recent Draws
+              </h2>
+              <p className="font-ui max-w-md text-xs leading-6 text-[#a89880]">
+                Every player has a shot. Here&apos;s who won recently.
+              </p>
             </div>
-            <h2 className="font-display text-center text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl">
-              Recent Draws
-            </h2>
-            <p className="font-ui max-w-md text-center text-xs leading-6 text-[#a89880]">
-              Every player has a shot. Here&apos;s who won recently.
-            </p>
+            <LotteryTicker limit={3} />
           </div>
-          <LotteryTicker />
-        </div>
-      </section>
+        </section>
 
-      <FeatureGrid loggedIn={false} />
-      <Footer />
-    </main>
+        <FeatureGrid loggedIn={loggedIn} />
+
+        {/* Footer only for logged-out visitors — a signed-in user is
+            mid-session, not browsing the marketing page, so the
+            community/credits block would just be clutter. BottomNav
+            (mobile tab bar) only for logged-in, since guests have
+            nowhere authenticated to navigate to. */}
+        {loggedIn ? <BottomNav /> : <Footer />}
+      </main>
+    </CurrencyProvider>
   );
 }

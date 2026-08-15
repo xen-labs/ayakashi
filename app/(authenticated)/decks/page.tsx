@@ -1,9 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import {
+  DndContext,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import {
   getDecks,
   upsertDeck,
@@ -255,6 +267,99 @@ function CardPickerModal({
   );
 }
 
+// ── One slot in the 12-slot grid — draggable if filled, always a drop
+// target. useDraggable and useDroppable are combined on the same
+// element via a merged ref, since any filled slot can also receive a
+// drop (that's how swapping works).
+function DeckSlotTile({
+  pos,
+  instanceId,
+  cardData,
+  busy,
+  onTap,
+}: {
+  pos: number;
+  instanceId: string | null;
+  cardData: CardInstance | null;
+  busy: boolean;
+  onTap: (pos: number) => void;
+}) {
+  const rarity = cardData?.card?.rarity ?? "C";
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: pos,
+    disabled: !instanceId || busy,
+  });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: pos });
+
+  const setRefs = (node: HTMLElement | null) => {
+    setDragRef(node);
+    setDropRef(node);
+  };
+
+  if (instanceId) {
+    return (
+      <button
+        ref={setRefs}
+        {...listeners}
+        {...attributes}
+        type="button"
+        title="Drag to move, tap to remove"
+        disabled={busy}
+        onClick={() => onTap(pos)}
+        className={`group relative aspect-[3/4] w-full touch-none overflow-hidden rounded-md ${RARITY_RING[rarity]} bg-[rgba(200,168,75,0.06)] transition-all disabled:opacity-50 ${
+          isDragging
+            ? "opacity-30"
+            : isOver
+              ? "ring-2 ring-ayakashi-gold scale-105"
+              : "hover:-translate-y-0.5 active:scale-95"
+        }`}
+      >
+        {cardData?.card?.mediaUrl ? (
+          <DeckTileArt
+            mediaUrl={cardData.card.mediaUrl}
+            fileExtension={cardData.card.fileExtension}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-lg">
+            🃏
+          </div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/70">
+          <X className="h-4 w-4 text-red-400 opacity-0 transition-opacity group-hover:opacity-100" />
+        </div>
+        {cardData?.card?.rarity && (
+          <span className="absolute bottom-0.5 right-0.5 text-[7px] font-bold text-white/90 drop-shadow">
+            {cardData.card.rarity}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      ref={setDropRef}
+      type="button"
+      title="Assign card"
+      disabled={busy}
+      onClick={() => onTap(pos)}
+      className={`flex aspect-[3/4] w-full items-center justify-center rounded-md border border-dashed bg-transparent transition-all active:scale-95 disabled:opacity-50 ${
+        isOver
+          ? "border-ayakashi-gold bg-ayakashi-gold/10 text-ayakashi-gold"
+          : "border-[rgba(200,168,75,0.20)] text-[rgba(200,168,75,0.25)] hover:border-ayakashi-gold/50 hover:text-ayakashi-gold/60"
+      }`}
+    >
+      <Plus className="h-4 w-4" />
+    </button>
+  );
+}
+
 // ── Single deck editor ────────────────────────────────────────────
 function DeckEditor({
   slot,
@@ -270,14 +375,21 @@ function DeckEditor({
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [cardMap, setCardMap] = useState<Record<string, CardInstance>>({});
-  // Press-and-hold-to-pick-up reordering: holding a filled slot "lifts"
-  // it (pickedUpPos), then tapping any other slot drops it there —
-  // swapping with whatever was in that slot if it was filled. No HTML5
-  // drag API (poor touch support) and no library — this is the same
-  // two-tap interaction pattern as a phone's home-screen icon reorder,
-  // which the target audience (mobile WhatsApp users) already knows.
-  const [pickedUpPos, setPickedUpPos] = useState<number | null>(null);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Real drag-and-drop via @dnd-kit — dragging a filled slot onto
+  // another slot swaps them (or moves it, if the target is empty);
+  // dropping outside any slot cancels. Replaces the old press-and-
+  // hold-then-tap pseudo-DnD, which felt laggy and didn't give any
+  // drag feedback until the hold timer fired.
+  const [activeDragPos, setActiveDragPos] = useState<number | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 8 },
+    }),
+  );
 
   const slots12 = Array.from({ length: 12 }, (_, i) =>
     slot.slots ? (slot.slots[i] ?? null) : null,
@@ -370,58 +482,52 @@ function DeckEditor({
     }
   };
 
-  // ── Pickup / drop ──
-  const startHold = (pos: number) => {
-    if (!slots12[pos] || busy) return;
-    holdTimer.current = setTimeout(() => {
-      setPickedUpPos(pos);
-      if (navigator.vibrate) navigator.vibrate(15); // tiny haptic tick, mirrors a native long-press
-    }, 380);
-  };
-  const cancelHold = () => {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
+  // ── Drag start / end ──
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragPos(Number(event.active.id));
   };
 
-  const handleTileTap = async (pos: number) => {
-    // Drop mode: any tap while something's picked up resolves the move,
-    // whether the target is the same slot (cancel), empty (move), or
-    // filled (swap).
-    if (pickedUpPos !== null) {
-      const fromPos = pickedUpPos;
-      setPickedUpPos(null);
-      if (fromPos === pos) return; // tapped the picked-up slot itself — cancel
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveDragPos(null);
+    const { active, over } = event;
+    if (!over) return; // dropped outside any slot — cancel
 
-      const movingId = slots12[fromPos];
-      const targetId = slots12[pos];
-      if (!movingId) return;
+    const fromPos = Number(active.id);
+    const pos = Number(over.id);
+    if (fromPos === pos) return;
 
-      setBusy(true);
-      try {
-        if (targetId) {
-          // Swap: move the target card out to the source slot first,
-          // then move the held card in — two calls, since the backend
-          // has no atomic swap endpoint, only position-explicit assign.
-          await assignCardToDeck(slot.slotIndex, {
-            position: fromPos,
-            instanceId: targetId,
-          });
-        } else {
-          await removeCardFromDeck(slot.slotIndex, fromPos);
-        }
+    const movingId = slots12[fromPos];
+    const targetId = slots12[pos];
+    if (!movingId) return;
+
+    setBusy(true);
+    try {
+      if (targetId) {
+        // Swap: move the target card out to the source slot first, then
+        // move the held card in — two calls, since the backend has no
+        // atomic swap endpoint, only position-explicit assign.
         await assignCardToDeck(slot.slotIndex, {
-          position: pos,
-          instanceId: movingId,
+          position: fromPos,
+          instanceId: targetId,
         });
-        onRefresh();
-      } catch {
-        /* noop */
-      } finally {
-        setBusy(false);
+      } else {
+        await removeCardFromDeck(slot.slotIndex, fromPos);
       }
-      return;
+      await assignCardToDeck(slot.slotIndex, {
+        position: pos,
+        instanceId: movingId,
+      });
+      onRefresh();
+    } catch {
+      /* noop */
+    } finally {
+      setBusy(false);
     }
+  };
 
-    // Normal mode: tap a filled slot to remove, empty slot to open picker.
+  const handleTileTap = (pos: number) => {
+    // A plain tap (no drag distance crossed) still works the old way —
+    // tap a filled slot to remove, tap an empty slot to open the picker.
     if (slots12[pos]) handleRemove(pos);
     else setPickerPos(pos);
   };
@@ -505,88 +611,55 @@ function DeckEditor({
       </div>
 
       <div className="flex flex-col gap-3 px-4 pb-4">
-        {pickedUpPos !== null && (
-          <p className="rounded-md border border-ayakashi-gold/40 bg-ayakashi-gold/10 px-3 py-2 text-center text-[11px] font-bold uppercase tracking-widest text-ayakashi-gold">
-            Card picked up — tap a slot to place it, or tap it again to cancel
-          </p>
-        )}
+        {/* 12-slot grid — larger, art-forward, animated tiles, real
+            drag-and-drop via @dnd-kit */}
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {slots12.map((instanceId, pos) => (
+              <DeckSlotTile
+                key={pos}
+                pos={pos}
+                instanceId={instanceId}
+                cardData={instanceId ? (cardMap[instanceId] ?? null) : null}
+                busy={busy}
+                onTap={handleTileTap}
+              />
+            ))}
+          </div>
 
-        {/* 12-slot grid — larger, art-forward, animated tiles */}
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-          {slots12.map((instanceId, pos) => {
-            const cardData = instanceId ? cardMap[instanceId] : null;
-            const rarity = cardData?.card?.rarity ?? "C";
-            const isPickedUp = pickedUpPos === pos;
-            const isDropTarget = pickedUpPos !== null && pickedUpPos !== pos;
-
-            return (
-              <div key={pos} className="relative">
-                {instanceId ? (
-                  <button
-                    type="button"
-                    title={
-                      isDropTarget
-                        ? "Tap to place here"
-                        : "Hold to move, tap to remove"
-                    }
-                    disabled={busy}
-                    onPointerDown={() => startHold(pos)}
-                    onPointerUp={cancelHold}
-                    onPointerLeave={cancelHold}
-                    onClick={() => handleTileTap(pos)}
-                    className={`group relative aspect-[3/4] w-full overflow-hidden rounded-md ${RARITY_RING[rarity]} bg-[rgba(200,168,75,0.06)] transition-all disabled:opacity-50 ${
-                      isPickedUp
-                        ? "-translate-y-1.5 opacity-60 ring-2 ring-ayakashi-gold"
-                        : isDropTarget
-                          ? "ring-2 ring-ayakashi-gold/50 hover:-translate-y-0.5"
-                          : "hover:-translate-y-0.5 active:scale-95"
-                    }`}
-                  >
-                    {cardData?.card?.mediaUrl ? (
-                      <DeckTileArt
-                        mediaUrl={cardData.card.mediaUrl}
-                        fileExtension={cardData.card.fileExtension}
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-lg">
-                        🃏
-                      </div>
-                    )}
-                    {!isDropTarget && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover:bg-black/70">
-                        <X className="h-4 w-4 text-red-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                      </div>
-                    )}
-                    {cardData?.card?.rarity && (
-                      <span className="absolute bottom-0.5 right-0.5 text-[7px] font-bold text-white/90 drop-shadow">
-                        {cardData.card.rarity}
-                      </span>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    title={
-                      pickedUpPos !== null ? "Tap to place here" : "Assign card"
-                    }
-                    disabled={busy}
-                    onClick={() => handleTileTap(pos)}
-                    className={`flex aspect-[3/4] w-full items-center justify-center rounded-md border border-dashed bg-transparent transition-all active:scale-95 disabled:opacity-50 ${
-                      pickedUpPos !== null
-                        ? "border-ayakashi-gold/60 text-ayakashi-gold/70"
-                        : "border-[rgba(200,168,75,0.20)] text-[rgba(200,168,75,0.25)] hover:border-ayakashi-gold/50 hover:text-ayakashi-gold/60"
-                    }`}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+          <DragOverlay dropAnimation={{ duration: 180, easing: "ease-out" }}>
+            {activeDragPos !== null && slots12[activeDragPos]
+              ? (() => {
+                  const draggedId = slots12[activeDragPos]!;
+                  const draggedCard = cardMap[draggedId];
+                  const rarity = draggedCard?.card?.rarity ?? "C";
+                  return (
+                    <div
+                      className={`aspect-[3/4] w-16 overflow-hidden rounded-md ${RARITY_RING[rarity]} bg-[rgba(200,168,75,0.06)] shadow-[0_8px_24px_rgba(0,0,0,0.6)]`}
+                    >
+                      {draggedCard?.card?.mediaUrl ? (
+                        <DeckTileArt
+                          mediaUrl={draggedCard.card.mediaUrl}
+                          fileExtension={draggedCard.card.fileExtension}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-lg">
+                          🃏
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              : null}
+          </DragOverlay>
+        </DndContext>
 
         <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.35)]">
-          {filledCount} / 12 slots filled · hold a card to move it
+          {filledCount} / 12 slots filled · drag a card to move it
         </p>
       </div>
 

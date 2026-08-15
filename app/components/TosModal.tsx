@@ -164,10 +164,10 @@ export function TosModal({ open, onClose }: TosModalProps) {
             8. Privacy Policy
           </h3>
           <p>
-            We collect your player name, email address, WhatsApp number, age,
-            and guild preference solely to operate the Platform. We do not sell
-            your data to third parties. Data is stored securely and retained
-            only as long as your account is active or as required by law.
+            We collect your player name, email address, WhatsApp number, and age
+            solely to operate the Platform. We do not sell your data to third
+            parties. Data is stored securely and retained only as long as your
+            account is active or as required by law.
           </p>
           <p className="mt-2">
             You may request deletion of your data at any time by contacting us
@@ -215,7 +215,7 @@ export function TosModal({ open, onClose }: TosModalProps) {
           </h3>
           <p>
             For questions about these Terms, reach us via the Ayakashi WhatsApp
-            bot or your guild support channel.
+            bot.
           </p>
         </section>
       </div>
