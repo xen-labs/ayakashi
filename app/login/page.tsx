@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, FormEvent } from "react";
 import { PasswordField } from "../components/PasswordField";
+import { EmberField } from "../components/EmberField";
 import { authLogin, getHomeStats, ApiResponseError } from "../../lib/api";
 
 const BOT_NUMBER = process.env.NEXT_PUBLIC_BOT_NUMBER ?? "919999999999";
@@ -101,13 +102,14 @@ export default function Login() {
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-10 sm:px-6 lg:px-8">
       {/* ambient gold glow */}
       <div className="pointer-events-none fixed left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[120px]" />
+      <EmberField count={12} />
 
       <section className="relative z-10 grid w-full max-w-5xl gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-center">
         {/* ── Left: branding ── */}
         <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
           <Link
             href="/"
-            className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
+            className="stagger-in text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
           >
             ← Back
           </Link>
@@ -117,26 +119,32 @@ export default function Login() {
             alt="Ayakashi"
             width={80}
             height={80}
-            className="logo-filter h-auto w-20"
+            className="logo-entrance h-auto w-20"
             priority
             unoptimized
           />
 
-          <div>
+          <div className="stagger-in" style={{ animationDelay: "0.15s" }}>
             <h1 className="font-display text-3xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-4xl md:text-5xl">
               Welcome Back
             </h1>
             <div className="mt-2 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent lg:w-full lg:max-w-[200px]" />
           </div>
 
-          <p className="max-w-sm text-sm leading-7 text-[#a89880]">
+          <p
+            className="stagger-in max-w-sm text-sm leading-7 text-[#a89880]"
+            style={{ animationDelay: "0.25s" }}
+          >
             Sign in to access your card collection, live auctions, guild events,
             and WhatsApp-linked rewards.
           </p>
 
           {/* Live player count — quiet social proof, only shown once loaded */}
           {playerCount !== null && (
-            <div className="flex items-center gap-2 text-xs text-[rgba(200,168,75,0.5)]">
+            <div
+              className="stagger-in flex items-center gap-2 text-xs text-[rgba(200,168,75,0.5)]"
+              style={{ animationDelay: "0.35s" }}
+            >
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#c8a84b] opacity-60" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#c8a84b]" />
@@ -147,7 +155,10 @@ export default function Login() {
             </div>
           )}
 
-          <p className="text-xs text-[rgba(200,168,75,0.35)] uppercase tracking-[0.15em]">
+          <p
+            className="stagger-in text-xs text-[rgba(200,168,75,0.35)] uppercase tracking-[0.15em]"
+            style={{ animationDelay: "0.4s" }}
+          >
             ✦ &nbsp; Ayakashi &nbsp; ✦
           </p>
         </div>
@@ -156,7 +167,8 @@ export default function Login() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="form-card w-full border p-6 sm:p-8"
+          className="form-card stagger-in w-full border p-6 sm:p-8"
+          style={{ animationDelay: "0.2s" }}
         >
           {/* form header */}
           <div className="mb-6 flex items-center gap-3">
@@ -183,7 +195,7 @@ export default function Login() {
                 placeholder="xenkai"
                 maxLength={20}
                 autoFocus
-                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
+                className="form-input form-input-glow h-12 border px-4 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
               />
               {fieldErrors.username && (
                 <p className="text-xs text-red-400">{fieldErrors.username}</p>
@@ -243,7 +255,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="brush-btn w-56 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="brush-btn brush-btn-glint w-56 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

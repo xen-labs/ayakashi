@@ -250,17 +250,20 @@ function ToolCard({
             </span>
             <span className="text-[rgba(200,168,75,0.30)]">+</span>
             <span
-              className={`truncate ${baseMaterialShort ? "text-red-300" : ""}`}
+              className={`flex items-center gap-1 truncate ${baseMaterialShort ? "text-red-300" : ""}`}
             >
-              ×{tool.nextLevelCost.materialQty} {tool.nextLevelCost.material}
+              <span aria-hidden>{tool.nextLevelCost.materialEmoji}</span>×
+              {tool.nextLevelCost.materialQty} {tool.nextLevelCost.materialName}
             </span>
             {tool.nextLevelCost.extra?.map((e) => {
               const short = haveOf(e.itemId) < e.qty;
               return (
                 <span key={e.itemId} className="flex items-center gap-1">
                   <span className="text-[rgba(200,168,75,0.30)]">+</span>
-                  <span className={`truncate ${short ? "text-red-300" : ""}`}>
-                    ×{e.qty} {e.name}
+                  <span
+                    className={`flex items-center gap-1 truncate ${short ? "text-red-300" : ""}`}
+                  >
+                    <span aria-hidden>{e.emoji}</span>×{e.qty} {e.name}
                   </span>
                 </span>
               );
@@ -294,6 +297,88 @@ function ToolCard({
                 : `Upgrade to Lv ${tool.level + 1}`}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Bank hero panel — same full-bleed aspect-square language the tool
+// art gets, but built from icon + animated gold rays/coin drift instead
+// of a static image (no bank/vault registry art exists to point at).
+// A slow radial sweep behind the vault icon plus 3 drifting coin glyphs
+// gives the panel real presence without needing an asset. ─────────────
+function BankHero() {
+  return (
+    <div className="hero-panel group relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden border-b border-[rgba(200,168,75,0.15)] bg-[radial-gradient(circle_at_50%_40%,rgba(200,168,75,0.14),transparent_70%)]">
+      <div className="hero-ray-sweep absolute inset-0 opacity-40" />
+      <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)] transition-transform duration-500 group-hover:scale-110">
+        <Landmark className="h-9 w-9 text-ayakashi-gold" />
+      </div>
+      {/* drifting coin glyphs */}
+      <span
+        className="coin-drift absolute left-[22%] top-[65%] text-lg opacity-70"
+        style={{ animationDelay: "0s" }}
+      >
+        🪙
+      </span>
+      <span
+        className="coin-drift absolute right-[24%] top-[70%] text-sm opacity-60"
+        style={{ animationDelay: "1.1s" }}
+      >
+        🪙
+      </span>
+      <span
+        className="coin-drift absolute left-[48%] top-[75%] text-xs opacity-50"
+        style={{ animationDelay: "2.2s" }}
+      >
+        🪙
+      </span>
+    </div>
+  );
+}
+
+// ── Vault hero panel — mirrors BankHero's scale, swaps the calm gold
+// sweep for a tenser look when the vault is critical: red pulse instead
+// of gold, faint crack lines fading in. Unowned vault gets a dimmed,
+// locked treatment instead of either. ──────────────────────────────────
+function VaultHero({ critical, owned }: { critical: boolean; owned: boolean }) {
+  if (!owned) {
+    return (
+      <div className="relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden border-b border-[rgba(200,168,75,0.12)] bg-[rgba(200,168,75,0.03)] opacity-50">
+        <Home className="h-12 w-12 text-[rgba(200,168,75,0.30)]" />
+      </div>
+    );
+  }
+  return (
+    <div
+      className={`hero-panel group relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden border-b transition-colors duration-500 ${
+        critical
+          ? "border-red-500/25 bg-[radial-gradient(circle_at_50%_40%,rgba(220,60,60,0.16),transparent_70%)]"
+          : "border-[rgba(200,168,75,0.15)] bg-[radial-gradient(circle_at_50%_40%,rgba(200,168,75,0.14),transparent_70%)]"
+      }`}
+    >
+      <div
+        className={`hero-ray-sweep absolute inset-0 opacity-40 ${critical ? "hero-ray-sweep-danger" : ""}`}
+      />
+      <div
+        className={`relative flex h-20 w-20 items-center justify-center rounded-full border transition-transform duration-500 group-hover:scale-110 ${
+          critical
+            ? "border-red-500/40 bg-black/50 shadow-[0_0_30px_rgba(220,60,60,0.30)]"
+            : "border-[rgba(200,168,75,0.35)] bg-black/50 shadow-[0_0_30px_rgba(200,168,75,0.25)]"
+        } ${critical ? "reveal-glow-pulse" : ""}`}
+      >
+        <Home
+          className={`h-9 w-9 ${critical ? "text-red-400" : "text-ayakashi-gold"}`}
+        />
+      </div>
+      {critical && (
+        <>
+          <span className="vault-spark absolute left-[30%] top-[35%] h-1 w-1 rounded-full bg-red-400" />
+          <span
+            className="vault-spark absolute right-[28%] top-[55%] h-1 w-1 rounded-full bg-red-400"
+            style={{ animationDelay: "0.6s" }}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -656,11 +741,9 @@ export default function Upgrade() {
         {/* ── Bank + Vault side by side ── */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {/* Bank */}
-          <div className="craft-card flex flex-col gap-4 rounded-xl p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(200,168,75,0.30)] bg-black/50 text-ayakashi-gold">
-                <Landmark className="h-4 w-4" />
-              </div>
+          <div className="craft-card vault-card-in flex flex-col overflow-hidden rounded-xl">
+            <BankHero />
+            <div className="flex flex-col gap-4 p-5">
               <div>
                 <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#f0e6c8]">
                   Bank
@@ -669,74 +752,67 @@ export default function Upgrade() {
                   Safe ryo storage · never robbable
                 </p>
               </div>
+
+              {dashData && (
+                <>
+                  <div className="flex flex-col">
+                    <StatRow
+                      label="Tier"
+                      value={String(dashData.currency.bankVaultTier)}
+                    />
+                    <StatRow
+                      label="Balance"
+                      value={formatNumber(dashData.currency.bank)}
+                    />
+                    <StatRow
+                      label="Cap"
+                      value={formatNumber(dashData.currency.bankCap)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <FillBar
+                      value={dashData.currency.bank}
+                      max={dashData.currency.bankCap}
+                    />
+                    <p className="text-right text-[10px] text-[rgba(200,168,75,0.35)]">
+                      {Math.min(
+                        100,
+                        Math.round(
+                          (dashData.currency.bank /
+                            Math.max(1, dashData.currency.bankCap)) *
+                            100,
+                        ),
+                      )}
+                      % full
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <button
+                type="button"
+                disabled={busyBank}
+                onClick={handleBankUpgrade}
+                className="mt-auto h-9 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busyBank ? "Upgrading…" : "Upgrade Bank Tier"}
+              </button>
             </div>
-
-            {dashData && (
-              <>
-                <div className="flex flex-col">
-                  <StatRow
-                    label="Tier"
-                    value={String(dashData.currency.bankVaultTier)}
-                  />
-                  <StatRow
-                    label="Balance"
-                    value={formatNumber(dashData.currency.bank)}
-                  />
-                  <StatRow
-                    label="Cap"
-                    value={formatNumber(dashData.currency.bankCap)}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <FillBar
-                    value={dashData.currency.bank}
-                    max={dashData.currency.bankCap}
-                  />
-                  <p className="text-right text-[10px] text-[rgba(200,168,75,0.35)]">
-                    {Math.min(
-                      100,
-                      Math.round(
-                        (dashData.currency.bank /
-                          Math.max(1, dashData.currency.bankCap)) *
-                          100,
-                      ),
-                    )}
-                    % full
-                  </p>
-                </div>
-              </>
-            )}
-
-            <button
-              type="button"
-              disabled={busyBank}
-              onClick={handleBankUpgrade}
-              className="mt-auto h-9 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busyBank ? "Upgrading…" : "Upgrade Bank Tier"}
-            </button>
           </div>
 
           {/* Vault */}
           <div
-            className={`craft-card flex flex-col gap-4 rounded-xl p-5 transition-colors duration-300 ${
+            className={`craft-card vault-card-in flex flex-col overflow-hidden rounded-xl transition-colors duration-300 ${
               !vault
                 ? "craft-card-locked"
                 : vaultCritical
                   ? "border-red-500/30"
                   : ""
             }`}
+            style={{ animationDelay: "90ms" }}
           >
-            <div className="flex items-center gap-3">
-              <div
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-black/50 ${
-                  vaultCritical
-                    ? "border-red-500/40 text-red-400"
-                    : "border-[rgba(200,168,75,0.30)] text-ayakashi-gold"
-                }`}
-              >
-                <Home className="h-4 w-4" />
-              </div>
+            <VaultHero critical={vaultCritical} owned={!!vault} />
+            <div className="flex flex-col gap-4 p-5">
               <div>
                 <h2 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[#f0e6c8]">
                   Home Vault
@@ -745,82 +821,82 @@ export default function Upgrade() {
                   Higher yield · can be robbed
                 </p>
               </div>
-            </div>
 
-            {vault ? (
-              <>
-                <div className="flex flex-col">
-                  <StatRow label="Tier" value={String(vault.tier)} />
-                  <StatRow
-                    label="Ryo"
-                    value={`${formatNumber(vault.ryo)} / ${formatNumber(vault.ryoCap)}`}
-                  />
-                  <StatRow
-                    label="Kitsu"
-                    value={`${formatNumber(vault.kitsu)} / ${formatNumber(vault.kitsuCap)}`}
-                  />
-                </div>
-
-                {/* Health bar — pulses via reveal-glow-pulse when critical,
-                    same urgency language the site already uses for other
-                    low-resource states, instead of a static red bar. */}
-                <div
-                  className={`flex flex-col gap-1.5 rounded-md border p-3 ${
-                    vaultCritical
-                      ? "border-red-500/25 bg-red-500/5"
-                      : "border-[rgba(200,168,75,0.12)] bg-black/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
-                      Vault Health
-                    </span>
-                    <span
-                      className={`text-xs font-bold tabular-nums ${vaultCritical ? "text-red-400" : "text-[#e6c96a]"}`}
-                    >
-                      {vault.health} / {vault.maxHealth}
-                    </span>
+              {vault ? (
+                <>
+                  <div className="flex flex-col">
+                    <StatRow label="Tier" value={String(vault.tier)} />
+                    <StatRow
+                      label="Ryo"
+                      value={`${formatNumber(vault.ryo)} / ${formatNumber(vault.ryoCap)}`}
+                    />
+                    <StatRow
+                      label="Kitsu"
+                      value={`${formatNumber(vault.kitsu)} / ${formatNumber(vault.kitsuCap)}`}
+                    />
                   </div>
-                  <HealthBar value={vault.health} max={vault.maxHealth} />
-                  {vaultCritical && (
-                    <p className="reveal-glow-pulse flex items-center gap-1.5 text-[10px] text-red-400">
-                      <ShieldAlert className="h-3 w-3" /> Vulnerable — repair
-                      soon
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-[rgba(200,168,75,0.40)]">
-                Buy a Home Vault from the shop first.
-              </p>
-            )}
 
-            <div className="mt-auto flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={busyVault || !vault}
-                onClick={handleVaultUpgrade}
-                className="h-9 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busyVault ? "Upgrading…" : "Upgrade Vault Tier"}
-              </button>
-              {vault?.repairCost && (
+                  {/* Health bar — pulses via reveal-glow-pulse when critical,
+                      same urgency language the site already uses for other
+                      low-resource states, instead of a static red bar. */}
+                  <div
+                    className={`flex flex-col gap-1.5 rounded-md border p-3 ${
+                      vaultCritical
+                        ? "border-red-500/25 bg-red-500/5"
+                        : "border-[rgba(200,168,75,0.12)] bg-black/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)]">
+                        Vault Health
+                      </span>
+                      <span
+                        className={`text-xs font-bold tabular-nums ${vaultCritical ? "text-red-400" : "text-[#e6c96a]"}`}
+                      >
+                        {vault.health} / {vault.maxHealth}
+                      </span>
+                    </div>
+                    <HealthBar value={vault.health} max={vault.maxHealth} />
+                    {vaultCritical && (
+                      <p className="reveal-glow-pulse flex items-center gap-1.5 text-[10px] text-red-400">
+                        <ShieldAlert className="h-3 w-3" /> Vulnerable — repair
+                        soon
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-[rgba(200,168,75,0.40)]">
+                  Buy a Home Vault from the shop first.
+                </p>
+              )}
+
+              <div className="mt-auto flex flex-col gap-2">
                 <button
                   type="button"
-                  disabled={busyRepair}
-                  onClick={handleRepair}
-                  className={`h-9 rounded-md border text-xs font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    vaultCritical
-                      ? "border-red-500 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-black"
-                      : "border-red-500/50 text-red-400 hover:bg-red-500/10"
-                  }`}
+                  disabled={busyVault || !vault}
+                  onClick={handleVaultUpgrade}
+                  className="h-9 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {busyRepair
-                    ? "Repairing…"
-                    : `Repair Vault — ${formatNumber(vault.repairCost.ryo)} ryo + ${vault.repairCost.materialQty}× ${vault.repairCost.material}`}
+                  {busyVault ? "Upgrading…" : "Upgrade Vault Tier"}
                 </button>
-              )}
+                {vault?.repairCost && (
+                  <button
+                    type="button"
+                    disabled={busyRepair}
+                    onClick={handleRepair}
+                    className={`h-9 rounded-md border text-xs font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      vaultCritical
+                        ? "border-red-500 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-black"
+                        : "border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    }`}
+                  >
+                    {busyRepair
+                      ? "Repairing…"
+                      : `Repair Vault — ${formatNumber(vault.repairCost.ryo)} ryo + ${vault.repairCost.materialQty}× ${vault.repairCost.material}`}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

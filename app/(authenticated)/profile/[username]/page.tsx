@@ -214,13 +214,13 @@ function DeckSlotCard({ slot }: { slot: DeckSlot }) {
 // ── Tap-to-manage action sheet (avatar/banner, own profile only) ────
 function CosmeticQuickSheet({
   slot,
-  passCount,
+  unlocked,
   banked,
   onClose,
   onDone,
 }: {
   slot: "avatar" | "banner";
-  passCount: number;
+  unlocked: boolean;
   banked: boolean;
   onClose: () => void;
   onDone: () => void;
@@ -329,8 +329,15 @@ function CosmeticQuickSheet({
             )}
 
             <p className="mt-1 text-center text-[10px] leading-relaxed text-[rgba(200,168,75,0.40)]">
-              Static uploads are free. Animated needs 1×{slot}_pass — you have{" "}
-              {passCount}.{" "}
+              Static uploads are free. Animated requires owning {slot}_pass —{" "}
+              {unlocked ? (
+                <span className="font-bold text-green-400">unlocked ✓</span>
+              ) : (
+                <span className="font-bold text-[rgba(200,168,75,0.55)]">
+                  not unlocked yet
+                </span>
+              )}
+              .{" "}
               <Link
                 href="/cosmetics"
                 className="text-ayakashi-gold hover:brightness-125"
@@ -1089,11 +1096,11 @@ export default function ProfilePage({
       {quickSheet && identity.isOwnProfile && (
         <CosmeticQuickSheet
           slot={quickSheet}
-          passCount={
+          unlocked={Boolean(
             (quickSheet === "avatar"
               ? identity.avatarPassCount
-              : identity.bannerPassCount) ?? 0
-          }
+              : identity.bannerPassCount) ?? 0,
+          )}
           banked={Boolean(
             quickSheet === "avatar"
               ? identity.avatarBanked

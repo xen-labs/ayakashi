@@ -9,6 +9,9 @@ import {
   Flame,
   Lock,
   CheckCircle2,
+  Minus,
+  Plus,
+  Sparkles,
   X,
 } from "lucide-react";
 import {
@@ -21,9 +24,12 @@ import type {
   CraftRecipe,
   CraftInput,
   CraftResponse,
+  CraftRoll,
 } from "../../../lib/api";
 import { useCurrency } from "../../components/CurrencyContext";
 import { CurrencyIcon } from "../../components/CurrencyIcon";
+
+const MAX_CRAFT_QTY = 20;
 
 function fmt(n: number | undefined | null) {
   return (n ?? 0).toLocaleString("en-US");
@@ -52,52 +58,99 @@ function outputRange(recipe: CraftRecipe): { min: number; max: number } | null {
   return null;
 }
 
-// ── Item art — image with emoji fallback ────────────────────────────
+// ── Item art — hero frame, same language as the Upgrade page's ItemArt:
+// a full-width aspect-square panel with a soft gradient backdrop and a
+// bottom hairline separating it from the card body, instead of a small
+// boxed thumbnail. `frame="thumb"` keeps the old compact form for spots
+// that still need it (material chips). Rarity now reads as a glow behind
+// the art rather than a hard ring boxing it in. ─────────────────────────
 function ItemArt({
   src,
   emoji,
   alt,
-  size = 64,
   rarity,
-  className = "",
+  frame = "hero",
 }: {
   src?: string;
   emoji: string;
   alt: string;
-  size?: number;
   rarity?: Rarity;
-  className?: string;
+  frame?: "hero" | "thumb";
 }) {
   const [broken, setBroken] = useState(false);
   const showImg = src && !broken;
+  const isThumb = frame === "thumb";
+
+  if (isThumb) {
+    return (
+      <div
+        className={`relative flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-black/40 ${rarityRing(rarity)}`}
+      >
+        {showImg ? (
+          <Image
+            src={src}
+            alt={alt}
+            width={38}
+            height={38}
+            className="object-contain p-1"
+            unoptimized
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <span style={{ fontSize: 19 }}>{emoji}</span>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`relative flex shrink-0 items-center justify-center rounded-lg bg-black/40 ${rarityRing(rarity)} ${className}`}
-      style={{ width: size, height: size }}
-    >
+    <div className="group relative aspect-square w-full overflow-hidden border-b border-[rgba(200,168,75,0.12)] bg-[rgba(200,168,75,0.04)]">
+      {/* rarity glow wash behind the art, replaces the old boxed ring */}
+      {rarity && rarity !== "common" && (
+        <div
+          className={`pointer-events-none absolute inset-0 opacity-60 blur-2xl ${
+            rarity === "legendary"
+              ? "bg-[radial-gradient(circle_at_50%_45%,rgba(230,180,80,0.35),transparent_65%)]"
+              : rarity === "epic"
+                ? "bg-[radial-gradient(circle_at_50%_45%,rgba(190,120,230,0.30),transparent_65%)]"
+                : rarity === "rare"
+                  ? "bg-[radial-gradient(circle_at_50%_45%,rgba(110,160,230,0.28),transparent_65%)]"
+                  : "bg-[radial-gradient(circle_at_50%_45%,rgba(120,200,140,0.25),transparent_65%)]"
+          }`}
+        />
+      )}
       {showImg ? (
         <Image
           src={src}
           alt={alt}
-          width={size}
-          height={size}
-          className="object-contain p-1"
+          width={280}
+          height={280}
+          className="relative mx-auto h-[80%] w-[80%] object-contain p-2 drop-shadow-[0_4px_20px_rgba(200,168,75,0.35)] transition-transform duration-300 group-hover:scale-[1.08]"
           unoptimized
           onError={() => setBroken(true)}
         />
       ) : (
-        <span style={{ fontSize: size * 0.5 }}>{emoji}</span>
+        <span className="relative flex h-full items-center justify-center text-7xl leading-none transition-transform duration-300 group-hover:scale-110 select-none">
+          {emoji}
+        </span>
       )}
     </div>
   );
 }
 
 // ── Material chip ────────────────────────────────────────────────────
-function MaterialChip({ input }: { input: CraftInput }) {
-  const enough = input.have >= input.qty;
+function MaterialChip({
+  input,
+  qtyMultiplier = 1,
+}: {
+  input: CraftInput;
+  qtyMultiplier?: number;
+}) {
+  const need = input.qty * qtyMultiplier;
+  const enough = input.have >= need;
   return (
     <div
-      className={`flex items-center gap-2 rounded-md border px-2 py-1.5 ${
+      className={`flex items-center gap-2 rounded-md border px-2 py-1.5 transition-colors duration-200 ${
         enough
           ? "border-[rgba(200,168,75,0.20)] bg-white/[0.02]"
           : "chip-short border-red-500/35 bg-red-500/5"
@@ -107,8 +160,8 @@ function MaterialChip({ input }: { input: CraftInput }) {
         src={input.webappImage}
         emoji={input.emoji}
         alt={input.displayName}
-        size={38}
         rarity={input.rarity}
+        frame="thumb"
       />
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="truncate text-[11px] text-[#f0e6c8]">
@@ -117,8 +170,75 @@ function MaterialChip({ input }: { input: CraftInput }) {
         <span
           className={`text-[10px] font-bold tabular-nums ${enough ? "text-[rgba(200,168,75,0.55)]" : "text-red-400"}`}
         >
-          {input.have} / {input.qty}
+          {input.have} / {need}
         </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Qty stepper — bulk craft control ───────────────────────────────
+function QtyStepper({
+  qty,
+  max,
+  onChange,
+}: {
+  qty: number;
+  max: number;
+  onChange: (n: number) => void;
+}) {
+  const step = (delta: number) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(Math.min(max, Math.max(1, qty + delta)));
+  };
+  const presets = [1, 5, 10, Math.min(20, max)].filter(
+    (v, i, arr) => v <= max && arr.indexOf(v) === i,
+  );
+
+  return (
+    <div
+      className="flex items-center gap-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center overflow-hidden rounded-md border border-[rgba(200,168,75,0.25)]">
+        <button
+          type="button"
+          onClick={step(-1)}
+          disabled={qty <= 1}
+          className="flex h-8 w-8 items-center justify-center text-[#c8a84b] transition-colors hover:bg-[rgba(200,168,75,0.12)] disabled:opacity-30"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <span className="w-9 text-center text-sm font-bold tabular-nums text-[#f0e6c8]">
+          {qty}
+        </span>
+        <button
+          type="button"
+          onClick={step(1)}
+          disabled={qty >= max}
+          className="flex h-8 w-8 items-center justify-center text-[#c8a84b] transition-colors hover:bg-[rgba(200,168,75,0.12)] disabled:opacity-30"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="flex items-center gap-1">
+        {presets.map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange(p);
+            }}
+            className={`rounded px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+              qty === p
+                ? "bg-[#c8a84b] text-black"
+                : "text-[rgba(200,168,75,0.55)] hover:bg-[rgba(200,168,75,0.10)]"
+            }`}
+          >
+            {p === max && max !== 20 ? "max" : `${p}×`}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -127,19 +247,37 @@ function MaterialChip({ input }: { input: CraftInput }) {
 // ── Recipe card ───────────────────────────────────────────────────
 function RecipeCard({
   recipe,
+  index,
   hasCraftingTable,
   onCraft,
   busy,
 }: {
   recipe: CraftRecipe;
+  index: number;
   hasCraftingTable: boolean;
-  onCraft: (recipe: CraftRecipe) => void;
+  onCraft: (recipe: CraftRecipe, qty: number) => void;
   busy: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const locked = !hasCraftingTable;
   const owned = recipe.alreadyOwnsTool;
-  const unavailable = locked || owned || !recipe.canAfford;
+  const bulkable = !owned; // tool first-crafts are always qty-locked to 1
+  const [qty, setQty] = useState(1);
+
+  // Max qty this player can currently afford across every material +
+  // ryo — recomputed whenever inputs/ryo/qty context changes. Capped by
+  // the server's MAX_CRAFT_QTY regardless of how much they could afford.
+  const maxAffordableQty = useMemo(() => {
+    if (!bulkable) return 1;
+    const byMaterials = recipe.inputs.map((i) =>
+      i.qty > 0 ? Math.floor(i.have / i.qty) : MAX_CRAFT_QTY,
+    );
+    const capped = Math.min(MAX_CRAFT_QTY, ...byMaterials);
+    return Math.max(0, capped);
+  }, [recipe.inputs, bulkable]);
+
+  const canAffordAtQty = recipe.canAfford && maxAffordableQty >= qty;
+  const unavailable = locked || owned || !canAffordAtQty;
   const risky = recipe.successRate < 100;
   const range = outputRange(recipe);
 
@@ -163,7 +301,8 @@ function RecipeCard({
 
   return (
     <div
-      className={`craft-card item-card-lift flex flex-col gap-4 rounded-xl p-4 ${locked ? "craft-card-locked" : ""} ${expanded ? "is-expanded" : ""}`}
+      className={`craft-card item-card-lift group flex flex-col overflow-hidden rounded-xl [animation:shop-card-in_0.35s_ease-out_backwards] ${locked ? "craft-card-locked" : ""} ${expanded ? "is-expanded" : ""}`}
+      style={{ animationDelay: `${index * 60}ms` }}
       onClick={() => setExpanded((v) => !v)}
       role="button"
       tabIndex={0}
@@ -175,96 +314,125 @@ function RecipeCard({
         }
       }}
     >
-      {/* Header row: output art + name + risk badge */}
-      <div className="flex items-start gap-3">
+      {/* Hero art panel — full width, upgrade-page scale */}
+      <div className="relative">
         <ItemArt
           src={cardArt}
           emoji={outputEmoji}
           alt={outputLabel}
-          size={84}
           rarity={recipe.outputRarity}
         />
-        <div className="min-w-0 flex-1">
+        {risky && (
+          <span className="absolute right-2 top-2 rounded border border-red-500/40 bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-red-400 backdrop-blur-sm">
+            {recipe.successRate}% success
+          </span>
+        )}
+        {owned && (
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded border border-green-500/40 bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-green-400 backdrop-blur-sm">
+            <CheckCircle2 className="h-3 w-3" /> Owned
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div>
           <p className="font-display truncate text-sm font-bold text-[#f0e6c8]">
             {recipe.name}
           </p>
           <p className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
             Yields {outputAmountText}{" "}
             {recipe.output.type === "kitsu" ? "" : outputEmoji} {outputLabel}
+            {qty > 1 && bulkable && (
+              <span className="text-[#e6c96a]"> × {qty}</span>
+            )}
           </p>
         </div>
-        {risky && (
-          <span className="shrink-0 rounded border border-red-500/35 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-red-400">
-            {recipe.successRate}%
-          </span>
-        )}
-      </div>
 
-      {/* Description — collapsed preview, tap the card to read in full */}
-      {recipe.description && (
-        <>
-          <div className="item-card-reveal">
-            <div>
-              <p className="pt-0.5 text-[11px] leading-relaxed text-[rgba(200,168,75,0.55)]">
-                {recipe.description}
-              </p>
+        {/* Description — collapsed preview, tap the card to read in full */}
+        {recipe.description && (
+          <>
+            <div className="item-card-reveal">
+              <div>
+                <p className="pt-0.5 text-[11px] leading-relaxed text-[rgba(200,168,75,0.55)]">
+                  {recipe.description}
+                </p>
+              </div>
             </div>
-          </div>
-          {!expanded && (
-            <p className="line-clamp-1 text-[11px] leading-relaxed text-[rgba(200,168,75,0.40)]">
-              {recipe.description}{" "}
-              <span className="text-[rgba(200,168,75,0.30)]">
-                — tap to read
-              </span>
-            </p>
-          )}
-        </>
-      )}
+            {!expanded && (
+              <p className="line-clamp-1 text-[11px] leading-relaxed text-[rgba(200,168,75,0.40)]">
+                {recipe.description}{" "}
+                <span className="text-[rgba(200,168,75,0.30)]">
+                  — tap to read
+                </span>
+              </p>
+            )}
+          </>
+        )}
 
-      {/* Materials */}
-      <div className="grid grid-cols-2 gap-1.5">
-        {recipe.inputs.map((input) => (
-          <MaterialChip key={input.itemId} input={input} />
-        ))}
-      </div>
-
-      {/* Ryo cost */}
-      {recipe.ryoCost > 0 && (
-        <div className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.65)]">
-          <CurrencyIcon type="ryo" size={14} />
-          <span className="font-bold tabular-nums">{fmt(recipe.ryoCost)}</span>
-          <span className="text-[rgba(200,168,75,0.40)]">ryo</span>
+        {/* Materials */}
+        <div className="grid grid-cols-2 gap-1.5">
+          {recipe.inputs.map((input) => (
+            <MaterialChip
+              key={input.itemId}
+              input={input}
+              qtyMultiplier={bulkable ? qty : 1}
+            />
+          ))}
         </div>
-      )}
 
-      {owned && (
-        <p className="flex items-center gap-1.5 text-xs text-green-400/80">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Already crafted
-        </p>
-      )}
-      {locked && (
-        <p className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.40)]">
-          <Lock className="h-3.5 w-3.5" /> Requires Crafting Table
-        </p>
-      )}
+        {/* Ryo cost */}
+        {recipe.ryoCost > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.65)]">
+            <CurrencyIcon type="ryo" size={14} />
+            <span className="font-bold tabular-nums">
+              {fmt(recipe.ryoCost * (bulkable ? qty : 1))}
+            </span>
+            <span className="text-[rgba(200,168,75,0.40)]">
+              ryo{qty > 1 && bulkable ? ` (${fmt(recipe.ryoCost)} ea)` : ""}
+            </span>
+          </div>
+        )}
 
-      <button
-        type="button"
-        disabled={unavailable || busy}
-        onClick={(e) => {
-          e.stopPropagation();
-          onCraft(recipe);
-        }}
-        className="h-9 rounded-md border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.18)] disabled:text-[rgba(200,168,75,0.22)] disabled:hover:bg-transparent"
-      >
-        {busy
-          ? "Crafting…"
-          : owned
-            ? "Already Owned"
-            : risky
-              ? "Attempt Ritual"
-              : "Craft"}
-      </button>
+        {locked && (
+          <p className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.40)]">
+            <Lock className="h-3.5 w-3.5" /> Requires Crafting Table
+          </p>
+        )}
+
+        <div className="mt-auto flex flex-col gap-2 pt-1">
+          {/* Bulk qty stepper — only for non-tool recipes with room to
+              craft at least one at current inventory levels */}
+          {bulkable && !locked && !owned && maxAffordableQty > 0 && (
+            <QtyStepper
+              qty={qty}
+              max={Math.max(1, maxAffordableQty)}
+              onChange={setQty}
+            />
+          )}
+
+          <button
+            type="button"
+            disabled={unavailable || busy}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCraft(recipe, bulkable ? qty : 1);
+            }}
+            className="h-9 rounded-md border border-[#c8a84b] text-xs font-bold uppercase tracking-widest text-[#c8a84b] transition-colors hover:bg-[#c8a84b] hover:text-black disabled:cursor-not-allowed disabled:border-[rgba(200,168,75,0.18)] disabled:text-[rgba(200,168,75,0.22)] disabled:hover:bg-transparent"
+          >
+            {busy
+              ? "Crafting…"
+              : owned
+                ? "Already Owned"
+                : risky
+                  ? qty > 1
+                    ? `Attempt Ritual × ${qty}`
+                    : "Attempt Ritual"
+                  : qty > 1
+                    ? `Craft × ${qty}`
+                    : "Craft"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -301,15 +469,105 @@ function CraftSection({
   );
 }
 
+// ── Circular hero art — used only in the modal reveal moment. Distinct
+// from the card's ItemArt: no square frame, no bottom hairline — just
+// the art floating inside a soft circular glow, ringed by the rarity
+// color as a genuine halo instead of a boxed outline. This replaces the
+// old approach of reusing the square card ItemArt at 128px, which read
+// as an odd frame-within-a-frame in the reveal modal. ──────────────────
+function RevealArt({
+  src,
+  emoji,
+  alt,
+  rarity,
+  size = 128,
+}: {
+  src?: string;
+  emoji: string;
+  alt: string;
+  rarity?: Rarity;
+  size?: number;
+}) {
+  const [broken, setBroken] = useState(false);
+  const showImg = src && !broken;
+  const glow =
+    rarity === "legendary"
+      ? "rgba(230,180,80,0.55)"
+      : rarity === "epic"
+        ? "rgba(190,120,230,0.5)"
+        : rarity === "rare"
+          ? "rgba(110,160,230,0.5)"
+          : rarity === "uncommon"
+            ? "rgba(120,200,140,0.45)"
+            : "rgba(200,168,75,0.4)";
+  return (
+    <div
+      className="relative flex items-center justify-center rounded-full"
+      style={{ width: size, height: size }}
+    >
+      <div
+        className="reveal-glow-pulse absolute inset-0 rounded-full blur-xl"
+        style={{ background: glow }}
+      />
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{ boxShadow: `0 0 0 1px ${glow}` }}
+      />
+      {showImg ? (
+        <Image
+          src={src}
+          alt={alt}
+          width={size}
+          height={size}
+          className="relative z-10 object-contain p-3 drop-shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+          unoptimized
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <span
+          className="relative z-10 leading-none select-none"
+          style={{ fontSize: size * 0.42 }}
+        >
+          {emoji}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Bulk roll strip — a row of small pip results (✓ / ✗) for qty > 1
+// crafts, staggered in so they read left-to-right like dice landing. ──
+function RollStrip({ rolls }: { rolls: CraftRoll[] }) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1.5">
+      {rolls.map((r, i) => (
+        <div
+          key={i}
+          className={`roll-pip flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-bold ${
+            r.success
+              ? "border-green-500/40 bg-green-500/10 text-green-400"
+              : "border-red-500/35 bg-red-500/10 text-red-400"
+          }`}
+          style={{ animationDelay: `${i * 60}ms` }}
+        >
+          {r.success ? "✓" : "✗"}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Craft modal: roll -> reveal ──────────────────────────────────────
 type ModalPhase = "rolling" | "success" | "fail" | "error";
 
 function CraftModal({
   recipe,
+  qty,
   onClose,
   onSettled,
 }: {
   recipe: CraftRecipe;
+  qty: number;
   onClose: () => void;
   onSettled: (res: CraftResponse | null, err?: string) => void;
 }) {
@@ -323,12 +581,18 @@ function CraftModal({
     startedRef.current = true;
 
     let cancelled = false;
-    const minRollTime = new Promise((r) => setTimeout(r, 1150));
+    // Bulk crafts get a slightly longer minimum roll time so the roll
+    // strip has room to feel like it's resolving multiple attempts
+    // rather than blinking past a batch of five in the same 1.15s a
+    // single craft gets.
+    const minRollTime = new Promise((r) =>
+      setTimeout(r, qty > 1 ? 1450 : 1150),
+    );
 
     (async () => {
       try {
         const [res] = await Promise.all([
-          executeCraft(recipe.recipeId),
+          executeCraft(recipe.recipeId, qty),
           minRollTime,
         ]);
         if (cancelled) return;
@@ -351,16 +615,18 @@ function CraftModal({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipe.recipeId]);
+  }, [recipe.recipeId, qty]);
 
   const outputEmoji =
     recipe.output.type === "kitsu" ? "🔥" : (recipe.outputEmoji ?? "");
-  // Same priority as the card: ritual's own art first, then the output
-  // item's registry art — previously this only ever checked the item
-  // path, so every kitsu-yielding ritual's modal fell back to emoji.
   const modalArt = recipe.webappImage ?? recipe.outputWebappImage;
-
   const canDismiss = phase !== "rolling";
+  const isBulk = qty > 1;
+  const isPartial =
+    isBulk &&
+    result?.successCount != null &&
+    result.successCount > 0 &&
+    (result.failCount ?? 0) > 0;
 
   return (
     <div
@@ -386,18 +652,26 @@ function CraftModal({
             <div className="relative flex h-32 w-32 items-center justify-center">
               <div className="rune-spin absolute inset-0 rounded-full border-2 border-dashed border-[rgba(200,168,75,0.35)]" />
               <div className="rune-spin-reverse absolute inset-3 rounded-full border border-[rgba(200,168,75,0.20)]" />
-              {modalArt ? (
-                <ItemArt
-                  src={modalArt}
-                  emoji={outputEmoji}
-                  alt={recipe.name}
-                  size={92}
-                  rarity={recipe.outputRarity}
-                  className="opacity-70"
-                />
-              ) : (
-                <span className="text-4xl">{outputEmoji || "✦"}</span>
-              )}
+              <RevealArt
+                src={modalArt}
+                emoji={outputEmoji || "✦"}
+                alt={recipe.name}
+                rarity={recipe.outputRarity}
+                size={92}
+              />
+              {/* ember particles swirling during the roll */}
+              <span
+                className="ember-particle absolute bottom-1 left-4 h-1 w-1 rounded-full bg-[#e6c96a]"
+                style={{ animationDelay: "0s" }}
+              />
+              <span
+                className="ember-particle absolute bottom-1 right-5 h-1 w-1 rounded-full bg-[#e6c96a]"
+                style={{ animationDelay: "0.4s" }}
+              />
+              <span
+                className="ember-particle absolute bottom-3 left-1/2 h-1 w-1 rounded-full bg-[#e6c96a]"
+                style={{ animationDelay: "0.8s" }}
+              />
             </div>
             <div>
               <p className="font-display text-sm font-bold tracking-wide text-[#f0e6c8]">
@@ -405,6 +679,7 @@ function CraftModal({
               </p>
               <p className="mt-1 text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
                 {recipe.name}
+                {isBulk && ` × ${qty}`}
               </p>
             </div>
           </>
@@ -413,23 +688,22 @@ function CraftModal({
         {phase === "success" && result && (
           <>
             <div className="reveal-pop relative flex h-36 w-36 items-center justify-center">
-              <div className="reveal-glow-pulse absolute inset-0 rounded-full bg-[#c8a84b]/20 blur-xl" />
-              {modalArt ? (
-                <ItemArt
-                  src={modalArt}
-                  emoji={outputEmoji}
-                  alt={recipe.name}
-                  size={128}
-                  rarity={recipe.outputRarity}
-                />
-              ) : (
-                <ItemArt
-                  src={recipe.webappImage ?? recipe.outputWebappImage}
-                  emoji={outputEmoji || "✦"}
-                  alt={recipe.outputDisplayName ?? recipe.name}
-                  size={96}
-                  rarity={recipe.outputRarity}
-                />
+              <RevealArt
+                src={modalArt}
+                emoji={outputEmoji || "✦"}
+                alt={recipe.outputDisplayName ?? recipe.name}
+                rarity={recipe.outputRarity}
+                size={128}
+              />
+              {/* celebratory sparkle burst on a clean success */}
+              {!isPartial && (
+                <>
+                  <Sparkles className="spark-burst absolute -right-1 -top-1 h-5 w-5 text-[#e6c96a]" />
+                  <Sparkles
+                    className="spark-burst absolute -bottom-1 -left-1 h-4 w-4 text-[#e6c96a]"
+                    style={{ animationDelay: "0.15s" }}
+                  />
+                </>
               )}
               {/* ember particles */}
               <span
@@ -446,8 +720,10 @@ function CraftModal({
               />
             </div>
             <div>
-              <p className="font-display text-lg font-bold tracking-wide text-[#e6c96a]">
-                Success!
+              <p
+                className={`font-display text-lg font-bold tracking-wide ${isPartial ? "text-amber-400" : "text-[#e6c96a]"}`}
+              >
+                {isPartial ? "Partial success" : "Success!"}
               </p>
               <p className="number-tick mt-1 flex items-center justify-center gap-1.5 text-sm text-[#f0e6c8]">
                 {result.output?.type === "kitsu" ? (
@@ -467,6 +743,14 @@ function CraftModal({
                   </span>
                 )}
               </p>
+              {isBulk && result.rolls && (
+                <div className="mt-3 flex flex-col items-center gap-1.5">
+                  <RollStrip rolls={result.rolls} />
+                  <p className="text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
+                    {result.successCount}/{qty} rituals succeeded
+                  </p>
+                </div>
+              )}
             </div>
             <button type="button" onClick={onClose} className="brush-btn w-40">
               Nice
@@ -488,6 +772,11 @@ function CraftModal({
                   ? errMsg
                   : (result?.message ?? "All materials were consumed.")}
               </p>
+              {isBulk && phase === "fail" && result?.rolls && (
+                <div className="mt-3 flex flex-col items-center gap-1.5">
+                  <RollStrip rolls={result.rolls} />
+                </div>
+              )}
             </div>
             <button type="button" onClick={onClose} className="brush-btn w-40">
               Close
@@ -509,6 +798,7 @@ export default function CraftPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeRecipe, setActiveRecipe] = useState<CraftRecipe | null>(null);
+  const [activeQty, setActiveQty] = useState(1);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(
@@ -550,8 +840,9 @@ export default function CraftPage() {
     };
   }, [data]);
 
-  const openCraft = (recipe: CraftRecipe) => {
+  const openCraft = (recipe: CraftRecipe, qty: number) => {
     setBusyId(recipe.recipeId);
+    setActiveQty(qty);
     setActiveRecipe(recipe);
   };
 
@@ -632,10 +923,11 @@ export default function CraftPage() {
             subtitle="One-time crafts · upgrade later"
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {toolRecipes.map((recipe) => (
+              {toolRecipes.map((recipe, i) => (
                 <RecipeCard
                   key={recipe.recipeId}
                   recipe={recipe}
+                  index={i}
                   hasCraftingTable={data?.hasCraftingTable ?? false}
                   onCraft={openCraft}
                   busy={busyId === recipe.recipeId}
@@ -650,13 +942,14 @@ export default function CraftPage() {
           <CraftSection
             icon={<Flame className="h-4 w-4" />}
             title="Rituals"
-            subtitle="Kitsu transmutations & bag upgrades"
+            subtitle="Kitsu transmutations & bag upgrades · bulk-craft up to 20×"
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {ritualRecipes.map((recipe) => (
+              {ritualRecipes.map((recipe, i) => (
                 <RecipeCard
                   key={recipe.recipeId}
                   recipe={recipe}
+                  index={toolRecipes.length + i}
                   hasCraftingTable={data?.hasCraftingTable ?? false}
                   onCraft={openCraft}
                   busy={busyId === recipe.recipeId}
@@ -676,6 +969,7 @@ export default function CraftPage() {
       {activeRecipe && (
         <CraftModal
           recipe={activeRecipe}
+          qty={activeQty}
           onClose={closeModal}
           onSettled={handleSettled}
         />

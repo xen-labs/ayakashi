@@ -8,6 +8,9 @@ import { TopBar } from "./components/TopBar";
 import { Footer } from "./components/Footer";
 import { CurrencyProvider } from "./components/CurrencyContext";
 import { BottomNav } from "./components/BottomNav";
+import { EmberField } from "./components/EmberField";
+import { LotteryTicker } from "./components/LotteryTicker";
+import { MarketplaceDeals } from "./components/MarketplaceDeals";
 import { getMe, getHomeStats } from "../lib/api";
 import type { MeResponse, HomeStatsResponse } from "../lib/api";
 
@@ -37,8 +40,7 @@ const FEATURES = [
     ),
     title: "Marketplace",
     body: "Trade cards and currency with other players in the open marketplace.",
-    href: null,
-    comingSoon: true,
+    href: "/marketplace",
   },
   {
     icon: (
@@ -51,8 +53,7 @@ const FEATURES = [
     ),
     title: "Guilds",
     body: "Form or join guilds, compete in events, and climb the leaderboard together.",
-    href: null,
-    comingSoon: true,
+    href: "/guilds",
   },
   {
     icon: (
@@ -82,7 +83,7 @@ function FeatureGrid({ loggedIn }: { loggedIn: boolean }) {
     <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         {!loggedIn && (
-          <div className="mb-12 flex flex-col items-center gap-4">
+          <div className="stagger-in mb-12 flex flex-col items-center gap-4">
             <div className="section-header">
               <span className="section-header-text">Features</span>
             </div>
@@ -92,7 +93,7 @@ function FeatureGrid({ loggedIn }: { loggedIn: boolean }) {
           </div>
         )}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feat) => {
+          {FEATURES.map((feat, i) => {
             const clickable = loggedIn && Boolean(feat.href);
             const inner = (
               <>
@@ -101,7 +102,7 @@ function FeatureGrid({ loggedIn }: { loggedIn: boolean }) {
                     Soon
                   </span>
                 )}
-                <div className="mb-4 flex h-10 w-10 items-center justify-center border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.06)]">
+                <div className="icon-badge mb-4 flex h-10 w-10 items-center justify-center">
                   <svg
                     width="18"
                     height="18"
@@ -130,13 +131,18 @@ function FeatureGrid({ loggedIn }: { loggedIn: boolean }) {
                 <Link
                   key={feat.title}
                   href={feat.href as string}
-                  className="form-card relative border p-6 transition-transform hover:-translate-y-0.5 hover:border-[rgba(200,168,75,0.45)]"
+                  className="form-card stagger-in relative border p-6 transition-transform hover:-translate-y-0.5 hover:border-[rgba(200,168,75,0.45)]"
+                  style={{ animationDelay: `${i * 0.06}s` }}
                 >
                   {inner}
                 </Link>
               );
             return (
-              <div key={feat.title} className="form-card relative border p-6">
+              <div
+                key={feat.title}
+                className="form-card stagger-in relative border p-6"
+                style={{ animationDelay: `${i * 0.06}s` }}
+              >
                 {inner}
               </div>
             );
@@ -213,16 +219,53 @@ export default function Home() {
           <main className="relative z-10 pb-16">
             <section className="px-4 pt-10 sm:px-6 lg:px-8">
               <div className="mx-auto w-full max-w-5xl flex flex-col gap-2">
-                <h1 className="font-display text-xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-2xl">
+                <h1 className="font-display stagger-in text-xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-2xl">
                   Welcome back,{" "}
                   <span className="text-[#c8a84b]">{user.displayName}</span>
                 </h1>
-                <p className="font-ui text-xs uppercase tracking-[0.12em] text-[rgba(200,168,75,0.40)]">
+                <p
+                  className="font-ui stagger-in text-xs uppercase tracking-[0.12em] text-[rgba(200,168,75,0.40)]"
+                  style={{ animationDelay: "0.1s" }}
+                >
                   Here&apos;s what&apos;s happening across Ayakashi.
                 </p>
-                <div className="mt-1 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent" />
+                <div
+                  className="stagger-in mt-1 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent"
+                  style={{ animationDelay: "0.15s" }}
+                />
               </div>
             </section>
+
+            {/* Marketplace deals — quick hits into a live economy */}
+            <section className="px-4 pt-10 sm:px-6 lg:px-8">
+              <div className="mx-auto w-full max-w-5xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#f0e6c8]">
+                    Marketplace Deals
+                  </h2>
+                  <Link
+                    href="/marketplace"
+                    className="font-ui text-xs font-semibold text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
+                  >
+                    Browse all →
+                  </Link>
+                </div>
+                <MarketplaceDeals />
+              </div>
+            </section>
+
+            {/* Recent lottery draws */}
+            <section className="px-4 pt-10 sm:px-6 lg:px-8">
+              <div className="mx-auto w-full max-w-5xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-[#f0e6c8]">
+                    Recent Lottery Draws
+                  </h2>
+                </div>
+                <LotteryTicker />
+              </div>
+            </section>
+
             <FeatureGrid loggedIn />
           </main>
           <BottomNav />
@@ -235,6 +278,7 @@ export default function Home() {
     <main className="relative bg-[#0a0a0a]">
       {/* ambient radial glow */}
       <div className="pointer-events-none fixed left-1/2 top-1/2 h-[min(70vw,560px)] w-[min(70vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[140px]" />
+      <EmberField count={20} />
 
       <section className="relative z-10 flex min-h-dvh flex-col items-center justify-between px-4 pb-16 pt-10 sm:px-6 lg:px-8">
         <div className="flex flex-1 w-full items-center justify-center">
@@ -244,12 +288,12 @@ export default function Home() {
               alt="Ayakashi"
               width={160}
               height={160}
-              className="logo-filter h-auto w-24 sm:w-32 lg:w-40"
+              className="logo-entrance h-auto w-24 sm:w-32 lg:w-40"
               priority
               unoptimized
             />
 
-            <div>
+            <div className="stagger-in" style={{ animationDelay: "0.15s" }}>
               <h1 className="font-display text-4xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-5xl lg:text-7xl">
                 Ayakashi
               </h1>
@@ -257,18 +301,24 @@ export default function Home() {
               <div className="mx-auto mt-3 h-px w-32 bg-gradient-to-r from-transparent via-[#c8a84b] to-transparent" />
             </div>
 
-            <p className="font-ui max-w-xl text-sm leading-7 text-[#a89880] sm:text-base">
+            <p
+              className="font-ui stagger-in max-w-xl text-sm leading-7 text-[#a89880] sm:text-base"
+              style={{ animationDelay: "0.25s" }}
+            >
               Experience the ultimate Web Companion for the Next-Gen WhatsApp
               AI. Collect cards, trade in live auctions, and summon your
               destiny.
             </p>
 
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div
+              className="stagger-in flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+              style={{ animationDelay: "0.35s" }}
+            >
               <a
                 href={BOT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="brush-btn w-52"
+                className="brush-btn brush-btn-glint w-52"
               >
                 Get Started
               </a>
@@ -282,7 +332,10 @@ export default function Home() {
               </a>
             </div>
 
-            <p className="font-ui text-xs text-[rgba(200,168,75,0.40)]">
+            <p
+              className="font-ui stagger-in text-xs text-[rgba(200,168,75,0.40)]"
+              style={{ animationDelay: "0.45s" }}
+            >
               Already have an account?{" "}
               <Link
                 href="/login"
@@ -364,6 +417,52 @@ export default function Home() {
               </>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* Marketplace deals — proof the economy is alive before signup */}
+      <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="stagger-in mb-10 flex flex-col items-center gap-4">
+            <div className="section-header">
+              <span className="section-header-text">Marketplace</span>
+            </div>
+            <h2 className="font-display text-center text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl">
+              Live Deals Right Now
+            </h2>
+            <p className="font-ui max-w-md text-center text-xs leading-6 text-[#a89880]">
+              Real listings from real players, trading this very moment.
+            </p>
+          </div>
+          <MarketplaceDeals />
+          <div className="mt-6 flex justify-center">
+            <a
+              href={BOT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-ui text-xs font-semibold text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
+            >
+              Join to start trading →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Recent lottery draws — proof rewards are real and frequent */}
+      <section className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="stagger-in mb-10 flex flex-col items-center gap-4">
+            <div className="section-header">
+              <span className="section-header-text">Lottery</span>
+            </div>
+            <h2 className="font-display text-center text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl">
+              Recent Draws
+            </h2>
+            <p className="font-ui max-w-md text-center text-xs leading-6 text-[#a89880]">
+              Every player has a shot. Here&apos;s who won recently.
+            </p>
+          </div>
+          <LotteryTicker />
         </div>
       </section>
 

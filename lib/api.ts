@@ -453,7 +453,19 @@ export interface ToolStatus {
     ryo: number;
     materialQty: number;
     material: string;
-    extra: { itemId: string; qty: number; name: string }[] | null;
+    /** Resolved display name for `material` — was previously absent, forcing the frontend to render the raw itemId. */
+    materialName: string;
+    materialEmoji: string;
+    materialWebappImage?: string;
+    extra:
+      | {
+          itemId: string;
+          qty: number;
+          name: string;
+          emoji: string;
+          webappImage?: string;
+        }[]
+      | null;
   } | null;
   craftRecipeId: string | null;
 }
@@ -760,6 +772,12 @@ export interface CraftRecipesResponse {
 export const getCraftRecipes = () =>
   apiFetch<CraftRecipesResponse>("/craft/recipes");
 
+/** One recipe execution's outcome inside a bulk (`qty` > 1) craft. */
+export interface CraftRoll {
+  success: boolean;
+  amount?: number;
+}
+
 export interface CraftResponse {
   recipeId: string;
   success: boolean;
@@ -770,11 +788,23 @@ export interface CraftResponse {
     amount: number;
   };
   message?: string;
+  /** Present only when the request specified qty > 1. */
+  qty?: number;
+  successCount?: number;
+  failCount?: number;
+  rolls?: CraftRoll[];
 }
-export const executeCraft = (recipeId: string) =>
+
+/**
+ * Executes a craft recipe. `qty` (default 1, server-capped at 20) runs
+ * the recipe that many times in one request — one materials pull, one
+ * ryo charge, one independent success roll per unit. Omit `qty` (or pass
+ * 1) for the original single-craft response shape.
+ */
+export const executeCraft = (recipeId: string, qty = 1) =>
   apiFetch<CraftResponse>("/craft", {
     method: "POST",
-    body: JSON.stringify({ recipeId }),
+    body: JSON.stringify(qty > 1 ? { recipeId, qty } : { recipeId }),
   });
 
 // ── Bank & Vault ──────────────────────────────────────────────────

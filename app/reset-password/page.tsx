@@ -4,9 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { useState, FormEvent, Suspense } from "react";
+import { useState, useEffect, FormEvent, Suspense } from "react";
 import { PasswordField } from "../components/PasswordField";
 import { BackToWhatsApp } from "../components/BackToWhatsApp";
+import { EmberField } from "../components/EmberField";
 import { authResetPassword, ApiResponseError } from "../../lib/api";
 
 // ── Field errors ───────────────────────────────────────────────────
@@ -25,6 +26,15 @@ function ResetPasswordInner() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [globalError, setGlobalError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  // Brief celebratory beat before handing off to login — long enough to
+  // register, short enough not to feel like a delay.
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => router.push("/login?reset=1"), 1400);
+    return () => clearTimeout(t);
+  }, [success, router]);
 
   // ── Dead-end: no token in URL ──────────────────────────────────
   if (!token) {
@@ -62,9 +72,9 @@ function ResetPasswordInner() {
     setLoading(true);
     try {
       await authResetPassword({ token, newPassword: password });
-      // API logs the user out everywhere on success — redirect to login
-      // with a success message via search param
-      router.push("/login?reset=1");
+      // API logs the user out everywhere on success — show a confirmation
+      // beat, then redirect to login.
+      setSuccess(true);
     } catch (err) {
       if (err instanceof ApiResponseError) {
         const { code, message, issues } = err.error;
@@ -144,15 +154,62 @@ function ResetPasswordInner() {
     );
   }
 
+  // ── Success beat — brief confirmation before redirecting ────────
+  if (success) {
+    return (
+      <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-10 sm:px-6">
+        <div className="pointer-events-none fixed left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.05)] blur-[100px]" />
+        <EmberField count={14} />
+        <section className="relative z-10 flex w-full max-w-md flex-col items-center gap-5 text-center">
+          <div className="coin-medallion stagger-in h-20 w-20">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-8 w-8 text-[#c8a84b]"
+              aria-hidden="true"
+            >
+              <polyline
+                points="20 6 9 17 4 12"
+                pathLength={24}
+                strokeDasharray={24}
+                className="checkmark-draw"
+                style={{ "--checkmark-length": 24 } as React.CSSProperties}
+              />
+            </svg>
+          </div>
+          <h1
+            className="font-display stagger-in text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8]"
+            style={{ animationDelay: "0.15s" }}
+          >
+            Password Updated
+          </h1>
+          <p
+            className="stagger-in text-sm leading-7 text-[#a89880]"
+            style={{ animationDelay: "0.25s" }}
+          >
+            You&apos;ve been signed out everywhere for safety.
+            <br />
+            Taking you to login…
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   // ── Main form ──────────────────────────────────────────────────
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-theme-texture bg-cover bg-center px-4 py-8 sm:px-6">
-      <div className="absolute inset-0 overlay-theme-heavy" />
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-10 sm:px-6">
+      <div className="pointer-events-none fixed left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[120px]" />
+      <EmberField count={14} />
 
-      <section className="relative z-10 flex w-full max-w-md flex-col items-center text-center">
+      <section className="form-card stagger-in relative z-10 flex w-full max-w-md flex-col items-center border p-6 text-center sm:p-8">
         <Link
           href="/"
-          className="mb-8 self-start text-sm font-semibold uppercase tracking-widest text-ayakashi-gold transition-colors hover:text-white"
+          className="stagger-in mb-8 self-start text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
         >
           ← Back to home
         </Link>
@@ -162,26 +219,34 @@ function ResetPasswordInner() {
           alt="Ayakashi"
           width={80}
           height={80}
-          className="logo-filter mb-6 h-auto w-16"
+          className="logo-entrance mb-6 h-auto w-16"
           priority
           unoptimized
         />
 
         <h1
-          className="theme-heading mb-3 text-2xl font-bold uppercase tracking-widest sm:text-3xl"
-          style={{ fontFamily: "serif" }}
+          className="font-display stagger-in mb-3 text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-3xl"
+          style={{ animationDelay: "0.15s" }}
         >
           Set New Password
         </h1>
+        <div
+          className="stagger-in mb-8 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent"
+          style={{ animationDelay: "0.2s" }}
+        />
 
-        <p className="theme-body mb-8 text-sm leading-7 sm:text-base">
+        <p
+          className="stagger-in mb-8 text-sm leading-7 text-[#a89880]"
+          style={{ animationDelay: "0.25s" }}
+        >
           Choose a strong new password for your account.
         </p>
 
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="w-full grid gap-5 text-left"
+          className="stagger-in grid w-full gap-5 text-left"
+          style={{ animationDelay: "0.3s" }}
         >
           <PasswordField
             label="New Password"
@@ -214,25 +279,55 @@ function ResetPasswordInner() {
           )}
 
           {globalError && !globalError.startsWith("__dead_end__") && (
-            <p className="rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+            <p className="border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-400">
               {globalError}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading || !password || !confirmPassword}
-            className="h-12 w-full border border-ayakashi-gold bg-ayakashi-gold px-6 text-base font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Saving…" : "Reset Password"}
-          </button>
+          <div className="mt-1 flex justify-center">
+            <button
+              type="submit"
+              disabled={loading || !password || !confirmPassword}
+              className="brush-btn brush-btn-glint w-56 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg
+                    className="h-3.5 w-3.5 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                  Saving…
+                </span>
+              ) : (
+                "Reset Password"
+              )}
+            </button>
+          </div>
         </form>
 
-        <p className="mt-6 text-sm text-gray-500">
+        <p
+          className="stagger-in mt-6 text-xs text-[rgba(200,168,75,0.35)]"
+          style={{ animationDelay: "0.4s" }}
+        >
           Remembered it?{" "}
           <Link
             href="/login"
-            className="font-semibold text-ayakashi-gold hover:text-white transition-colors"
+            className="font-semibold text-[rgba(200,168,75,0.6)] transition-colors hover:text-[#c8a84b]"
           >
             Back to Login
           </Link>

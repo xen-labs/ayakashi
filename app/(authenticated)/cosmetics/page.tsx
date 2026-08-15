@@ -18,7 +18,10 @@ import type {
 
 // ── constants matching the backend ───────────────────────────────
 // cosmeticUpload.ts: MAX_FILE_BYTES = 32MB, ALLOWED_MIMETYPES = png/jpeg/webp/gif
-// Animated (pages > 1 per sharp) costs avatar_pass or banner_pass.
+// Animated (pages > 1 per sharp) requires owning avatar_pass or
+// banner_pass — a ONE-TIME PURCHASE (see shopCatalog.ts's
+// ONE_OF_A_KIND_ITEM_IDS) that permanently unlocks animated uploads
+// for that slot, not a per-upload consumable credit.
 // Static (single frame) is always free.
 const MAX_MB = 32;
 const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
@@ -42,7 +45,13 @@ const TOP_TABS = [
 type TopTab = (typeof TOP_TABS)[number]["id"];
 
 // ── Rules pill ────────────────────────────────────────────────────
-function RulesPill({ passItem }: { passItem?: string }) {
+function RulesPill({
+  passItem,
+  unlocked,
+}: {
+  passItem?: string;
+  unlocked?: boolean;
+}) {
   return (
     <div className="flex flex-wrap items-start gap-2 rounded-md border border-[rgba(200,168,75,0.15)] bg-[rgba(200,168,75,0.04)] px-3 py-2.5 text-[10px] leading-5 text-[rgba(200,168,75,0.55)]">
       <Info className="mt-0.5 h-3 w-3 shrink-0 text-[rgba(200,168,75,0.40)]" />
@@ -53,11 +62,16 @@ function RulesPill({ passItem }: { passItem?: string }) {
           <>
             {" "}
             <span className="font-bold text-purple-400">Animated</span> GIF ·
-            animated WEBP — costs 1×{" "}
+            animated WEBP — requires owning{" "}
             <code className="rounded bg-purple-500/10 px-1 text-purple-300">
               {passItem}
             </code>{" "}
-            per upload.
+            (one-time purchase from the Shop, unlocks it permanently).
+            {unlocked && (
+              <span className="ml-1.5 inline-flex items-center gap-1 rounded-sm bg-green-500/15 px-1.5 py-0.5 font-bold text-green-400">
+                <Check className="h-2.5 w-2.5" /> Unlocked
+              </span>
+            )}
           </>
         )}{" "}
         Max file size: {MAX_MB}MB.
@@ -203,6 +217,7 @@ function SlotPanel({
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [sheetTarget, setSheetTarget] = useState<CosmeticUpload | null>(null);
+  const [passUnlocked, setPassUnlocked] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const passItem =
     slot !== "deckBackground"
@@ -220,6 +235,20 @@ function SlotPanel({
       setLoading(false);
     }
   }, [slot, slotIndex]);
+
+  // Only relevant for avatar/banner (deckBackground never costs a
+  // pass — see PASS_INFO's comment). Fetched once on mount so the
+  // "Unlocked" badge reflects reality up front instead of only
+  // surfacing pass status reactively after a failed upload attempt.
+  useEffect(() => {
+    if (!passItem) return;
+    getInventory()
+      .then((res) => setPassUnlocked(res.ownedItemIds.includes(passItem)))
+      .catch(() => {
+        /* badge just won't show — upload flow still works and will
+           surface missing_pass correctly if they actually lack it */
+      });
+  }, [passItem]);
 
   useEffect(() => {
     load();
@@ -242,8 +271,11 @@ function SlotPanel({
 
     setUploading(true);
     try {
-      await uploadCosmetic(slot, file, slotIndex);
+      const res = await uploadCosmetic(slot, file, slotIndex);
       setToast({ msg: "Uploaded and equipped!", ok: true });
+      // An animated upload only succeeds if the pass was owned — a
+      // successful static upload proves nothing about pass ownership.
+      if (res.kind === "animated") setPassUnlocked(true);
       await load();
     } catch (err) {
       let msg = "Upload failed. Please try again.";
@@ -252,7 +284,7 @@ function SlotPanel({
           msg =
             "Network error — couldn't reach the server. Check your connection.";
         } else if (err.error.code === "missing_pass") {
-          msg = `Animated uploads require a ${passItem ?? "cosmetic pass"} in your inventory.`;
+          msg = `Animated uploads need ${passItem ?? "a cosmetic pass"} — buy it once from the Shop to unlock animated uploads for this slot permanently.`;
         } else if (err.error.code === "invalid_file_type") {
           msg = "Unsupported file type. Use PNG, JPEG, WEBP, or GIF.";
         } else if (err.error.code === "file_too_large") {
@@ -327,7 +359,7 @@ function SlotPanel({
         />
       </div>
 
-      <RulesPill passItem={passItem} />
+      <RulesPill passItem={passItem} unlocked={passUnlocked} />
 
       {toast && (
         <button

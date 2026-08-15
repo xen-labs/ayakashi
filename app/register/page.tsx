@@ -8,6 +8,9 @@ import { useState, useEffect, useRef, FormEvent, Suspense } from "react";
 import { PasswordField } from "../components/PasswordField";
 import { TosModal } from "../components/TosModal";
 import { BackToWhatsApp } from "../components/BackToWhatsApp";
+import { EmberField } from "../components/EmberField";
+import { CurrencyIcon } from "../components/CurrencyIcon";
+import { useCountUp } from "../hooks/useCountUp";
 import {
   authRegister,
   checkUsernameAvailable,
@@ -46,6 +49,53 @@ interface FieldErrors {
   username?: string;
   password?: string;
   age?: string;
+}
+
+/** One side of the welcome bonus card: icon, count-up number, radial burst. */
+function RewardStat({
+  type,
+  amount,
+  label,
+  delay,
+}: {
+  type: "ryo" | "kitsu";
+  amount: number;
+  label: string;
+  delay: number;
+}) {
+  const { value, done } = useCountUp(amount, { duration: 900, delay });
+  const burstAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+
+  return (
+    <div className="relative flex flex-col items-center gap-1.5">
+      <div className="relative flex h-9 w-9 items-center justify-center">
+        {!done &&
+          burstAngles.map((angle) => (
+            <span
+              key={angle}
+              className="coin-burst-spark"
+              style={
+                {
+                  "--burst-angle": `${angle}deg`,
+                  animationDelay: `${delay}ms`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+        <CurrencyIcon type={type} size={30} className="coin-float" />
+      </div>
+      <span
+        className={`font-display text-2xl font-bold text-[#c8a84b] tabular-nums ${
+          done ? "stat-glow" : "count-up-active"
+        }`}
+      >
+        +{value.toLocaleString("en-US")}
+      </span>
+      <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.5)]">
+        {label}
+      </span>
+    </div>
+  );
 }
 
 function RegisterInner() {
@@ -215,8 +265,16 @@ function RegisterInner() {
     return (
       <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-8">
         <div className="pointer-events-none fixed left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.05)] blur-[100px]" />
+        <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2">
+          <div className="hero-ray-sweep absolute inset-0 rounded-full" />
+        </div>
+        <EmberField count={16} />
+
         <section className="relative z-10 flex w-full max-w-md flex-col items-center gap-6 text-center">
-          <div className="coin-medallion h-20 w-20">
+          <div
+            className="coin-medallion h-20 w-20 stagger-in"
+            style={{ animationDelay: "0.05s" }}
+          >
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -227,52 +285,64 @@ function RegisterInner() {
               className="h-8 w-8 text-[#c8a84b]"
               aria-hidden="true"
             >
-              <polyline points="20 6 9 17 4 12" />
+              <polyline
+                points="20 6 9 17 4 12"
+                pathLength={24}
+                strokeDasharray={24}
+                className="checkmark-draw"
+                style={{ "--checkmark-length": 24 } as React.CSSProperties}
+              />
             </svg>
           </div>
-          <h1 className="font-display text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8]">
+          <h1
+            className="font-display text-2xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] stagger-in"
+            style={{ animationDelay: "0.15s" }}
+          >
             Welcome, {successData.displayName}!
           </h1>
-          <p className="text-sm leading-7 text-[#a89880]">
+          <p
+            className="text-sm leading-7 text-[#a89880] stagger-in"
+            style={{ animationDelay: "0.25s" }}
+          >
             Your account is ready. Username:{" "}
             <span className="font-bold text-[#c8a84b]">
               @{successData.username}
             </span>
           </p>
           {successData.welcomeBonus && (
-            <div className="welcome-bonus-card relative w-full overflow-hidden border border-[rgba(200,168,75,0.4)] bg-black/40 px-6 py-5">
+            <div
+              className="welcome-bonus-card relative w-full overflow-hidden border border-[rgba(200,168,75,0.4)] bg-black/40 px-6 py-5"
+              style={{ animationDelay: "0.35s" }}
+            >
               <div className="welcome-bonus-shimmer pointer-events-none absolute inset-0" />
               <p className="relative z-10 text-xs font-bold uppercase tracking-[0.2em] text-[#c8a84b]">
                 ✦ Welcome Bonus ✦
               </p>
               <div className="relative z-10 mt-3 flex items-center justify-center gap-8">
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-3xl">🪙</span>
-                  <span className="font-display text-2xl font-bold text-[#c8a84b]">
-                    +{successData.welcomeBonus.ryo.toLocaleString("en-US")}
-                  </span>
-                  <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.5)]">
-                    Ryo
-                  </span>
-                </div>
+                <RewardStat
+                  type="ryo"
+                  amount={successData.welcomeBonus.ryo}
+                  label="Ryo"
+                  delay={450}
+                />
                 <div className="h-10 w-px bg-[rgba(200,168,75,0.2)]" />
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-3xl">🦊</span>
-                  <span className="font-display text-2xl font-bold text-[#c8a84b]">
-                    +{successData.welcomeBonus.kitsu.toLocaleString("en-US")}
-                  </span>
-                  <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.5)]">
-                    Kitsu
-                  </span>
-                </div>
+                <RewardStat
+                  type="kitsu"
+                  amount={successData.welcomeBonus.kitsu}
+                  label="Kitsu"
+                  delay={600}
+                />
               </div>
             </div>
           )}
-          <div className="flex justify-center">
+          <div
+            className="flex justify-center stagger-in"
+            style={{ animationDelay: "0.75s" }}
+          >
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              className="brush-btn w-52"
+              className="brush-btn brush-btn-glint w-52"
             >
               Go to Dashboard
             </button>
@@ -286,13 +356,14 @@ function RegisterInner() {
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 py-10 sm:px-6 lg:px-8">
       <div className="pointer-events-none fixed left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(200,168,75,0.04)] blur-[120px]" />
+      <EmberField count={12} />
 
       <section className="relative z-10 grid w-full max-w-5xl gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
         {/* ── Left: branding ── */}
         <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
           <Link
             href="/"
-            className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
+            className="stagger-in text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(200,168,75,0.55)] transition-colors hover:text-[#c8a84b]"
           >
             ← Back
           </Link>
@@ -301,21 +372,27 @@ function RegisterInner() {
             alt="Ayakashi"
             width={80}
             height={80}
-            className="logo-filter h-auto w-20"
+            className="logo-entrance h-auto w-20"
             priority
             unoptimized
           />
-          <div>
+          <div className="stagger-in" style={{ animationDelay: "0.15s" }}>
             <h1 className="font-display text-3xl font-bold uppercase tracking-[0.05em] text-[#f0e6c8] sm:text-4xl md:text-5xl">
               Start Your Legacy
             </h1>
             <div className="mt-2 h-px w-24 bg-gradient-to-r from-[#c8a84b] to-transparent lg:max-w-[200px]" />
           </div>
-          <p className="max-w-sm text-sm leading-7 text-[#a89880]">
+          <p
+            className="stagger-in max-w-sm text-sm leading-7 text-[#a89880]"
+            style={{ animationDelay: "0.25s" }}
+          >
             Create your companion profile for card claims, live auctions, guild
             events, and WhatsApp-linked rewards.
           </p>
-          <p className="text-xs text-[rgba(200,168,75,0.35)] uppercase tracking-[0.15em]">
+          <p
+            className="stagger-in text-xs text-[rgba(200,168,75,0.35)] uppercase tracking-[0.15em]"
+            style={{ animationDelay: "0.35s" }}
+          >
             ✦ &nbsp; Ayakashi &nbsp; ✦
           </p>
         </div>
@@ -324,7 +401,8 @@ function RegisterInner() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="form-card w-full border p-6 sm:p-8"
+          className="form-card stagger-in w-full border p-6 sm:p-8"
+          style={{ animationDelay: "0.2s" }}
         >
           {/* form header */}
           <div className="mb-6 flex items-center gap-3">
@@ -352,7 +430,7 @@ function RegisterInner() {
                   placeholder="xenkai"
                   maxLength={20}
                   autoFocus
-                  className="form-input h-12 w-full border px-4 pr-10 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
+                  className="form-input form-input-glow h-12 w-full border px-4 pr-10 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
                 />
                 <span
                   className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
@@ -473,7 +551,7 @@ function RegisterInner() {
                 min={13}
                 max={120}
                 placeholder="18"
-                className="form-input h-12 border px-4 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
+                className="form-input form-input-glow h-12 border px-4 outline-none transition-colors placeholder:text-[rgba(200,168,75,0.2)] focus:border-[#c8a84b]"
               />
               {form.age && parseInt(form.age, 10) < 13 && (
                 <p className="text-xs text-red-400">
@@ -542,7 +620,7 @@ function RegisterInner() {
                   );
                 })()
               }
-              className="brush-btn w-56 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="brush-btn brush-btn-glint w-56 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
