@@ -1178,18 +1178,14 @@ dialog::backdrop {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   LEADERBOARD #1 — EMBER SPARKLE + SHOOTING STAR
-   Replaces the old rotating dashed-ring/orbiting-dot halo (which read
-   as a visible spinning line, not an effect) with two independent,
-   non-geometric motions:
-   1. A handful of small embers drift straight up from behind the
-      avatar and fade out, each on its own random-feeling delay/
-      duration/x-offset — like sparks rising off a low flame, not a
-      circle being traced.
-   2. A single comet streaks diagonally across the corner every ~9s,
-      leaving a short fading trail, then vanishes until its next lap.
-   Nothing here moves in a perfect circle or traces a visible ring, so
-   there's no "line" for the eye to lock onto — just ambient drift.
+   LEADERBOARD #1 — EMBER SPARKLE
++   Replaces the old rotating dashed-ring/orbiting-dot halo (which read
++   as a visible spinning line, not an effect) with a single
++   non-geometric motion: a handful of small embers drift straight up
++   from behind the avatar and fade out, each on its own random-feeling
++   delay/duration/x-offset — like sparks rising off a low flame, not a
++   circle being traced. The comet/shooting-star variant was removed
++   per feedback; nothing here traces a visible line.
    ══════════════════════════════════════════════════════════════════ */
 @keyframes ember-rise {
   0% {

@@ -45,6 +45,7 @@ import type {
 } from "../../../../lib/api";
 import { AvatarWithFrame } from "../../../components/AvatarWithFrame";
 import { CardTile } from "../../../components/CardTile";
+import { CropModal } from "../../../components/CropModal";
 
 // ── helpers ───────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -380,6 +381,11 @@ function CosmeticQuickSheet({
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  // File staged for cropping before it's actually uploaded — same
+  // crop-before-upload flow as the full Cosmetics page (see
+  // cosmetic_page.tsx's SlotPanel), just scoped to this quick sheet's
+  // single upload button rather than a static/animated pair.
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   const openSwitcher = async () => {
     setMode("switcher");
@@ -393,14 +399,11 @@ function CosmeticQuickSheet({
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
+  const doUpload = async (fileToUpload: File) => {
     setUploading(true);
     setErr("");
     try {
-      await uploadCosmetic(slot, file);
+      await uploadCosmetic(slot, fileToUpload);
       onDone();
     } catch (err) {
       setErr(
@@ -409,6 +412,27 @@ function CosmeticQuickSheet({
     } finally {
       setUploading(false);
     }
+  };
+
+  // Static IMAGES get staged for cropping first (matches WhatsApp —
+  // crop is a photo-only step there too, see CropModal.tsx's header).
+  // Video files skip straight to upload.
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    if (file.type.startsWith("video/")) {
+      doUpload(file);
+      return;
+    }
+    setCropFile(file);
+  };
+
+  const handleCropCancel = () => setCropFile(null);
+
+  const handleCropConfirm = (croppedFile: File) => {
+    setCropFile(null);
+    doUpload(croppedFile);
   };
 
   const handleSwitch = async (u: CosmeticUpload) => {
@@ -462,10 +486,18 @@ function CosmeticQuickSheet({
             <input
               ref={fileRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
               className="hidden"
               onChange={handleFile}
             />
+            {cropFile && (
+              <CropModal
+                file={cropFile}
+                aspect={slot === "avatar" ? 1 : 16 / 9}
+                onCancel={handleCropCancel}
+                onCropped={handleCropConfirm}
+              />
+            )}
 
             {banked && (
               <button

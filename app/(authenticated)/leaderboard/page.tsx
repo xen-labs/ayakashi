@@ -57,23 +57,19 @@ const PODIUM_CONFIG: Record<
     height: "h-28 sm:h-36",
     order: "order-2",
     delay: "300ms",
-    // [CHANGED] 76 -> 95, per feedback that podium avatars read too
-    // small. Kept the champion : runner-up ratio close to the
-    // original (~1.32:1 vs ~1.27:1) so rank 1 still reads as clearly
-    // the biggest rather than all three suddenly looking similar.
-    avatarSize: 95,
+    avatarSize: 102,
   },
   2: {
     height: "h-20 sm:h-28",
     order: "order-1",
     delay: "150ms",
-    avatarSize: 72,
+    avatarSize: 82,
   },
   3: {
     height: "h-16 sm:h-20",
     order: "order-3",
     delay: "150ms",
-    avatarSize: 72,
+    avatarSize: 82,
   },
 };
 
@@ -131,7 +127,7 @@ function Podium({ rows }: { rows: PodiumRow[] }) {
   if (ranks.length === 0) return null;
 
   return (
-    <div className="glass-panel glass-panel-aura relative flex flex-col items-center gap-0 overflow-visible rounded-2xl border px-4 pb-0 pt-9 sm:px-8 sm:pt-10">
+    <div className="glass-panel relative flex flex-col items-center gap-0 overflow-visible rounded-2xl border px-4 pb-0 pt-9 sm:px-8 sm:pt-10">
       {/* [FIXED — this pass] The panel was overflow-hidden with only
           pt-4 above a crown sitting at -top-7/-top-8 (i.e. ~28-32px
           above the avatar) — the rounded top edge + hidden overflow
@@ -162,7 +158,7 @@ function Podium({ rows }: { rows: PodiumRow[] }) {
                         larger avatar below it without the two crowding
                         each other. */}
                     <Crown
-                      className="crown-glint absolute -top-6 h-5 w-5 text-[#FFD700] sm:-top-7 sm:h-6 sm:w-6"
+                      className="crown-glint absolute -top-4 h-5 w-5 text-[#FFD700] sm:-top-5 sm:h-6 sm:w-6"
                       fill="currentColor"
                     />
                     {/* Rising embers — random-feeling x-offset/delay/

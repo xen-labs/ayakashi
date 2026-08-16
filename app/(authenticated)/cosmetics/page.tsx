@@ -16,24 +16,31 @@ import type {
   OwnedFrameItem,
 } from "../../../lib/api";
 import { FireSpinner } from "../../components/FireSpinner";
+import { CropModal } from "../../components/CropModal";
 
 // ── constants matching the backend ───────────────────────────────
-// cosmeticUpload.ts: MAX_FILE_BYTES = 32MB, ALLOWED_MIMETYPES = png/jpeg/webp/gif
-// Animated (pages > 1 per sharp) requires owning avatar_pass or
-// banner_pass — a ONE-TIME PURCHASE (see shopCatalog.ts's
-// ONE_OF_A_KIND_ITEM_IDS) that permanently unlocks animated uploads
-// for that slot, not a per-upload consumable credit.
-// Static (single frame) is always free.
+// cosmeticUpload.ts: static avatar 3MB, static banner/deckBg 5MB,
+// animated avatar 5MB/3s, animated banner 8MB/6s. ALLOWED_MIMETYPES now
+// covers png/jpeg/webp/gif PLUS mp4/webm/mov — see that file's header
+// for the tiered-cap reasoning and why video is treated as "animated"
+// the same as GIF.
+// Animated (multi-frame image OR any video) requires owning avatar_pass
+// or banner_pass — a ONE-TIME PURCHASE (see shopCatalog.ts's
+// ONE_OF_A_KIND_ITEM_IDS) that permanently unlocks animated uploads for
+// that slot, not a per-upload consumable credit. Static (single frame)
+// is always free.
 //
-// [CHANGED] Banking model is now fixed at exactly one static slot +
-// one animated slot per cosmetic type (avatar/banner) — not a scrollable
-// upload history. Uploading a new file of either kind REPLACES whatever
-// was banked for that kind; the OTHER kind's banked upload is left
-// alone, which is what lets a player toggle between "my static" and
-// "my animated" without re-uploading either. See cosmeticUpload.ts's
-// header for the matching backend change.
-const MAX_MB = 32;
-const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
+// Banking model is exactly one static slot + one animated slot per
+// cosmetic type (avatar/banner) — not a scrollable upload history.
+// Uploading a new file of either kind REPLACES whatever was banked for
+// that kind; the OTHER kind's banked upload is left alone, which is
+// what lets a player toggle between "my static" and "my animated"
+// without re-uploading either. See cosmeticUpload.ts's header for the
+// matching backend behavior.
+const MAX_MB = 8; // largest tier (animated banner) — per-card labels
+// below show the real per-kind/per-slot number via RulesPill.
+const ACCEPTED =
+  "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime";
 const DECK_SLOT_COUNT = 5;
 
 // ── pass info per slot ────────────────────────────────────────────
@@ -57,33 +64,38 @@ type TopTab = (typeof TOP_TABS)[number]["id"];
 function RulesPill({
   passItem,
   unlocked,
+  aspectRatio,
 }: {
   passItem?: string;
   unlocked?: boolean;
+  aspectRatio: "square" | "banner";
 }) {
+  const staticMax = aspectRatio === "square" ? 3 : 5;
+  const animatedMax = aspectRatio === "square" ? 5 : 8;
+  const animatedSec = aspectRatio === "square" ? 3 : 6;
   return (
     <div className="flex flex-wrap items-start gap-2 rounded-md border border-[rgba(200,168,75,0.15)] bg-[rgba(200,168,75,0.04)] px-3 py-2.5 text-[10px] leading-5 text-[rgba(200,168,75,0.55)]">
       <Info className="mt-0.5 h-3 w-3 shrink-0 text-[rgba(200,168,75,0.40)]" />
       <span>
         <span className="font-bold text-[rgba(200,168,75,0.70)]">Static</span>{" "}
-        PNG · JPEG · WEBP — free, no limit on swaps.
+        PNG · JPEG · WEBP — free, no limit on swaps. Max {staticMax}MB.
         {passItem && (
           <>
             {" "}
             <span className="font-bold text-purple-400">Animated</span> GIF ·
-            animated WEBP — requires owning{" "}
+            MP4 · WEBM — requires owning{" "}
             <code className="rounded bg-purple-500/10 px-1 text-purple-300">
               {passItem}
             </code>{" "}
-            (one-time purchase from the Shop, unlocks it permanently).
+            (one-time purchase from the Shop, unlocks it permanently). Max{" "}
+            {animatedMax}MB, {animatedSec}s.
             {unlocked && (
               <span className="ml-1.5 inline-flex items-center gap-1 rounded-sm bg-green-500/15 px-1.5 py-0.5 font-bold text-green-400">
                 <Check className="h-2.5 w-2.5" /> Unlocked
               </span>
             )}
           </>
-        )}{" "}
-        Max file size: {MAX_MB}MB.
+        )}
       </span>
     </div>
   );
@@ -116,6 +128,7 @@ function KindSlotCard({
 }) {
   const h = aspectRatio === "banner" ? "h-20" : "h-24";
   const label = kind === "animated" ? "Animated" : "Static";
+  const isVideo = Boolean(upload && /\.(mp4|webm|mov)(\?|$)/i.test(upload.url));
 
   return (
     <div
@@ -146,12 +159,23 @@ function KindSlotCard({
         className={`relative w-full ${h} overflow-hidden rounded-md bg-[rgba(200,168,75,0.04)]`}
       >
         {upload ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={upload.url}
-            alt={label}
-            className="h-full w-full object-cover"
-          />
+          isVideo ? (
+            <video
+              src={upload.url}
+              className="h-full w-full object-cover"
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={upload.url}
+              alt={label}
+              className="h-full w-full object-cover"
+            />
+          )
         ) : (
           <div className="flex h-full items-center justify-center text-[10px] text-[rgba(200,168,75,0.30)]">
             {locked ? (lockedReason ?? "Locked") : "Not set"}
@@ -159,12 +183,19 @@ function KindSlotCard({
         )}
       </div>
 
-      <div className="flex gap-1.5">
+      {/* [FIXED] flex-wrap + a wider gap so Replace/Use/Delete never
+          crowd each other or the neighboring card's buttons at narrow
+          widths — combined with SlotPanel stacking cards to one column
+          below sm: (see below), this is the actual fix for the button
+          overlap reported earlier. Delete also drops to full width on
+          its own row if wrapping occurs, rather than shrinking to an
+          ambiguous sliver next to Replace. */}
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           disabled={uploading || locked}
           onClick={onUploadClick}
-          className="flex h-8 flex-1 items-center justify-center gap-1 rounded-md border border-[rgba(200,168,75,0.30)] text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.75)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-8 min-w-[72px] flex-1 items-center justify-center gap-1 rounded-md border border-[rgba(200,168,75,0.30)] text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.75)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-40"
         >
           {uploading ? (
             <FireSpinner size={12} />
@@ -177,7 +208,7 @@ function KindSlotCard({
           <button
             type="button"
             onClick={onEquip}
-            className="flex h-8 flex-1 items-center justify-center gap-1 rounded-md border border-ayakashi-gold text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
+            className="flex h-8 min-w-[72px] flex-1 items-center justify-center gap-1 rounded-md border border-ayakashi-gold text-[10px] font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black"
           >
             <Check className="h-3 w-3" /> Use
           </button>
@@ -218,6 +249,14 @@ function SlotPanel({
   >(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [passUnlocked, setPassUnlocked] = useState(false);
+  // The file staged for cropping before it's actually uploaded — set by
+  // handleFile, cleared on crop confirm/cancel. Holding the *intended*
+  // kind alongside it so the crop confirm handler knows which upload
+  // path to continue into.
+  const [cropTarget, setCropTarget] = useState<{
+    file: File;
+    intendedKind: "static" | "animated";
+  } | null>(null);
   const staticFileRef = useRef<HTMLInputElement>(null);
   const animatedFileRef = useRef<HTMLInputElement>(null);
   const passItem =
@@ -262,20 +301,45 @@ function SlotPanel({
 
   // deckBackground has no animated tier at all — the deck card render
   // is a static composite regardless (see cosmeticUpload.ts's header),
-  // so any GIF uploaded there is silently flattened server-side. Only
-  // avatar/banner get the static+animated two-card layout below.
+  // so any animated input uploaded there is silently flattened
+  // server-side. Only avatar/banner get the static+animated two-card
+  // layout below.
   const supportsAnimated = slot !== "deckBackground";
 
-  const handleFile = async (
+  // Step 1: file picked. Static IMAGES get staged for cropping first
+  // (matches WhatsApp — crop is a photo-only step there too, see
+  // CropModal.tsx's header for why video deliberately doesn't get this
+  // treatment). Video files skip straight to upload — cropping is
+  // skipped only if the user cancels the crop modal for an image
+  // (handled in handleCropCancel).
+  const handleFile = (
     e: React.ChangeEvent<HTMLInputElement>,
     intendedKind: "static" | "animated",
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+    if (file.type.startsWith("video/")) {
+      doUpload(file, intendedKind);
+      return;
+    }
+    setCropTarget({ file, intendedKind });
+  };
 
-    if (file.size > MAX_MB * 1024 * 1024) {
-      setToast({ msg: `File exceeds ${MAX_MB}MB limit.`, ok: false });
+  // Step 2: crop confirmed → actually upload the cropped file through
+  // the existing flow. The size cap is still enforced here as a fast
+  // client-side pre-check (real enforcement is server-side regardless,
+  // see cosmeticUpload.ts) — cropping usually SHRINKS the file since
+  // it's cutting the frame down, but a re-encoded video can occasionally
+  // come out larger than the source depending on codec/bitrate, so this
+  // check still matters post-crop, not just pre-crop.
+  const doUpload = async (file: File, intendedKind: "static" | "animated") => {
+    const maxBytesClientGuess = intendedKind === "animated" ? 8 : 5;
+    if (file.size > maxBytesClientGuess * 1024 * 1024) {
+      setToast({
+        msg: `File exceeds the ${maxBytesClientGuess}MB limit for ${intendedKind} uploads.`,
+        ok: false,
+      });
       return;
     }
 
@@ -302,11 +366,14 @@ function SlotPanel({
         } else if (err.error.code === "missing_pass") {
           msg = `Animated uploads need ${passItem ?? "a cosmetic pass"} — buy it once from the Shop to unlock animated uploads for this slot permanently.`;
         } else if (err.error.code === "invalid_file_type") {
-          msg = "Unsupported file type. Use PNG, JPEG, WEBP, or GIF.";
+          msg =
+            "Unsupported file type. Use PNG, JPEG, WEBP, GIF, MP4, WEBM, or MOV.";
         } else if (err.error.code === "file_too_large") {
-          msg = `File is too large. Maximum size is ${MAX_MB}MB.`;
+          msg = err.error.message;
         } else if (err.error.code === "animation_too_long") {
           msg = err.error.message;
+        } else if (err.error.code === "invalid_video") {
+          msg = "Couldn't process this video — try a different file.";
         } else {
           msg = err.error.message || msg;
         }
@@ -318,6 +385,15 @@ function SlotPanel({
       setUploadingKind(null);
     }
   };
+
+  const handleCropConfirm = (croppedFile: File) => {
+    const target = cropTarget;
+    setCropTarget(null);
+    if (!target) return;
+    doUpload(croppedFile, target.intendedKind);
+  };
+
+  const handleCropCancel = () => setCropTarget(null);
 
   const handleEquip = async (u: CosmeticUpload) => {
     try {
@@ -345,6 +421,8 @@ function SlotPanel({
   const animatedUpload = uploads.find((u) => u.kind === "animated") ?? null;
   const equippedUpload = uploads.find((u) => u.isEquipped);
 
+  const cropAspect = aspectRatio === "square" ? 1 : 16 / 9;
+
   return (
     <div className="form-card flex flex-col gap-4 rounded-xl border p-5">
       <div className="flex flex-col gap-0.5">
@@ -362,6 +440,7 @@ function SlotPanel({
       <RulesPill
         passItem={supportsAnimated ? passItem : undefined}
         unlocked={passUnlocked}
+        aspectRatio={aspectRatio}
       />
 
       {toast && (
@@ -388,8 +467,14 @@ function SlotPanel({
           <FireSpinner size={28} />
         </div>
       ) : (
+        // [FIXED] Single column below sm:, two columns from sm: up —
+        // was a flat grid-cols-2 at every width, which crammed both
+        // cards' button rows together on narrow phone screens and read
+        // as one overlapping cluster of buttons. Stacking removes the
+        // cross-column crowding entirely; each card gets full width on
+        // mobile.
         <div
-          className={`grid gap-2.5 ${supportsAnimated ? "grid-cols-2" : "grid-cols-1"}`}
+          className={`grid gap-3 ${supportsAnimated ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
         >
           <KindSlotCard
             kind="static"
@@ -418,9 +503,10 @@ function SlotPanel({
 
       {/* Both file inputs accept the same mimetypes — the backend is
           the real source of truth for which kind an upload becomes
-          (via sharp's page count), these two buttons just express
-          intent so the "locked" state on the animated card can gate
-          the animated button specifically. */}
+          (via sharp's page count for images, mimetype+duration for
+          video), these two buttons just express intent so the "locked"
+          state on the animated card can gate the animated button
+          specifically. */}
       <input
         ref={staticFileRef}
         type="file"
@@ -435,6 +521,15 @@ function SlotPanel({
         className="hidden"
         onChange={(e) => handleFile(e, "animated")}
       />
+
+      {cropTarget && (
+        <CropModal
+          file={cropTarget.file}
+          aspect={cropAspect}
+          onCancel={handleCropCancel}
+          onCropped={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }
