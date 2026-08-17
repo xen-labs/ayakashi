@@ -43,6 +43,21 @@ const ACCEPTED =
   "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime";
 const DECK_SLOT_COUNT = 5;
 
+// Per-slot animated caps — must mirror cosmeticUpload.ts's
+// MAX_ANIMATED_AVATAR_BYTES/SECONDS and MAX_ANIMATED_BANNER_BYTES/
+// SECONDS exactly. Fed into CropModal so its trim window and
+// auto-compress ladder target the SAME limits the server will actually
+// enforce — if these two ever drift apart, the client will happily
+// produce a file that still gets rejected server-side (annoying but not
+// unsafe, since the server re-checks regardless).
+const ANIMATED_CAPS: Record<
+  "square" | "banner",
+  { seconds: number; bytes: number }
+> = {
+  square: { seconds: 3, bytes: 5 * 1024 * 1024 },
+  banner: { seconds: 6, bytes: 8 * 1024 * 1024 },
+};
+
 // ── pass info per slot ────────────────────────────────────────────
 const PASS_INFO: Record<
   "avatar" | "banner",
@@ -306,12 +321,11 @@ function SlotPanel({
   // layout below.
   const supportsAnimated = slot !== "deckBackground";
 
-  // Step 1: file picked. Static IMAGES get staged for cropping first
-  // (matches WhatsApp — crop is a photo-only step there too, see
-  // CropModal.tsx's header for why video deliberately doesn't get this
-  // treatment). Video files skip straight to upload — cropping is
-  // skipped only if the user cancels the crop modal for an image
-  // (handled in handleCropCancel).
+  // Step 1: file picked → always stage it for CropModal, regardless of
+  // type. Images get spatial crop; video gets trim (only if over the
+  // slot's duration cap) + auto bitrate step-down if still over the
+  // byte cap after trim — see CropModal.tsx's header for why these are
+  // different flows sharing one modal shell.
   const handleFile = (
     e: React.ChangeEvent<HTMLInputElement>,
     intendedKind: "static" | "animated",
@@ -319,22 +333,22 @@ function SlotPanel({
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    if (file.type.startsWith("video/")) {
-      doUpload(file, intendedKind);
-      return;
-    }
     setCropTarget({ file, intendedKind });
   };
 
-  // Step 2: crop confirmed → actually upload the cropped file through
-  // the existing flow. The size cap is still enforced here as a fast
-  // client-side pre-check (real enforcement is server-side regardless,
-  // see cosmeticUpload.ts) — cropping usually SHRINKS the file since
-  // it's cutting the frame down, but a re-encoded video can occasionally
-  // come out larger than the source depending on codec/bitrate, so this
-  // check still matters post-crop, not just pre-crop.
+  // Step 2: crop/trim confirmed → actually upload the processed file
+  // through the existing flow. The size cap is still enforced here as a
+  // fast client-side pre-check (real enforcement is server-side
+  // regardless, see cosmeticUpload.ts) — CropModal's own auto-compress
+  // step already tries hard to land under the cap for video, but this
+  // catches the (rare) case where even the lowest bitrate rung didn't
+  // fit, or where an image crop still exceeds the static cap.
   const doUpload = async (file: File, intendedKind: "static" | "animated") => {
-    const maxBytesClientGuess = intendedKind === "animated" ? 8 : 5;
+    const staticCapMb = aspectRatio === "square" ? 3 : 5;
+    const maxBytesClientGuess =
+      intendedKind === "animated"
+        ? ANIMATED_CAPS[aspectRatio].bytes / (1024 * 1024)
+        : staticCapMb;
     if (file.size > maxBytesClientGuess * 1024 * 1024) {
       setToast({
         msg: `File exceeds the ${maxBytesClientGuess}MB limit for ${intendedKind} uploads.`,
@@ -526,6 +540,8 @@ function SlotPanel({
         <CropModal
           file={cropTarget.file}
           aspect={cropAspect}
+          maxDurationSeconds={ANIMATED_CAPS[aspectRatio].seconds}
+          maxBytes={ANIMATED_CAPS[aspectRatio].bytes}
           onCancel={handleCropCancel}
           onCropped={handleCropConfirm}
         />

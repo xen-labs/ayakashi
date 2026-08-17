@@ -6,8 +6,8 @@ import {
   LayoutDashboard,
   ShoppingBag,
   Store,
+  Gavel,
   Layers,
-  Backpack,
   CircleUserRound,
   MoreHorizontal,
 } from "lucide-react";
@@ -18,12 +18,21 @@ import { useState } from "react";
 // authenticated player navigates back to), so merging them frees a slot
 // instead of showing two landing-page entries side by side.
 //
-// Shop / Market / Profile are primary per design direction — Shop and
-// Market are both "spend or trade right now" loops (Shop = NPC catalog,
-// Market = player-to-player), Profile is identity/stats a player checks
-// constantly, not an occasional settings-style page. Cards stays primary
-// for the same reason noted before: core browsing content, same footing
-// as Shop, not a once-in-a-while check like Ranks.
+// Shop / Market / Auctions / Profile are primary per design direction —
+// Shop, Market, and Auctions are all "spend or trade right now" loops
+// (Shop = NPC catalog, Market = flat-price player-to-player, Auctions =
+// live/competitive player-to-player), Profile is identity/stats a player
+// checks constantly, not an occasional settings-style page. Cards stays
+// primary for the same reason noted before: core browsing content, same
+// footing as Shop, not a once-in-a-while check like Ranks.
+//
+// [CHANGED] Items (inventory) moved OUT of primary to make room for
+// Auctions — it's a "manage what you already own" page, the same bucket
+// Craft/Upgrade/Bank-Vault already got sorted into below, not a "browse
+// or act right now" loop the way Auctions is. Auctions specifically
+// earns the primary slot over Items because it's time-sensitive (an
+// auction you're winning can be lost while you're not looking at it) —
+// exactly the kind of thing bottom-nav primary real estate is for.
 //
 // Craft/Upgrade/Bank-Vault moved OUT of primary (Craft was here before)
 // — these are all "manage what you've already built" pages, a different
@@ -34,13 +43,14 @@ const PRIMARY_NAV = [
   { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/shop", label: "Shop", Icon: ShoppingBag },
   { href: "/marketplace", label: "Market", Icon: Store },
+  { href: "/auctions", label: "Auctions", Icon: Gavel },
   { href: "/cards", label: "Cards", Icon: Layers },
-  { href: "/inventory", label: "Items", Icon: Backpack },
   { href: "/profile", label: "Profile", Icon: CircleUserRound },
 ];
 
 // Secondary nav — shown in overflow drawer
 const SECONDARY_NAV = [
+  { href: "/inventory", label: "Items" },
   { href: "/craft", label: "Craft" },
   { href: "/upgrade", label: "Upgrade" },
   { href: "/bank-vault", label: "Bank/Vault" },
@@ -63,7 +73,7 @@ export function BottomNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.18)] bg-black/98 backdrop-blur-md"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.18)] bg-black/98 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md"
         aria-label="Main navigation"
       >
         <div className="mx-auto flex max-w-lg items-stretch">

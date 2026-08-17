@@ -43,9 +43,10 @@ import type {
   CosmeticUpload,
   FriendStatus,
 } from "../../../../lib/api";
-import { AvatarWithFrame } from "../../../components/AvatarWithFrame";
+import { StaticAvatar } from "../../../components/StaticAvatar";
 import { CardTile } from "../../../components/CardTile";
 import { CropModal } from "../../../components/CropModal";
+import { getStaticAvatarUrl } from "../../../components/staticAvatarUrl";
 
 // ── helpers ───────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -362,6 +363,20 @@ function BigDeckView({
 }
 
 // ── Tap-to-manage action sheet (avatar/banner, own profile only) ────
+// Per-slot animated caps for the quick-upload sheet — mirrors
+// cosmeticUpload.ts's MAX_ANIMATED_AVATAR_BYTES/SECONDS and
+// MAX_ANIMATED_BANNER_BYTES/SECONDS. Same constant as
+// cosmetic_page.tsx's ANIMATED_CAPS, duplicated here since this file
+// doesn't share a module with that page — keep both in sync if the
+// backend caps ever change.
+const QUICK_SHEET_CAPS: Record<
+  "avatar" | "banner",
+  { seconds: number; bytes: number }
+> = {
+  avatar: { seconds: 3, bytes: 5 * 1024 * 1024 },
+  banner: { seconds: 6, bytes: 8 * 1024 * 1024 },
+};
+
 function CosmeticQuickSheet({
   slot,
   unlocked,
@@ -414,17 +429,13 @@ function CosmeticQuickSheet({
     }
   };
 
-  // Static IMAGES get staged for cropping first (matches WhatsApp —
-  // crop is a photo-only step there too, see CropModal.tsx's header).
-  // Video files skip straight to upload.
+  // Everything gets staged for CropModal — images get spatial crop,
+  // video gets trim (if over the duration cap) + auto-compress (if over
+  // the byte cap after trim). See CropModal.tsx's header.
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    if (file.type.startsWith("video/")) {
-      doUpload(file);
-      return;
-    }
     setCropFile(file);
   };
 
@@ -494,6 +505,8 @@ function CosmeticQuickSheet({
               <CropModal
                 file={cropFile}
                 aspect={slot === "avatar" ? 1 : 16 / 9}
+                maxDurationSeconds={QUICK_SHEET_CAPS[slot].seconds}
+                maxBytes={QUICK_SHEET_CAPS[slot].bytes}
                 onCancel={handleCropCancel}
                 onCropped={handleCropConfirm}
               />
@@ -604,8 +617,10 @@ function PendingRequestRow({
       >
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
           {requester.avatarUrl ? (
+            // [FIXED] Dense list of pending requests — force static,
+            // same reasoning as the friends list and search results.
             <Image
-              src={requester.avatarUrl}
+              src={getStaticAvatarUrl(requester.avatarUrl, "friendsList")}
               alt=""
               width={40}
               height={40}
@@ -681,6 +696,8 @@ export default function ProfilePage({
   const [cardsSort, setCardsSort] = useState<"newest" | "rarity" | "name">(
     "newest",
   );
+  const [cardsQ, setCardsQ] = useState("");
+  const [cardsQInput, setCardsQInput] = useState(""); // debounced separately from cardsQ so typing doesn't fire a request per keystroke
   const [cardsLoading, setCardsLoading] = useState(false);
 
   const [likeLoading, setLikeLoading] = useState(false);
@@ -701,14 +718,15 @@ export default function ProfilePage({
   const isProgrammaticScroll = useRef(false);
 
   const load = useCallback(
-    async (page = 1, sort: "newest" | "rarity" | "name" = "newest") => {
-      if (page === 1 && sort === "newest") setLoading(true);
+    async (page = 1, sort: "newest" | "rarity" | "name" = "newest", q = "") => {
+      if (page === 1 && sort === "newest" && !q) setLoading(true);
       else setCardsLoading(true);
       setError("");
       try {
         const res = await getProfile(username, {
           cardsPage: page,
           cardsSort: sort,
+          cardsQ: q || undefined,
         });
         setData(res);
         setLikeCount(res.identity.likeCount);
@@ -731,17 +749,33 @@ export default function ProfilePage({
   );
 
   useEffect(() => {
-    load(1, "newest");
+    load(1, "newest", "");
   }, [load]);
+
+  // Debounce search input — wait for a pause in typing before firing a
+  // request, same reasoning as the auction listing modal's card picker.
+  // Search always resets to page 1 (a filtered result set has a
+  // different totalPages than the unfiltered one, so staying on the
+  // previous page number would be meaningless).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (cardsQInput === cardsQ) return;
+      setCardsQ(cardsQInput);
+      setCardsPage(1);
+      load(1, cardsSort, cardsQInput);
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardsQInput]);
 
   const handleSortChange = (s: "newest" | "rarity" | "name") => {
     setCardsSort(s);
     setCardsPage(1);
-    load(1, s);
+    load(1, s, cardsQ);
   };
   const handlePageChange = (p: number) => {
     setCardsPage(p);
-    load(p, cardsSort);
+    load(p, cardsSort, cardsQ);
   };
 
   const handleLike = async () => {
@@ -876,16 +910,34 @@ export default function ProfilePage({
           onClick={() => identity.isOwnProfile && setQuickSheet("banner")}
           className={`relative block h-40 w-full overflow-hidden bg-gradient-to-br from-[rgba(200,168,75,0.15)] to-black sm:h-56 ${identity.isOwnProfile ? "group cursor-pointer" : "cursor-default"}`}
         >
-          {identity.bannerUrl && (
-            <Image
-              src={identity.bannerUrl}
-              alt="banner"
-              fill
-              className="object-cover"
-              unoptimized
-              priority
-            />
-          )}
+          {/* [FIXED] next/image (below) can only decode actual image
+              formats — handed an mp4/webm/mov bannerUrl it silently
+              renders nothing, same root cause as the blank-avatar bug
+              (see AvatarWithFrame). Detect video by extension and
+              render a real <video> tag for those; keep next/image for
+              everything else since it still earns its keep there
+              (automatic responsive sizing/priority-loading for the much
+              more common static-image case). */}
+          {identity.bannerUrl &&
+            (/\.(mp4|webm|mov)(\?|$)/i.test(identity.bannerUrl) ? (
+              <video
+                src={identity.bannerUrl}
+                className="absolute inset-0 h-full w-full object-cover"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+            ) : (
+              <Image
+                src={identity.bannerUrl}
+                alt="banner"
+                fill
+                className="object-cover"
+                unoptimized
+                priority
+              />
+            ))}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/10 to-black/30" />
           {identity.isOwnProfile && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
@@ -903,17 +955,14 @@ export default function ProfilePage({
             onClick={() => identity.isOwnProfile && setQuickSheet("avatar")}
             className={`group relative block rounded-full ${identity.isOwnProfile ? "cursor-pointer" : "cursor-default"}`}
           >
-            {/* [FIXED — this pass] Was `ring-4 ring-[#0a0a0a]` here — a
-                solid dark separator ring meant to visually inset the
-                avatar into the banner behind it. That's fine against
-                the OLD hardcoded default frame, but now that a
-                player's real equipped frame renders here (see
-                AvatarWithFrame's frameSrc below), the frame art IS the
-                visual boundary — the extra ring sat just outside it
-                and read as a second, redundant frame. Removed; the
-                equipped frame (or default frame, for players with none
-                equipped) is the only ring now. */}
-            <AvatarWithFrame
+            {/* [CHANGED — this pass] Switched from AvatarWithFrame to
+                StaticAvatar — product decision that ONLY the
+                leaderboard shows a player's real animated
+                avatar/frame; every other context, including a player's
+                own profile page, shows the static poster frame
+                instead. See staticAvatarUrl.ts's header. */}
+            <StaticAvatar
+              preset="profile"
               avatarSrc={
                 identity.avatarUrl ??
                 "/user-profile/user-profile/default-avatar.webp"
@@ -1080,21 +1129,30 @@ export default function ProfilePage({
                     {fmt(cards.totalCount)} card
                     {cards.totalCount !== 1 ? "s" : ""}
                   </span>
-                  <div className="flex gap-0 overflow-hidden rounded-md border border-[rgba(200,168,75,0.20)]">
-                    {SORT_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => handleSortChange(opt.id)}
-                        className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                          cardsSort === opt.id
-                            ? "bg-ayakashi-gold/15 text-ayakashi-gold"
-                            : "text-[rgba(200,168,75,0.40)] hover:text-[rgba(200,168,75,0.70)]"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={cardsQInput}
+                      onChange={(e) => setCardsQInput(e.target.value)}
+                      placeholder="Search cards..."
+                      className="form-input h-8 w-40 border px-2.5 text-xs outline-none sm:w-48"
+                    />
+                    <div className="flex gap-0 overflow-hidden rounded-md border border-[rgba(200,168,75,0.20)]">
+                      {SORT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => handleSortChange(opt.id)}
+                          className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                            cardsSort === opt.id
+                              ? "bg-ayakashi-gold/15 text-ayakashi-gold"
+                              : "text-[rgba(200,168,75,0.40)] hover:text-[rgba(200,168,75,0.70)]"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1122,7 +1180,7 @@ export default function ProfilePage({
                   </div>
                 ) : cards.results.length === 0 ? (
                   <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                    No cards yet.
+                    {cardsQ ? "No cards match your search." : "No cards yet."}
                   </p>
                 ) : (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -1240,8 +1298,14 @@ export default function ProfilePage({
                         >
                           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
                             {f.avatarUrl ? (
+                              // [FIXED] Friends list — force static,
+                              // same reasoning as pending requests and
+                              // search results.
                               <Image
-                                src={f.avatarUrl}
+                                src={getStaticAvatarUrl(
+                                  f.avatarUrl,
+                                  "friendsList",
+                                )}
                                 alt=""
                                 width={40}
                                 height={40}

@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, UserPlus, ArrowLeftRight, Tag } from "lucide-react";
+import {
+  Bell,
+  UserPlus,
+  ArrowLeftRight,
+  Tag,
+  Gavel,
+  Crown,
+} from "lucide-react";
 import {
   getNotifications,
   markAllNotificationsRead,
@@ -11,6 +18,9 @@ import {
 import type {
   AppNotification,
   MarketplaceSaleNotificationData,
+  AuctionOutbidNotificationData,
+  AuctionWonNotificationData,
+  AuctionSoldNotificationData,
 } from "../../lib/api";
 
 function fmtRelative(iso: string): string {
@@ -32,6 +42,11 @@ function NotificationIcon({ type }: { type: AppNotification["type"] }) {
       return <UserPlus className="h-3.5 w-3.5" />;
     case "trade_offer":
       return <ArrowLeftRight className="h-3.5 w-3.5" />;
+    case "auction_won":
+      return <Crown className="h-3.5 w-3.5" />;
+    case "auction_outbid":
+    case "auction_sold":
+      return <Gavel className="h-3.5 w-3.5" />;
   }
 }
 
@@ -39,6 +54,16 @@ function notificationHref(n: AppNotification): string {
   switch (n.type) {
     case "marketplace_sale":
       return "/dashboard";
+    case "auction_outbid":
+    case "auction_won":
+    case "auction_sold": {
+      // Every auction data shape carries cardInstanceId — route straight
+      // to that auction's page rather than a generic dashboard bounce,
+      // since "go see the thing that changed" is the whole point of
+      // clicking an outbid/won/sold notification.
+      const d = n.data as { cardInstanceId?: string };
+      return d.cardInstanceId ? `/auctions/${d.cardInstanceId}` : "/auctions";
+    }
     case "friend_request":
     case "trade_offer":
       return "/dashboard";
@@ -54,6 +79,46 @@ function NotificationText({ n }: { n: AppNotification }) {
         bought{" "}
         <span className="font-semibold text-[#e6c96a]">{d.cardName}</span> for{" "}
         {d.price?.toLocaleString?.() ?? d.price} Kitsu
+      </span>
+    );
+  }
+  if (n.type === "auction_outbid") {
+    const d = n.data as unknown as AuctionOutbidNotificationData;
+    return (
+      <span className="text-[#f0e6c8]">
+        <span className="font-semibold text-[#e6c96a]">{d.newBidderName}</span>{" "}
+        outbid you — new high bid{" "}
+        {d.newHighBid?.toLocaleString?.() ?? d.newHighBid} Kitsu
+      </span>
+    );
+  }
+  if (n.type === "auction_won") {
+    const d = n.data as unknown as AuctionWonNotificationData;
+    return (
+      <span className="text-[#f0e6c8]">
+        You won{" "}
+        <span className="font-semibold text-[#e6c96a]">{d.cardName}</span> for{" "}
+        {d.finalPrice?.toLocaleString?.() ?? d.finalPrice} Kitsu
+      </span>
+    );
+  }
+  if (n.type === "auction_sold") {
+    const d = n.data as unknown as AuctionSoldNotificationData;
+    if (d.failed) {
+      return (
+        <span className="text-[#f0e6c8]">
+          Your auction for{" "}
+          <span className="font-semibold text-[#e6c96a]">{d.cardName}</span> hit
+          an error settling — please check it
+        </span>
+      );
+    }
+    return (
+      <span className="text-[#f0e6c8]">
+        <span className="font-semibold text-[#e6c96a]">{d.buyerName}</span> won
+        your auction for{" "}
+        <span className="font-semibold text-[#e6c96a]">{d.cardName}</span> —{" "}
+        {d.finalPrice?.toLocaleString?.() ?? d.finalPrice} Kitsu
       </span>
     );
   }

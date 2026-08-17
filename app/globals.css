@@ -13,6 +13,19 @@
   --color-ayakashi-navy: #0a0a0a;
 }
 
+/* ── Shared bottom-nav geometry ──────────────────────────────────────
+  BottomNav.tsx has no explicit height class (py-2.5 + 20px icon +
+  gap + label text ≈ 57px); any other fixed element that needs to
+  dock above the nav instead of underneath it (z-40) references this
+   var rather than hardcoding a guessed pixel value in a second file.
+   Includes the iOS/Android gesture-bar safe-area inset, since the nav
+   itself sits flush at bottom:0 and needs the same padding — without
+   it, the nav's own content can be crowded by the home-indicator area
+   on notched devices. */
+:root {
+  --bottom-nav-h: calc(57px + env(safe-area-inset-bottom, 0px));
+}
+
 /* ── Base font assignment ─────────────────────────────────────────── */
 body {
   font-family: var(--font-inter), sans-serif;
@@ -2127,4 +2140,210 @@ dialog::backdrop {
 .flame-video {
   width: 100%;
   height: 100%;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   AUCTION PAGE — live bid feed, countdown urgency, chat, sticky bar
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Browse-grid tile entrance — reuses shop-card-in's timing but its
+   own class so auction tiles don't have to import the shop's. */
+@keyframes auction-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.auction-tile-in {
+  animation: auction-tile-in 0.3s ease-out backwards;
+}
+
+/* Countdown chip — calm gold at rest, shifts to an urgent red pulse
+   under 5 minutes (toggled via .is-urgent from JS, not a fixed delay,
+   since "how close to expiry" only the component knows). */
+@keyframes auction-urgent-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 80, 80, 0);
+    color: #f0a0a0;
+  }
+  50% {
+    box-shadow: 0 0 12px 1px rgba(220, 80, 80, 0.35);
+    color: #ff8a8a;
+  }
+}
+.auction-countdown-urgent {
+  animation: auction-urgent-pulse 1.1s ease-in-out infinite;
+  border-color: rgba(220, 80, 80, 0.5) !important;
+}
+
+/* New high bid landing in the live feed — slides up from the bottom
+   like a chat message, distinct from trade-row-in's horizontal slide
+   since this feed is vertical and newest-at-bottom. */
+@keyframes auction-bid-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.auction-bid-in {
+  animation: auction-bid-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* One-shot flash on the current-bid number itself the instant a new
+   bid lands — brief gold flare then settles, so the number reads as
+   "just changed" even if the person's eyes were elsewhere. Removed by
+   JS after ~600ms (see AuctionDetail's handling), same one-shot
+   pattern as .shake-fail. */
+@keyframes auction-price-flash {
+  0% {
+    text-shadow: 0 0 0 rgba(200, 168, 75, 0);
+    transform: scale(1);
+  }
+  30% {
+    text-shadow:
+      0 0 20px rgba(255, 220, 130, 0.9),
+      0 0 40px rgba(200, 168, 75, 0.5);
+    transform: scale(1.08);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(200, 168, 75, 0);
+    transform: scale(1);
+  }
+}
+.auction-price-flash {
+  animation: auction-price-flash 0.6s ease-out both;
+  display: inline-block;
+}
+
+/* Ambient breathing glow on the current-bid panel — signals "this is
+   live" even between bids, restrained enough not to distract from
+   reading the number. */
+@keyframes auction-live-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(200, 168, 75, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(200, 168, 75, 0.28),
+      0 0 24px rgba(200, 168, 75, 0.08);
+  }
+}
+.auction-live-panel {
+  animation: auction-live-glow 3s ease-in-out infinite;
+}
+
+/* Chat message pop-in — reuses trade-offer-in's easing/scale feel but
+   its own class to keep the auction chat feed self-contained. */
+@keyframes auction-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.auction-chat-in {
+  animation: auction-chat-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* "LIVE" dot — small breathing indicator next to the SSE connection
+   status, green when connected. */
+@keyframes auction-live-dot {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(120, 220, 150, 0.6);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px rgba(120, 220, 150, 0);
+  }
+}
+.auction-live-dot {
+  animation: auction-live-dot 1.8s ease-in-out infinite;
+}
+
+/* Sticky mobile bid bar — slides up on mount so it doesn't just
+   appear pinned with no motion at all. */
+@keyframes auction-bidbar-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.auction-bidbar-in {
+  animation: auction-bidbar-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Buy-now button — slightly more insistent glint than the standard
+   brush-btn-glint, since buy-now is a bigger commitment worth a
+   slightly stronger visual pull. Reuses the existing keyframes. */
+.auction-buynow-btn {
+  position: relative;
+  overflow: hidden;
+}
+.auction-buynow-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  animation: brush-btn-glint-sweep 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auction-buynow-btn::after {
+    animation: none;
+    display: none;
+  }
+  .auction-countdown-urgent,
+  .auction-live-panel,
+  .auction-live-dot {
+    animation: none;
+  }
+}
+
+/* Outbid toast — reuses shop-toast-in's slide/fade for a consistent
+   toast feel across the app. */
+@keyframes auction-outbid-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+.auction-outbid-shake {
+  animation: auction-outbid-shake 0.4s ease both;
 }

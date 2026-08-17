@@ -11,6 +11,7 @@ import {
   HelpCircle,
   ArrowUpCircle,
   Trophy,
+  Gavel,
 } from "lucide-react";
 import { useCurrency } from "./CurrencyContext";
 import { AvatarWithFrame } from "./AvatarWithFrame";
@@ -20,15 +21,20 @@ import type { MeResponse } from "../../lib/api";
 
 const HIDDEN_ON = ["/profile", "/login", "/register"];
 
-// Mirrors BottomNav's primary/secondary split — Shop/Market are core
-// spend-or-trade loops, Inventory and Cards are core browsing. Upgrade
-// moved out (same "manage what you've built" bucket as Craft/Bank-Vault
-// on mobile) — reachable from the Profile dropdown or its own page link,
-// not a top-level rail item.
+// Mirrors BottomNav's primary/secondary split — Shop/Market/Auctions are
+// core spend-or-trade loops, Inventory and Cards are core browsing.
+// Upgrade moved out (same "manage what you've built" bucket as Craft/
+// Bank-Vault on mobile) — reachable from the Profile dropdown or its own
+// page link, not a top-level rail item.
+//
+// [CHANGED] Auctions added — unlike BottomNav (which had to trade Items
+// out of primary for space), the desktop rail has room for all of them,
+// so Inventory stays put alongside it.
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/shop", label: "Shop" },
   { href: "/marketplace", label: "Market" },
+  { href: "/auctions", label: "Auctions" },
   { href: "/cards", label: "Cards" },
   { href: "/inventory", label: "Inventory" },
 ];

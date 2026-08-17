@@ -406,6 +406,8 @@ export interface CardInstance {
   issueNumber: number;
   listing: unknown | null;
   isLocked: boolean;
+  pendingTradeId: string | null;
+  activeLoanId: string | null;
   card: {
     _id: string;
     name: string;
@@ -427,6 +429,7 @@ export const getInventoryCards = (params?: {
   page?: number;
   rarity?: string;
   series?: string;
+  q?: string;
   listed?: "true" | "false";
   sort?: "newest" | "rarity" | "name";
 }) => {
@@ -434,6 +437,7 @@ export const getInventoryCards = (params?: {
   if (params?.page) qs.set("page", String(params.page));
   if (params?.rarity) qs.set("rarity", params.rarity);
   if (params?.series) qs.set("series", params.series);
+  if (params?.q) qs.set("q", params.q);
   if (params?.listed) qs.set("listed", params.listed);
   if (params?.sort) qs.set("sort", params.sort);
   const query = qs.toString();
@@ -689,11 +693,27 @@ export interface ProfileResponse {
 
 export const getProfile = (
   username: string,
-  params?: { cardsPage?: number; cardsSort?: "newest" | "rarity" | "name" },
+  params?: {
+    cardsPage?: number;
+    cardsSort?: "newest" | "rarity" | "name";
+    cardsQ?: string;
+  },
 ) => {
+  // NOTE: backend (routes/profile.ts) forwards req.query straight into
+  // getOwnedCards() untouched, which expects OwnedCardsQuery's actual
+  // field names — q/sort/page, NOT cardsQ/cardsSort/cardsPage. The
+  // "cards"-prefixed param names here are this function's OWN external
+  // API (kept prefixed so callers can tell at a glance these are
+  // profile-cards-section params, not some other section's), remapped
+  // to the real backend names right here at the request boundary. Do
+  // not rename these query keys to match params 1:1 — sending cardsPage
+  // literally as "cardsPage" is a no-op server-side (Fastify silently
+  // ignores unknown query keys, getOwnedCards falls back to page 1) —
+  // this was the actual pagination/search bug fixed here.
   const qs = new URLSearchParams();
-  if (params?.cardsPage) qs.set("cardsPage", String(params.cardsPage));
-  if (params?.cardsSort) qs.set("cardsSort", params.cardsSort);
+  if (params?.cardsPage) qs.set("page", String(params.cardsPage));
+  if (params?.cardsSort) qs.set("sort", params.cardsSort);
+  if (params?.cardsQ) qs.set("q", params.cardsQ);
   const q = qs.toString();
   return apiFetch<ProfileResponse>(
     `/profile/${encodeURIComponent(username)}${q ? `?${q}` : ""}`,
@@ -986,27 +1006,51 @@ export const removeCardFromDeck = (slotIndex: number, position: number) =>
 export type NotificationType =
   | "marketplace_sale"
   | "friend_request"
-  | "trade_offer";
+  | "trade_offer"
+  | "auction_outbid"
+  | "auction_won"
+  | "auction_sold";
 
 export interface MarketplaceSaleNotificationData {
   instanceId: string;
   cardId: string;
   cardName: string;
   price: number;
+  buyerAvatarUrl: string | null;
   buyerId: string;
   buyerName: string;
+}
+
+export interface AuctionOutbidNotificationData {
+  cardInstanceId: string;
+  newHighBid: number;
+  newBidderName: string;
+}
+
+export interface AuctionWonNotificationData {
+  cardInstanceId: string;
+  cardName: string;
+  finalPrice: number;
+}
+
+export interface AuctionSoldNotificationData {
+  cardInstanceId: string;
+  cardName: string;
+  buyerName: string;
+  finalPrice: number;
+  failed?: boolean;
 }
 
 export interface AppNotification {
   id: string;
   type: NotificationType;
   read: boolean;
-  // Only marketplace_sale is populated with a known shape today —
-  // friend_request/trade_offer notifications aren't written by the
-  // backend yet (those still surface via dashboard's own
-  // pendingFriendRequests/pending-trades polling, not this system).
-  // Narrow further per-type here as those get wired up.
-  data: MarketplaceSaleNotificationData | Record<string, unknown>;
+  data:
+    | MarketplaceSaleNotificationData
+    | AuctionOutbidNotificationData
+    | AuctionWonNotificationData
+    | AuctionSoldNotificationData
+    | Record<string, unknown>;
   createdAt: string;
 }
 
@@ -1704,3 +1748,206 @@ export const cancelMarketplaceListing = (instanceId: string) =>
     `/marketplace/cancel/${encodeURIComponent(instanceId)}`,
     { method: "POST" },
   );
+
+export interface OwnedCard {
+  instanceId: string;
+  issueNumber: number;
+  shortId: string;
+  name: string;
+  seriesName: string;
+  rarity: CatalogCardRarity;
+  isEvent: boolean;
+  eventName: string | null;
+  thumbUrl: string;
+  mediaType: string;
+  fileExtension: string;
+  ownerCount: number;
+  wishlistCount: number;
+  totalIssued: number;
+}
+
+export interface OwnedCardsResponse {
+  results: OwnedCard[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface OwnedCardsQuery {
+  q?: string;
+  rarity?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export const getOwnedCards = (params?: OwnedCardsQuery) => {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.rarity) qs.set("rarity", params.rarity);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+  const query = qs.toString();
+  return apiFetch<OwnedCardsResponse>(
+    `/cards/owned${query ? `?${query}` : ""}`,
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════
+// ── Auctions ──────────────────────────────────────────────────────
+// GET  /auctions                       — browse active auctions
+// GET  /auctions/:instanceId           — single auction detail + bids
+// POST /auctions/list                  — list an owned card
+// POST /auctions/:instanceId/bid       — place a bid
+// POST /auctions/:instanceId/cancel    — cancel a no-bids-yet auction
+// GET  /auctions/:instanceId/stream    — SSE live feed
+// POST /auctions/:instanceId/chat      — post a chat message
+// GET  /auctions/terms                 — per-rarity increment/duration
+//
+// Mirrors the Marketplace section immediately above it — same
+// CatalogCardRarity reuse, same ApiResponseError handling contract.
+// ══════════════════════════════════════════════════════════════════
+
+export type AuctionSort = "ending_soon" | "price_asc" | "price_desc" | "newest";
+
+export interface AuctionListingCard {
+  name: string;
+  rarity: CatalogCardRarity;
+  seriesName: string;
+  mediaUrl: string;
+  mediaType: string;
+}
+
+export interface AuctionListing {
+  instanceId: string;
+  card: AuctionListingCard | null;
+  currentBid: number;
+  buyNowPrice: number | null;
+  bidCount: number;
+  expiresAt: string;
+  highestBidderId: string | null;
+}
+
+export interface AuctionBrowseResponse {
+  page: number;
+  totalPages: number;
+  total: number;
+  items: AuctionListing[];
+}
+
+export interface AuctionBrowseQuery {
+  page?: number;
+  sort?: AuctionSort;
+  /** comma-separated, e.g. "SR,SSR,UR" */
+  rarity?: string;
+}
+
+export const getAuctions = (params?: AuctionBrowseQuery) => {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.sort) qs.set("sort", params.sort);
+  if (params?.rarity) qs.set("rarity", params.rarity);
+  const query = qs.toString();
+  return apiFetch<AuctionBrowseResponse>(
+    `/auctions${query ? `?${query}` : ""}`,
+  );
+};
+
+export interface AuctionBidHistoryEntry {
+  bidderJid: string;
+  bidderName: string;
+  amount: number;
+  won: boolean;
+  createdAt: string;
+}
+
+export interface AuctionDetail {
+  instanceId: string;
+  card: {
+    shortId?: string;
+    name: string;
+    rarity: CatalogCardRarity;
+    seriesName: string;
+    mediaUrl: string;
+    mediaType: string;
+  } | null;
+  sellerId: string;
+  sellerName: string;
+  currentBid: number;
+  buyNowPrice: number | null;
+  bidIncrement: number;
+  bidCount: number;
+  expiresAt: string;
+  highestBidderId: string | null;
+  highestBidderName: string | null;
+  bids: AuctionBidHistoryEntry[];
+  /** NOTE: requires a small backend addition — see routes/auctions.ts
+   *  changes below. Without it, the page falls back to treating
+   *  neither as true, which only affects "you're the seller" /
+   *  "you're winning" UI framing, not any actual bid validation
+   *  (the server already rejects self-bids and race losses either way). */
+  isMine?: boolean;
+  isHighestBidder?: boolean;
+}
+
+export const getAuctionDetail = (instanceId: string) =>
+  apiFetch<AuctionDetail>(`/auctions/${encodeURIComponent(instanceId)}`);
+
+export interface ListAuctionResponse {
+  instanceId: string;
+  startingBid: number;
+  buyNowPrice: number | null;
+  expiresAt: string;
+}
+
+export const listCardForAuction = (
+  instanceId: string,
+  buyNowPrice: number | null,
+) =>
+  apiFetch<ListAuctionResponse>("/auctions/list", {
+    method: "POST",
+    body: JSON.stringify({ instanceId, buyNowPrice: buyNowPrice ?? undefined }),
+  });
+
+export interface PlaceAuctionBidResponse {
+  instanceId: string;
+  amount: number;
+  isNowHighestBidder: true;
+  wonByBuyNow: boolean;
+}
+
+export const placeAuctionBid = (instanceId: string, amount: number) =>
+  apiFetch<PlaceAuctionBidResponse>(
+    `/auctions/${encodeURIComponent(instanceId)}/bid`,
+    { method: "POST", body: JSON.stringify({ amount }) },
+  );
+
+export const cancelAuction = (instanceId: string) =>
+  apiFetch<{ instanceId: string; cancelled: true }>(
+    `/auctions/${encodeURIComponent(instanceId)}/cancel`,
+    { method: "POST" },
+  );
+
+export const sendAuctionChat = (instanceId: string, text: string) =>
+  apiFetch<{ ok: boolean }>(
+    `/auctions/${encodeURIComponent(instanceId)}/chat`,
+    {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    },
+  );
+
+export interface AuctionTerm {
+  bidIncrement: number;
+  durationMs: number;
+}
+
+export const getAuctionTerms = () =>
+  apiFetch<Record<CatalogCardRarity, AuctionTerm>>("/auctions/terms");
+
+// The SSE stream itself is NOT fetched through apiFetch — EventSource
+// needs a plain URL it opens itself (with credentials via
+// withCredentials), not a fetch() call. This just centralizes the URL
+// build so call sites don't hardcode API_BASE.
+export const auctionStreamUrl = (instanceId: string) =>
+  `${API_BASE}/auctions/${encodeURIComponent(instanceId)}/stream`;

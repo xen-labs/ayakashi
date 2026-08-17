@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Search, X } from "lucide-react";
 import { searchPlayers, ApiResponseError } from "../../lib/api";
 import type { PlayerSearchResult } from "../../lib/api";
+import { getStaticAvatarUrl } from "./staticAvatarUrl";
 
 interface Props {
   /** Render as a full standalone section (default) or a compact inline search bar */
@@ -85,8 +86,14 @@ export function PlayerSearch({
       >
         <div className="h-8 w-8 shrink-0 overflow-hidden border border-[rgba(200,168,75,0.20)] bg-[rgba(200,168,75,0.05)] transition-transform group-hover:scale-105 group-hover:border-[rgba(200,168,75,0.45)]">
           {r.avatarUrl ? (
+            // [FIXED] Was rendering r.avatarUrl raw — an animated
+            // GIF/MP4/WEBM avatar would autoplay for every visible
+            // search result at once. Search results are exactly the
+            // dense/incidental context that should stay static — see
+            // staticAvatarUrl.ts's header for the leaderboard-only
+            // carve-out.
             <Image
-              src={r.avatarUrl}
+              src={getStaticAvatarUrl(r.avatarUrl, "friendsList")}
               alt={r.displayName}
               width={32}
               height={32}

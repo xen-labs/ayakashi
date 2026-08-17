@@ -13,6 +13,18 @@ import Image from "next/image";
  * over the inner circle, so regardless of how thick or thin the frame
  * art is, it always sits right on the boundary.
  *
+ * [FIXED — this pass] avatarSrc can now be a video (MP4/WEBM/MOV) since
+ * cosmeticUpload.ts started accepting video as an "animated" avatar
+ * format alongside GIF — see that file's header. next/image can only
+ * decode actual image formats; handed a video URL it silently rendered
+ * nothing, which is why uploading an MP4 avatar showed up blank. We
+ * detect video by file extension on the URL and render a real <video>
+ * tag for those, keeping next/image for everything else (GIF included
+ * — next/image DOES render animated GIF, it just can't touch video
+ * containers). frameSrc is intentionally NOT covered by this — it's
+ * always static frame art (never user-uploaded media), so it stays a
+ * plain next/image unconditionally.
+ *
  * Usage:
  *   <AvatarWithFrame
  *     avatarSrc="/user-profile/user-profile/default-avatar.webp"
@@ -30,6 +42,8 @@ export interface AvatarWithFrameProps {
   alt?: string;
 }
 
+const VIDEO_EXT_RE = /\.(mp4|webm|mov)(\?|$)/i;
+
 export function AvatarWithFrame({
   avatarSrc,
   frameSrc,
@@ -42,6 +56,7 @@ export function AvatarWithFrame({
   // so render it larger than the avatar so the ring sits on the avatar edge.
   // frameSize prop overrides this if you need to fine-tune.
   const frame = frameSize ?? Math.round(avatarSize * 1.35);
+  const isVideo = VIDEO_EXT_RE.test(avatarSrc);
 
   return (
     <div
@@ -53,17 +68,35 @@ export function AvatarWithFrame({
         className="absolute rounded-full overflow-hidden"
         style={{ width: avatarSize, height: avatarSize }}
       >
-        <Image
-          src={avatarSrc}
-          alt={alt}
-          width={avatarSize}
-          height={avatarSize}
-          className="h-full w-full object-cover"
-          unoptimized
-        />
+        {isVideo ? (
+          <video
+            src={avatarSrc}
+            className="h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            // No poster attribute here on purpose — these are short (≤3s,
+            // see cosmeticUpload.ts's MAX_ANIMATED_AVATAR_SECONDS) looping
+            // clips that start playing essentially immediately, so a
+            // poster frame would only flash briefly before autoplay takes
+            // over and isn't worth the extra request.
+          />
+        ) : (
+          <Image
+            src={avatarSrc}
+            alt={alt}
+            width={avatarSize}
+            height={avatarSize}
+            className="h-full w-full object-cover"
+            unoptimized
+          />
+        )}
       </div>
 
-      {/* Frame — larger than avatar so the ring aligns with the avatar edge */}
+      {/* Frame — larger than avatar so the ring aligns with the avatar edge.
+          Always static art, never user-uploaded media — no video branch
+          needed here. */}
       <Image
         src={frameSrc}
         alt=""
