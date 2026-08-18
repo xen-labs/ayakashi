@@ -12,17 +12,23 @@
 // getPosterFrameUrl / THUMBNAIL_PRESETS if those ever change — there is
 // no build-time link between the two copies to catch drift.
 //
-// WHERE THIS IS USED: everywhere EXCEPT the leaderboard. Product
-// decision — leaderboard avatars keep playing their real animated
-// upload (few rows, high-attention context, a game-y "showing off"
-// spot), while every denser/more-incidental context (friends list,
+// WHERE THIS IS USED: dense/incidental contexts only — friends list,
 // pending requests, search results, card owner/wishlist lists, trade
-// panels) forces a static poster frame instead — both for the
-// performance/battery cost of N simultaneous autoplaying videos in a
-// list, and because a small avatar deep in a dense list isn't a context
-// where the animation actually gets appreciated. See leaderboard's
-// page.tsx / RowAvatar, which intentionally does NOT use this — it
-// keeps passing the raw avatarUrl straight to AvatarWithFrame.
+// panels. Product decision, two carve-outs that intentionally do NOT
+// use this and pass the raw avatarUrl straight to AvatarWithFrame
+// instead:
+//   1. Leaderboard — few rows, high-attention "showing off" spot. See
+//      leaderboard.ts's use of getThumbnailUrl (not
+//      getStaticThumbnailUrl) and leaderboard_page.tsx's RowAvatar.
+//   2. A player's OWN profile page hero avatar — players pay real
+//      currency for animated avatars/frames, and their own profile is
+//      the single highest-visibility place that cosmetic should show
+//      off, not the one place it gets frozen. See username_page.tsx's
+//      profile header, which uses AvatarWithFrame directly.
+// Everywhere else stays static for the performance/battery cost of N
+// simultaneous autoplaying videos in a list, and because a small avatar
+// deep in a dense list isn't a context where the animation actually
+// gets appreciated.
 
 const VIDEO_EXT_RE = /\.(mp4|webm|mov)(\?|$)/i;
 

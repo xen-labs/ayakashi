@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  ShoppingBag,
-  Store,
-  Gavel,
-  Layers,
-  CircleUserRound,
-  MoreHorizontal,
+    LayoutDashboard,
+    ShoppingBag,
+    Store,
+    Gavel,
+    Layers,
+    CircleUserRound,
+    MoreHorizontal
 } from "lucide-react";
 import { useState } from "react";
 
@@ -38,134 +38,160 @@ import { useState } from "react";
 // — these are all "manage what you've already built" pages, a different
 // mode of use than "browse or act right now." That's the same primary/
 // secondary split Ranks already followed; Craft just hadn't been sorted
-// into it yet.
+// into it yet. Fusion belongs in this same bucket — it consumes cards
+// you already own to mint a new one, not something a player is browsing
+// or acting on moment-to-moment the way Shop/Market/Auctions are.
 const PRIMARY_NAV = [
-  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { href: "/shop", label: "Shop", Icon: ShoppingBag },
-  { href: "/marketplace", label: "Market", Icon: Store },
-  { href: "/auctions", label: "Auctions", Icon: Gavel },
-  { href: "/cards", label: "Cards", Icon: Layers },
-  { href: "/profile", label: "Profile", Icon: CircleUserRound },
+    { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+    { href: "/shop", label: "Shop", Icon: ShoppingBag },
+    { href: "/marketplace", label: "Market", Icon: Store },
+    { href: "/auctions", label: "Auctions", Icon: Gavel },
+    { href: "/cards", label: "Cards", Icon: Layers },
+    { href: "/profile", label: "Profile", Icon: CircleUserRound }
 ];
 
 // Secondary nav — shown in overflow drawer
 const SECONDARY_NAV = [
-  { href: "/inventory", label: "Items" },
-  { href: "/craft", label: "Craft" },
-  { href: "/upgrade", label: "Upgrade" },
-  { href: "/bank-vault", label: "Bank/Vault" },
-  { href: "/leaderboard", label: "Ranks" },
-  { href: "/trade", label: "Trade" },
-  { href: "/loadout", label: "Loadout" },
-  { href: "/decks", label: "Decks" },
-  { href: "/players", label: "Players" },
-  { href: "/cosmetics", label: "Cosmetics" },
+    { href: "/inventory", label: "Items" },
+    { href: "/craft", label: "Craft" },
+    { href: "/upgrade", label: "Upgrade" },
+    { href: "/fusion", label: "Fusion" },
+    { href: "/bank-vault", label: "Bank/Vault" },
+    { href: "/leaderboard", label: "Ranks" },
+    { href: "/trade", label: "Trade" },
+    { href: "/loadout", label: "Loadout" },
+    { href: "/decks", label: "Decks" },
+    { href: "/players", label: "Players" },
+    { href: "/cosmetics", label: "Cosmetics" }
 ];
 
 export function BottomNav() {
-  const pathname = usePathname();
-  const [moreOpen, setMoreOpen] = useState(false);
+    const pathname = usePathname();
+    const [moreOpen, setMoreOpen] = useState(false);
 
-  const isSecondaryActive = SECONDARY_NAV.some(
-    (n) => pathname === n.href || pathname?.startsWith(n.href + "/"),
-  );
+    const isSecondaryActive = SECONDARY_NAV.some(
+        n => pathname === n.href || pathname?.startsWith(n.href + "/")
+    );
 
-  return (
-    <>
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.18)] bg-black/98 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md"
-        aria-label="Main navigation"
-      >
-        <div className="mx-auto flex max-w-lg items-stretch">
-          {PRIMARY_NAV.map(({ href, label, Icon }) => {
-            const active =
-              pathname === href || pathname?.startsWith(href + "/");
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-                  active
-                    ? "text-[#c8a84b]"
-                    : "text-[rgba(200,168,75,0.38)] hover:text-[rgba(200,168,75,0.75)]"
-                }`}
-              >
-                {active && (
-                  <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
-                )}
-                <Icon
-                  className="h-[20px] w-[20px]"
-                  strokeWidth={active ? 2.2 : 1.6}
-                />
-                <span
-                  className={`text-[9px] font-bold uppercase tracking-[0.08em] ${active ? "text-[#c8a84b]" : ""}`}
-                >
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-
-          {/* ── More button ── */}
-          <button
-            type="button"
-            onClick={() => setMoreOpen((v) => !v)}
-            className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-              isSecondaryActive || moreOpen
-                ? "text-[#c8a84b]"
-                : "text-[rgba(200,168,75,0.38)] hover:text-[rgba(200,168,75,0.75)]"
-            }`}
-            aria-expanded={moreOpen}
-            aria-label="More pages"
-          >
-            {(isSecondaryActive || moreOpen) && (
-              <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
-            )}
-            <MoreHorizontal
-              className="h-[20px] w-[20px]"
-              strokeWidth={moreOpen ? 2.2 : 1.6}
-            />
-            <span className="text-[9px] font-bold uppercase tracking-[0.08em]">
-              More
-            </span>
-          </button>
-        </div>
-      </nav>
-
-      {/* ── More drawer (slides up above nav) ── */}
-      {moreOpen && (
+    return (
         <>
-          {/* backdrop */}
-          <div
-            className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
-            onClick={() => setMoreOpen(false)}
-          />
-          <div className="fixed bottom-16 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.20)] bg-[#0d0c00]/98 backdrop-blur-md">
-            <div className="mx-auto grid max-w-lg grid-cols-3 gap-0">
-              {SECONDARY_NAV.map(({ href, label }) => {
-                const active =
-                  pathname === href || pathname?.startsWith(href + "/");
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setMoreOpen(false)}
-                    className={`flex flex-col items-center justify-center gap-1 border-b border-r border-[rgba(200,168,75,0.10)] px-2 py-4 text-center transition-colors last:border-r-0 ${
-                      active
-                        ? "bg-[rgba(200,168,75,0.08)] text-[#c8a84b]"
-                        : "text-[rgba(200,168,75,0.50)] hover:bg-[rgba(200,168,75,0.05)] hover:text-[rgba(200,168,75,0.80)]"
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">
-                      {label}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
+            {/* [REDESIGNED] bg-black/98 was effectively opaque (98% black) —
+          "backdrop-blur-md" on a near-opaque background does almost
+          nothing visually, since there's barely any translucency for
+          it to blur THROUGH. Dropped to /70 so the blur actually shows
+          page content softly bleeding through behind the nav (real
+          glassmorphism, not just a dark bar), and added a top-edge
+          gradient glow line for a bit of polish on scroll-under
+          content. */}
+            <nav
+                className="fixed bottom-0 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.18)] bg-black/70 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl"
+                aria-label="Main navigation"
+            >
+                <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-[rgba(200,168,75,0.4)] to-transparent" />
+                <div className="mx-auto flex max-w-lg items-stretch">
+                    {PRIMARY_NAV.map(({ href, label, Icon }) => {
+                        const active =
+                            pathname === href ||
+                            pathname?.startsWith(href + "/");
+                        return (
+                            <Link
+                                key={href}
+                                href={href}
+                                className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 transition-all duration-200 ${
+                                    active
+                                        ? "text-[#c8a84b]"
+                                        : "text-[rgba(200,168,75,0.38)] hover:text-[rgba(200,168,75,0.75)]"
+                                }`}
+                            >
+                                {active && (
+                                    <>
+                                        <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
+                                        {/* Soft glow bloom behind the active icon — subtle,
+                        not the whole tab, just a hint of light under
+                        the icon itself. */}
+                                        <span className="absolute top-1 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-[#c8a84b]/20 blur-md" />
+                                    </>
+                                )}
+                                <Icon
+                                    className="relative h-[20px] w-[20px]"
+                                    strokeWidth={active ? 2.2 : 1.6}
+                                />
+                                <span
+                                    className={`relative text-[9px] font-bold uppercase tracking-[0.08em] ${active ? "text-[#c8a84b]" : ""}`}
+                                >
+                                    {label}
+                                </span>
+                            </Link>
+                        );
+                    })}
+
+                    {/* ── More button ── */}
+                    <button
+                        type="button"
+                        onClick={() => setMoreOpen(v => !v)}
+                        className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 transition-all duration-200 ${
+                            isSecondaryActive || moreOpen
+                                ? "text-[#c8a84b]"
+                                : "text-[rgba(200,168,75,0.38)] hover:text-[rgba(200,168,75,0.75)]"
+                        }`}
+                        aria-expanded={moreOpen}
+                        aria-label="More pages"
+                    >
+                        {(isSecondaryActive || moreOpen) && (
+                            <>
+                                <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 bg-[#c8a84b] shadow-[0_0_8px_rgba(200,168,75,0.7)]" />
+                                <span className="absolute top-1 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-[#c8a84b]/20 blur-md" />
+                            </>
+                        )}
+                        <MoreHorizontal
+                            className={`relative h-[20px] w-[20px] transition-transform duration-300 ${moreOpen ? "rotate-90" : ""}`}
+                            strokeWidth={moreOpen ? 2.2 : 1.6}
+                        />
+                        <span className="relative text-[9px] font-bold uppercase tracking-[0.08em]">
+                            More
+                        </span>
+                    </button>
+                </div>
+            </nav>
+
+            {/* ── More drawer (slides up above nav) ── */}
+            {moreOpen && (
+                <>
+                    {/* backdrop */}
+                    <div
+                        className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+                        onClick={() => setMoreOpen(false)}
+                    />
+                    {/* [REDESIGNED] Same translucency fix as the main nav —
+              /98 -> /75, real backdrop-blur-xl so it actually reads as
+              frosted glass over whatever's scrolled underneath. */}
+                    <div className="drawer-slide-up fixed bottom-16 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.20)] bg-[#0d0c00]/75 backdrop-blur-xl">
+                        <div className="mx-auto grid max-w-lg grid-cols-3 gap-0">
+                            {SECONDARY_NAV.map(({ href, label }) => {
+                                const active =
+                                    pathname === href ||
+                                    pathname?.startsWith(href + "/");
+                                return (
+                                    <Link
+                                        key={href}
+                                        href={href}
+                                        onClick={() => setMoreOpen(false)}
+                                        className={`flex flex-col items-center justify-center gap-1 border-b border-r border-[rgba(200,168,75,0.10)] px-2 py-4 text-center transition-colors last:border-r-0 ${
+                                            active
+                                                ? "bg-[rgba(200,168,75,0.10)] text-[#c8a84b]"
+                                                : "text-[rgba(200,168,75,0.50)] hover:bg-[rgba(200,168,75,0.06)] hover:text-[rgba(200,168,75,0.80)]"
+                                        }`}
+                                    >
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.1em]">
+                                            {label}
+                                        </span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </>
+            )}
         </>
-      )}
-    </>
-  );
+    );
 }

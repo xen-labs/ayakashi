@@ -24,7 +24,7 @@ const SORTS: { value: CatalogSort; label: string }[] = [
 
 function SkeletonTile() {
   return (
-    <div className="aspect-[3/4] w-full animate-pulse rounded-md bg-[rgba(200,168,75,0.06)]" />
+    <div className="aspect-[3/4] w-full animate-pulse bg-[rgba(200,168,75,0.06)]" />
   );
 }
 

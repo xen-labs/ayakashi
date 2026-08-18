@@ -1,162 +1,241 @@
 "use client";
 
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  use as usePromise,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    use as usePromise
 } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Heart,
-  ArrowLeft,
-  UserPlus,
-  UserCheck,
-  UserX,
-  Clock,
-  Camera,
-  Upload,
-  X,
-  Check,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
+    Heart,
+    ArrowLeft,
+    UserPlus,
+    UserCheck,
+    UserX,
+    Clock,
+    Camera,
+    Upload,
+    X,
+    Check,
+    Sparkles,
+    ChevronLeft,
+    ChevronRight,
+    Users,
+    Calendar
 } from "lucide-react";
 import {
-  getProfile,
-  likeProfile,
-  sendFriendRequest,
-  acceptFriendRequest,
-  removeFriend,
-  uploadCosmetic,
-  getCosmeticUploads,
-  equipCosmetic,
-  ApiResponseError,
+    getProfile,
+    likeProfile,
+    sendFriendRequest,
+    acceptFriendRequest,
+    removeFriend,
+    uploadCosmetic,
+    getCosmeticUploads,
+    equipCosmetic,
+    ApiResponseError
 } from "../../../../lib/api";
 import type {
-  ProfileResponse,
-  ProfileCardItem,
-  DeckSlotCard as DeckSlotCardData,
-  CosmeticUpload,
-  FriendStatus,
+    ProfileResponse,
+    ProfileCardItem,
+    DeckSlotCard as DeckSlotCardData,
+    CosmeticUpload,
+    FriendStatus
 } from "../../../../lib/api";
-import { StaticAvatar } from "../../../components/StaticAvatar";
+import { AvatarWithFrame } from "../../../components/AvatarWithFrame";
 import { CardTile } from "../../../components/CardTile";
 import { CropModal } from "../../../components/CropModal";
 import { getStaticAvatarUrl } from "../../../components/staticAvatarUrl";
+import { useCountUp } from "../../../hooks/useCountUp";
 
 // ── helpers ───────────────────────────────────────────────────────
 function fmt(n: number) {
-  return n.toLocaleString("en-US");
+    return n.toLocaleString("en-US");
 }
 
 // ── XP bar ────────────────────────────────────────────────────────
+// [REDESIGNED — 2nd pass] First attempt (CSS radial-gradient dots) read
+// as "faintly textured," not "liquid" — too subtle, no real glow. This
+// version: an actual SVG sine-wave shape (two overlapping wave paths,
+// scrolling at different speeds via a wrapper twice the bar's width
+// translating left) for a genuinely liquid silhouette instead of a
+// flat gradient, plus a real multi-layer glow bloom (stacked box-shadow,
+// not a single soft one) for actual neon intensity. Numbers still count
+// up via useCountUp from the first pass.
 function XpBar({ xp, level }: { xp: number; level: number }) {
-  const xpPerLevel = 1000;
-  const currentXp = xp % xpPerLevel;
-  const pct = Math.min(100, (currentXp / xpPerLevel) * 100);
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex justify-between text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-        <span>Lv {level}</span>
-        <span>
-          {fmt(currentXp)} / {fmt(xpPerLevel)} XP
-        </span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(200,168,75,0.10)]">
-        <div
-          className="h-full rounded-full bg-ayakashi-gold shadow-[0_0_6px_rgba(200,168,75,0.5)] transition-all"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
+    const xpPerLevel = 1000;
+    const currentXp = xp % xpPerLevel;
+    const pct = Math.min(100, (currentXp / xpPerLevel) * 100);
+    const { value: animatedXp } = useCountUp(currentXp, {
+        duration: 1100,
+        delay: 150
+    });
+    const { value: animatedPct } = useCountUp(Math.round(pct), {
+        duration: 1100,
+        delay: 150
+    });
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
+                <span className="stat-glow font-bold text-ayakashi-gold">
+                    Lv {level}
+                </span>
+                <span>
+                    {fmt(animatedXp)} / {fmt(xpPerLevel)} XP
+                </span>
+            </div>
+
+            {/* Track */}
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-black/60 ring-1 ring-[rgba(200,168,75,0.15)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)]">
+                {/* Fill — width animates via useCountUp's animatedPct. The glow
+            bloom lives on THIS element (not the track) so it travels
+            with the fill's leading edge as it grows, like a real light
+            source. */}
+                <div
+                    className="xp-neon-fill absolute inset-y-0 left-0 overflow-hidden rounded-full transition-[width] duration-300 ease-out"
+                    style={{ width: `${animatedPct}%` }}
+                >
+                    {/* Liquid wave layer — an SVG pattern twice the fill's width,
+              animated via CSS translateX to scroll leftward
+              continuously (see xp-wave-scroll keyframe). Two <path>s at
+              different opacities/phases inside the same SVG read as
+              overlapping wave crests, like real liquid. */}
+                    <div className="xp-wave-scroll absolute inset-y-0 left-0 h-full w-[200%]">
+                        <svg
+                            viewBox="0 0 200 24"
+                            preserveAspectRatio="none"
+                            className="h-full w-full"
+                        >
+                            <defs>
+                                <linearGradient
+                                    id="xpFillGrad"
+                                    x1="0"
+                                    y1="0"
+                                    x2="0"
+                                    y2="1"
+                                >
+                                    <stop offset="0%" stopColor="#fff3c4" />
+                                    <stop offset="35%" stopColor="#ffd54a" />
+                                    <stop offset="100%" stopColor="#c8a84b" />
+                                </linearGradient>
+                            </defs>
+                            {/* base liquid body */}
+                            <rect
+                                x="0"
+                                y="6"
+                                width="200"
+                                height="18"
+                                fill="url(#xpFillGrad)"
+                            />
+                            {/* back wave crest — dimmer, offset phase */}
+                            <path
+                                d="M0,8 C 12.5,3 37.5,3 50,8 C 62.5,13 87.5,13 100,8 C 112.5,3 137.5,3 150,8 C 162.5,13 187.5,13 200,8 L200,24 L0,24 Z"
+                                fill="#e6b84f"
+                                opacity="0.55"
+                            />
+                            {/* front wave crest — brighter, different phase, sits on top */}
+                            <path
+                                d="M0,10 C 8,6 17,6 25,10 C 33,14 42,14 50,10 C 58,6 67,6 75,10 C 83,14 92,14 100,10 C 108,6 117,6 125,10 C133,14 142,14 150,10 C158,6 167,6 175,10 C183,14 192,14 200,10 L200,24 L0,24 Z"
+                                fill="#fff3c4"
+                                opacity="0.6"
+                            />
+                        </svg>
+                    </div>
+
+                    {/* Top highlight — a thin bright line right at the surface of
+              the liquid, like light catching the meniscus. */}
+                    <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-b from-white/70 to-transparent" />
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // ── Friend button — all four states ─────────────────────────────────
 function FriendButton({
-  status,
-  onAdd,
-  onAccept,
-  onDecline,
-  onRemove,
-  busy,
+    status,
+    onAdd,
+    onAccept,
+    onDecline,
+    onRemove,
+    busy
 }: {
-  status: FriendStatus;
-  onAdd: () => void;
-  onAccept: () => void;
-  onDecline: () => void;
-  onRemove: () => void;
-  busy: boolean;
+    status: FriendStatus;
+    onAdd: () => void;
+    onAccept: () => void;
+    onDecline: () => void;
+    onRemove: () => void;
+    busy: boolean;
 }) {
-  if (status === "friends") {
+    if (status === "friends") {
+        return (
+            <button
+                type="button"
+                disabled={busy}
+                onClick={onRemove}
+                className="flex items-center gap-1.5 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-green-400 transition-colors hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+            >
+                <UserCheck className="h-3.5 w-3.5" /> Friends
+            </button>
+        );
+    }
+    if (status === "request_sent") {
+        return (
+            <button
+                type="button"
+                disabled={busy}
+                onClick={onRemove}
+                className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
+            >
+                <Clock className="h-3.5 w-3.5" /> Pending
+            </button>
+        );
+    }
+    if (status === "request_received") {
+        return (
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onAccept}
+                    className="flex items-center gap-1.5 rounded-md border border-ayakashi-gold bg-ayakashi-gold px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-black transition-colors hover:brightness-110 disabled:opacity-50"
+                >
+                    <UserCheck className="h-3.5 w-3.5" /> Accept
+                </button>
+                <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onDecline}
+                    className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)] transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
+                >
+                    <UserX className="h-3.5 w-3.5" />
+                </button>
+            </div>
+        );
+    }
     return (
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onRemove}
-        className="flex items-center gap-1.5 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-green-400 transition-colors hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
-      >
-        <UserCheck className="h-3.5 w-3.5" /> Friends
-      </button>
-    );
-  }
-  if (status === "request_sent") {
-    return (
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onRemove}
-        className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
-      >
-        <Clock className="h-3.5 w-3.5" /> Pending
-      </button>
-    );
-  }
-  if (status === "request_received") {
-    return (
-      <div className="flex items-center gap-2">
         <button
-          type="button"
-          disabled={busy}
-          onClick={onAccept}
-          className="flex items-center gap-1.5 rounded-md border border-ayakashi-gold bg-ayakashi-gold px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-black transition-colors hover:brightness-110 disabled:opacity-50"
+            type="button"
+            disabled={busy}
+            onClick={onAdd}
+            className="flex items-center gap-1.5 rounded-md border border-ayakashi-gold px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-50"
         >
-          <UserCheck className="h-3.5 w-3.5" /> Accept
+            <UserPlus className="h-3.5 w-3.5" /> Add Friend
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onDecline}
-          className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.55)] transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
-        >
-          <UserX className="h-3.5 w-3.5" />
-        </button>
-      </div>
     );
-  }
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={onAdd}
-      className="flex items-center gap-1.5 rounded-md border border-ayakashi-gold px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-50"
-    >
-      <UserPlus className="h-3.5 w-3.5" /> Add Friend
-    </button>
-  );
 }
 
 // ── Rarity colors — for the animated per-slot card art border ───────
 const RARITY_COLORS: Record<string, string> = {
-  C: "border-[rgba(200,168,75,0.15)] text-[rgba(200,168,75,0.5)]",
-  R: "border-[rgba(120,200,150,0.35)] text-[#7fd39c]",
-  SR: "border-[rgba(90,160,230,0.4)] text-[#6fb2f0]",
-  SSR: "border-[rgba(190,110,230,0.45)] text-[#c98af0]",
-  UR: "border-[rgba(230,180,60,0.55)] text-[#f0c445]",
+    C: "border-[rgba(200,168,75,0.15)] text-[rgba(200,168,75,0.5)]",
+    R: "border-[rgba(120,200,150,0.35)] text-[#7fd39c]",
+    SR: "border-[rgba(90,160,230,0.4)] text-[#6fb2f0]",
+    SSR: "border-[rgba(190,110,230,0.45)] text-[#c98af0]",
+    UR: "border-[rgba(230,180,60,0.55)] text-[#f0c445]"
 };
 
 // ── One card slot inside the big deck view — renders real animated
@@ -174,58 +253,58 @@ const RARITY_COLORS: Record<string, string> = {
 // a press/hover lift so picking one up feels tactile — active: (not
 // just hover:) since this is a touch surface first.
 function DeckCardSlot({
-  card,
-  index,
+    card,
+    index
 }: {
-  card: DeckSlotCardData | null;
-  index: number;
+    card: DeckSlotCardData | null;
+    index: number;
 }) {
-  const isVideo = card?.mediaType === "video";
+    const isVideo = card?.mediaType === "video";
 
-  if (!card) {
+    if (!card) {
+        return (
+            <div
+                className="deck-slot-in relative aspect-[3/4] overflow-hidden rounded-md border border-dashed border-[rgba(200,168,75,0.25)] bg-black/45 backdrop-blur-[1px]"
+                style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
+            >
+                <div className="flex h-full w-full items-center justify-center text-[rgba(200,168,75,0.30)]">
+                    <span className="text-2xl">+</span>
+                </div>
+            </div>
+        );
+    }
+
     return (
-      <div
-        className="deck-slot-in relative aspect-[3/4] overflow-hidden rounded-md border border-dashed border-[rgba(200,168,75,0.25)] bg-black/45 backdrop-blur-[1px]"
-        style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
-      >
-        <div className="flex h-full w-full items-center justify-center text-[rgba(200,168,75,0.30)]">
-          <span className="text-2xl">+</span>
+        <div
+            className="deck-slot-in deck-card-lift relative aspect-[3/4] overflow-hidden"
+            style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
+        >
+            {isVideo ? (
+                <video
+                    src={card.thumbUrl}
+                    className="h-full w-full object-contain"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="metadata"
+                />
+            ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={card.thumbUrl}
+                    alt={card.name}
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                />
+            )}
+            <span
+                className={`absolute left-1 top-1 rounded-sm border bg-black/70 px-1 py-0.5 text-[8px] font-bold uppercase tracking-widest ${RARITY_COLORS[card.rarity] ?? RARITY_COLORS.C}`}
+            >
+                {card.rarity}
+            </span>
         </div>
-      </div>
     );
-  }
-
-  return (
-    <div
-      className="deck-slot-in deck-card-lift relative aspect-[3/4] overflow-hidden rounded-md"
-      style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
-    >
-      {isVideo ? (
-        <video
-          src={card.thumbUrl}
-          className="h-full w-full rounded-md object-cover"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-        />
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={card.thumbUrl}
-          alt={card.name}
-          className="h-full w-full rounded-md object-cover"
-          loading="lazy"
-        />
-      )}
-      <span
-        className={`absolute left-1 top-1 rounded-sm border bg-black/70 px-1 py-0.5 text-[8px] font-bold uppercase tracking-widest ${RARITY_COLORS[card.rarity] ?? RARITY_COLORS.C}`}
-      >
-        {card.rarity}
-      </span>
-    </div>
-  );
 }
 
 // ── Big deck view — one deck at a time, animated card slots, arrows
@@ -233,73 +312,75 @@ function DeckCardSlot({
 // the switchable set entirely — nothing to arrow into for a slot the
 // player hasn't unlocked yet.
 function BigDeckView({
-  deckSection,
-  isOwnProfile,
+    deckSection,
+    isOwnProfile
 }: {
-  deckSection: ProfileResponse["deck"];
-  isOwnProfile: boolean;
+    deckSection: ProfileResponse["deck"];
+    isOwnProfile: boolean;
 }) {
-  const unlockedDecks = deckSection.slots.filter((s) => s.state !== "locked");
-  const [index, setIndex] = useState(() =>
-    Math.max(
-      0,
-      unlockedDecks.findIndex((s) => s.state === "active"),
-    ),
-  );
-  const [direction, setDirection] = useState<"left" | "right">("right");
-
-  if (unlockedDecks.length === 0) {
-    return (
-      <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-        No decks yet.
-      </p>
+    const unlockedDecks = deckSection.slots.filter(s => s.state !== "locked");
+    const [index, setIndex] = useState(() =>
+        Math.max(
+            0,
+            unlockedDecks.findIndex(s => s.state === "active")
+        )
     );
-  }
+    const [direction, setDirection] = useState<"left" | "right">("right");
 
-  const current = unlockedDecks[Math.min(index, unlockedDecks.length - 1)];
+    if (unlockedDecks.length === 0) {
+        return (
+            <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                No decks yet.
+            </p>
+        );
+    }
 
-  const goPrev = () => {
-    setDirection("left");
-    setIndex((i) => (i - 1 + unlockedDecks.length) % unlockedDecks.length);
-  };
-  const goNext = () => {
-    setDirection("right");
-    setIndex((i) => (i + 1) % unlockedDecks.length);
-  };
+    const current = unlockedDecks[Math.min(index, unlockedDecks.length - 1)];
 
-  return (
-    <div className="flex flex-col gap-4">
-      {unlockedDecks.length > 1 && (
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={goPrev}
-            aria-label="Previous deck"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
-            Deck {index + 1} / {unlockedDecks.length}
-          </span>
-          <button
-            type="button"
-            onClick={goNext}
-            aria-label="Next deck"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+    const goPrev = () => {
+        setDirection("left");
+        setIndex(i => (i - 1 + unlockedDecks.length) % unlockedDecks.length);
+    };
+    const goNext = () => {
+        setDirection("right");
+        setIndex(i => (i + 1) % unlockedDecks.length);
+    };
 
-      <div
-        key={current.slotIndex}
-        className={`relative overflow-hidden rounded-xl border form-card ${
-          direction === "right" ? "deck-switch-in-right" : "deck-switch-in-left"
-        }`}
-      >
-        {/* [CHANGED — this pass] Background now fills the ENTIRE card
+    return (
+        <div className="flex flex-col gap-4">
+            {unlockedDecks.length > 1 && (
+                <div className="flex items-center justify-between">
+                    <button
+                        type="button"
+                        onClick={goPrev}
+                        aria-label="Previous deck"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="text-xs uppercase tracking-widest text-[rgba(200,168,75,0.45)]">
+                        Deck {index + 1} / {unlockedDecks.length}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={goNext}
+                        aria-label="Next deck"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
+
+            <div
+                key={current.slotIndex}
+                className={`relative overflow-hidden rounded-xl border form-card ${
+                    direction === "right"
+                        ? "deck-switch-in-right"
+                        : "deck-switch-in-left"
+                }`}
+            >
+                {/* [CHANGED — this pass] Background now fills the ENTIRE card
             area (absolute inset-0, behind everything), not just a
             96px strip above the grid — per product decision, the
             player's chosen art should show in full behind the cards,
@@ -312,54 +393,55 @@ function BigDeckView({
             or busy the source art is. Falls back to a plain dark
             panel (no image layer at all) when the deck has no
             background set. */}
-        {current.backgroundUrl ? (
-          <Image
-            src={current.backgroundUrl}
-            alt=""
-            fill
-            className="object-cover"
-            unoptimized
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[#0d0c08]" />
-        )}
-        {/* Top-to-bottom fade, keeps the deck name legible */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/85 via-black/35 to-black/70" />
-        {/* Edge vignette, keeps the card grid legible against bright/
+                {current.backgroundUrl ? (
+                    <Image
+                        src={current.backgroundUrl}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized
+                    />
+                ) : (
+                    <div className="absolute inset-0 bg-[#0d0c08]" />
+                )}
+                {/* Top-to-bottom fade, keeps the deck name legible */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/85 via-black/35 to-black/70" />
+                {/* Edge vignette, keeps the card grid legible against bright/
             busy art at the sides and bottom where the linear fade
             above is weakest */}
-        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_60px_28px_rgba(0,0,0,0.65)]" />
+                <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_60px_28px_rgba(0,0,0,0.65)]" />
 
-        <div className="relative z-10 px-4 pt-4">
-          <p className="font-display text-sm font-bold text-[#f0e6c8] drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
-            {current.deckName ?? `Deck ${current.slotIndex + 1}`}
-          </p>
+                <div className="relative z-10 px-4 pt-4">
+                    <p className="font-display text-sm font-bold text-[#f0e6c8] drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                        {current.deckName ?? `Deck ${current.slotIndex + 1}`}
+                    </p>
+                </div>
+
+                <div className="relative z-10 grid grid-cols-4 gap-3 p-4">
+                    {current.state === "active" && current.resolvedSlots
+                        ? current.resolvedSlots.map((card, i) => (
+                              <DeckCardSlot key={i} card={card} index={i} />
+                          ))
+                        : Array.from({ length: 12 }).map((_, i) => (
+                              <DeckCardSlot key={i} card={null} index={i} />
+                          ))}
+                </div>
+
+                {current.state === "empty" && (
+                    <p className="relative z-10 pb-4 text-center text-xs text-[rgba(200,168,75,0.55)] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+                        {isOwnProfile
+                            ? "This deck is empty — head to Manage Decks to add cards."
+                            : "This deck is empty."}
+                    </p>
+                )}
+
+                <p className="relative z-10 pb-4 text-center text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.55)] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+                    {current.filledSlotCount ?? 0} / {deckSection.deckSize}{" "}
+                    cards
+                </p>
+            </div>
         </div>
-
-        <div className="relative z-10 grid grid-cols-4 gap-3 p-4">
-          {current.state === "active" && current.resolvedSlots
-            ? current.resolvedSlots.map((card, i) => (
-                <DeckCardSlot key={i} card={card} index={i} />
-              ))
-            : Array.from({ length: 12 }).map((_, i) => (
-                <DeckCardSlot key={i} card={null} index={i} />
-              ))}
-        </div>
-
-        {current.state === "empty" && (
-          <p className="relative z-10 pb-4 text-center text-xs text-[rgba(200,168,75,0.55)] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-            {isOwnProfile
-              ? "This deck is empty — head to Manage Decks to add cards."
-              : "This deck is empty."}
-          </p>
-        )}
-
-        <p className="relative z-10 pb-4 text-center text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.55)] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-          {current.filledSlotCount ?? 0} / {deckSection.deckSize} cards
-        </p>
-      </div>
-    </div>
-  );
+    );
 }
 
 // ── Tap-to-manage action sheet (avatar/banner, own profile only) ────
@@ -370,547 +452,570 @@ function BigDeckView({
 // doesn't share a module with that page — keep both in sync if the
 // backend caps ever change.
 const QUICK_SHEET_CAPS: Record<
-  "avatar" | "banner",
-  { seconds: number; bytes: number }
+    "avatar" | "banner",
+    { seconds: number; bytes: number }
 > = {
-  avatar: { seconds: 3, bytes: 5 * 1024 * 1024 },
-  banner: { seconds: 6, bytes: 8 * 1024 * 1024 },
+    avatar: { seconds: 3, bytes: 5 * 1024 * 1024 },
+    banner: { seconds: 6, bytes: 8 * 1024 * 1024 }
 };
 
 function CosmeticQuickSheet({
-  slot,
-  unlocked,
-  banked,
-  onClose,
-  onDone,
+    slot,
+    unlocked,
+    banked,
+    onClose,
+    onDone
 }: {
-  slot: "avatar" | "banner";
-  unlocked: boolean;
-  banked: boolean;
-  onClose: () => void;
-  onDone: () => void;
+    slot: "avatar" | "banner";
+    unlocked: boolean;
+    banked: boolean;
+    onClose: () => void;
+    onDone: () => void;
 }) {
-  const [mode, setMode] = useState<"menu" | "switcher">("menu");
-  const [uploads, setUploads] = useState<CosmeticUpload[]>([]);
-  const [loadingSwitcher, setLoadingSwitcher] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [err, setErr] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
-  // File staged for cropping before it's actually uploaded — same
-  // crop-before-upload flow as the full Cosmetics page (see
-  // cosmetic_page.tsx's SlotPanel), just scoped to this quick sheet's
-  // single upload button rather than a static/animated pair.
-  const [cropFile, setCropFile] = useState<File | null>(null);
+    const [mode, setMode] = useState<"menu" | "switcher">("menu");
+    const [uploads, setUploads] = useState<CosmeticUpload[]>([]);
+    const [loadingSwitcher, setLoadingSwitcher] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [err, setErr] = useState("");
+    const fileRef = useRef<HTMLInputElement>(null);
+    // File staged for cropping before it's actually uploaded — same
+    // crop-before-upload flow as the full Cosmetics page (see
+    // cosmetic_page.tsx's SlotPanel), just scoped to this quick sheet's
+    // single upload button rather than a static/animated pair.
+    const [cropFile, setCropFile] = useState<File | null>(null);
 
-  const openSwitcher = async () => {
-    setMode("switcher");
-    setLoadingSwitcher(true);
-    try {
-      setUploads((await getCosmeticUploads(slot)).uploads);
-    } catch {
-      /* noop */
-    } finally {
-      setLoadingSwitcher(false);
-    }
-  };
+    const openSwitcher = async () => {
+        setMode("switcher");
+        setLoadingSwitcher(true);
+        try {
+            setUploads((await getCosmeticUploads(slot)).uploads);
+        } catch {
+            /* noop */
+        } finally {
+            setLoadingSwitcher(false);
+        }
+    };
 
-  const doUpload = async (fileToUpload: File) => {
-    setUploading(true);
-    setErr("");
-    try {
-      await uploadCosmetic(slot, fileToUpload);
-      onDone();
-    } catch (err) {
-      setErr(
-        err instanceof ApiResponseError ? err.error.message : "Upload failed.",
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
+    const doUpload = async (fileToUpload: File) => {
+        setUploading(true);
+        setErr("");
+        try {
+            await uploadCosmetic(slot, fileToUpload);
+            onDone();
+        } catch (err) {
+            setErr(
+                err instanceof ApiResponseError
+                    ? err.error.message
+                    : "Upload failed."
+            );
+        } finally {
+            setUploading(false);
+        }
+    };
 
-  // Everything gets staged for CropModal — images get spatial crop,
-  // video gets trim (if over the duration cap) + auto-compress (if over
-  // the byte cap after trim). See CropModal.tsx's header.
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    setCropFile(file);
-  };
+    // Everything gets staged for CropModal — images get spatial crop,
+    // video gets trim (if over the duration cap) + auto-compress (if over
+    // the byte cap after trim). See CropModal.tsx's header.
+    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = "";
+        setCropFile(file);
+    };
 
-  const handleCropCancel = () => setCropFile(null);
+    const handleCropCancel = () => setCropFile(null);
 
-  const handleCropConfirm = (croppedFile: File) => {
-    setCropFile(null);
-    doUpload(croppedFile);
-  };
+    const handleCropConfirm = (croppedFile: File) => {
+        setCropFile(null);
+        doUpload(croppedFile);
+    };
 
-  const handleSwitch = async (u: CosmeticUpload) => {
-    try {
-      await equipCosmetic({ slot, uploadId: u.id });
-      onDone();
-    } catch (err) {
-      setErr(err instanceof ApiResponseError ? err.error.message : "Failed.");
-    }
-  };
+    const handleSwitch = async (u: CosmeticUpload) => {
+        try {
+            await equipCosmetic({ slot, uploadId: u.id });
+            onDone();
+        } catch (err) {
+            setErr(
+                err instanceof ApiResponseError ? err.error.message : "Failed."
+            );
+        }
+    };
 
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        className="craft-modal-pop form-card w-full max-w-sm rounded-t-2xl border p-5 sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-widest text-ayakashi-gold">
-            {slot === "avatar" ? "Avatar" : "Banner"}
-          </span>
-          <button
-            type="button"
+    return (
+        <div
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center"
             onClick={onClose}
-            className="text-[rgba(200,168,75,0.45)] hover:text-ayakashi-gold"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        >
+            <div
+                className="craft-modal-pop form-card w-full max-w-sm rounded-t-2xl border p-5 sm:rounded-2xl"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="mb-4 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-widest text-ayakashi-gold">
+                        {slot === "avatar" ? "Avatar" : "Banner"}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="text-[rgba(200,168,75,0.45)] hover:text-ayakashi-gold"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {err && (
+                    <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                        {err}
+                    </p>
+                )}
+
+                {mode === "menu" ? (
+                    <div className="flex flex-col gap-2.5">
+                        <button
+                            type="button"
+                            disabled={uploading}
+                            onClick={() => fileRef.current?.click()}
+                            className="flex h-11 items-center justify-center gap-2 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-50"
+                        >
+                            <Upload className="h-4 w-4" />{" "}
+                            {uploading ? "Uploading…" : "Upload New"}
+                        </button>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                            className="hidden"
+                            onChange={handleFile}
+                        />
+                        {cropFile && (
+                            <CropModal
+                                file={cropFile}
+                                aspect={slot === "avatar" ? 1 : 16 / 9}
+                                maxDurationSeconds={
+                                    QUICK_SHEET_CAPS[slot].seconds
+                                }
+                                maxBytes={QUICK_SHEET_CAPS[slot].bytes}
+                                onCancel={handleCropCancel}
+                                onCropped={handleCropConfirm}
+                            />
+                        )}
+
+                        {banked && (
+                            <button
+                                type="button"
+                                onClick={openSwitcher}
+                                className="flex h-11 items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.30)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                            >
+                                <Sparkles className="h-4 w-4" /> Switch Animated
+                            </button>
+                        )}
+
+                        <p className="mt-1 text-center text-[10px] leading-relaxed text-[rgba(200,168,75,0.40)]">
+                            Static uploads are free. Animated requires owning{" "}
+                            {slot}_pass —{" "}
+                            {unlocked ? (
+                                <span className="font-bold text-green-400">
+                                    unlocked ✓
+                                </span>
+                            ) : (
+                                <span className="font-bold text-[rgba(200,168,75,0.55)]">
+                                    not unlocked yet
+                                </span>
+                            )}
+                            .{" "}
+                            <Link
+                                href="/cosmetics"
+                                className="text-ayakashi-gold hover:brightness-125"
+                                onClick={onClose}
+                            >
+                                Full manager →
+                            </Link>
+                        </p>
+                    </div>
+                ) : loadingSwitcher ? (
+                    <div className="flex h-24 items-center justify-center">
+                        <svg
+                            className="h-5 w-5 animate-spin text-ayakashi-gold"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                        >
+                            <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                            />
+                            <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                            />
+                        </svg>
+                    </div>
+                ) : uploads.length === 0 ? (
+                    <p className="py-8 text-center text-xs text-[rgba(200,168,75,0.40)]">
+                        No animated uploads banked yet.
+                    </p>
+                ) : (
+                    <div
+                        className={`grid gap-2 ${slot === "banner" ? "grid-cols-2" : "grid-cols-3"}`}
+                    >
+                        {uploads.map(u => (
+                            <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => handleSwitch(u)}
+                                className={`overflow-hidden rounded-md border ${u.isEquipped ? "border-ayakashi-gold ring-1 ring-ayakashi-gold/40" : "border-[rgba(200,168,75,0.20)]"}`}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={u.url}
+                                    alt=""
+                                    className={`w-full object-cover ${slot === "banner" ? "h-14" : "h-16"}`}
+                                />
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
-
-        {err && (
-          <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-            {err}
-          </p>
-        )}
-
-        {mode === "menu" ? (
-          <div className="flex flex-col gap-2.5">
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-              className="flex h-11 items-center justify-center gap-2 rounded-md border border-ayakashi-gold text-xs font-bold uppercase tracking-widest text-ayakashi-gold transition-colors hover:bg-ayakashi-gold hover:text-black disabled:opacity-50"
-            >
-              <Upload className="h-4 w-4" />{" "}
-              {uploading ? "Uploading…" : "Upload New"}
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-              className="hidden"
-              onChange={handleFile}
-            />
-            {cropFile && (
-              <CropModal
-                file={cropFile}
-                aspect={slot === "avatar" ? 1 : 16 / 9}
-                maxDurationSeconds={QUICK_SHEET_CAPS[slot].seconds}
-                maxBytes={QUICK_SHEET_CAPS[slot].bytes}
-                onCancel={handleCropCancel}
-                onCropped={handleCropConfirm}
-              />
-            )}
-
-            {banked && (
-              <button
-                type="button"
-                onClick={openSwitcher}
-                className="flex h-11 items-center justify-center gap-2 rounded-md border border-[rgba(200,168,75,0.30)] text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
-              >
-                <Sparkles className="h-4 w-4" /> Switch Animated
-              </button>
-            )}
-
-            <p className="mt-1 text-center text-[10px] leading-relaxed text-[rgba(200,168,75,0.40)]">
-              Static uploads are free. Animated requires owning {slot}_pass —{" "}
-              {unlocked ? (
-                <span className="font-bold text-green-400">unlocked ✓</span>
-              ) : (
-                <span className="font-bold text-[rgba(200,168,75,0.55)]">
-                  not unlocked yet
-                </span>
-              )}
-              .{" "}
-              <Link
-                href="/cosmetics"
-                className="text-ayakashi-gold hover:brightness-125"
-                onClick={onClose}
-              >
-                Full manager →
-              </Link>
-            </p>
-          </div>
-        ) : loadingSwitcher ? (
-          <div className="flex h-24 items-center justify-center">
-            <svg
-              className="h-5 w-5 animate-spin text-ayakashi-gold"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              />
-            </svg>
-          </div>
-        ) : uploads.length === 0 ? (
-          <p className="py-8 text-center text-xs text-[rgba(200,168,75,0.40)]">
-            No animated uploads banked yet.
-          </p>
-        ) : (
-          <div
-            className={`grid gap-2 ${slot === "banner" ? "grid-cols-2" : "grid-cols-3"}`}
-          >
-            {uploads.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => handleSwitch(u)}
-                className={`overflow-hidden rounded-md border ${u.isEquipped ? "border-ayakashi-gold ring-1 ring-ayakashi-gold/40" : "border-[rgba(200,168,75,0.20)]"}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={u.url}
-                  alt=""
-                  className={`w-full object-cover ${slot === "banner" ? "h-14" : "h-16"}`}
-                />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    );
 }
 
 // ── Pending friend request row ───────────────────────────────────────
 function PendingRequestRow({
-  requester,
-  onAccept,
-  onDecline,
-  busy,
+    requester,
+    onAccept,
+    onDecline,
+    busy
 }: {
-  requester: {
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-  };
-  onAccept: () => void;
-  onDecline: () => void;
-  busy: boolean;
+    requester: {
+        username: string;
+        displayName: string;
+        avatarUrl: string | null;
+    };
+    onAccept: () => void;
+    onDecline: () => void;
+    busy: boolean;
 }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(200,168,75,0.15)] bg-white/[0.02] p-3">
-      <Link
-        href={`/profile/${requester.username}`}
-        className="flex min-w-0 items-center gap-3"
-      >
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
-          {requester.avatarUrl ? (
-            // [FIXED] Dense list of pending requests — force static,
-            // same reasoning as the friends list and search results.
-            <Image
-              src={getStaticAvatarUrl(requester.avatarUrl, "friendsList")}
-              alt=""
-              width={40}
-              height={40}
-              className="h-full w-full object-cover"
-              unoptimized
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[rgba(200,168,75,0.5)]">
-              {requester.displayName.slice(0, 1).toUpperCase()}
+    return (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(200,168,75,0.15)] bg-white/[0.02] p-3">
+            <Link
+                href={`/profile/${requester.username}`}
+                className="flex min-w-0 items-center gap-3"
+            >
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
+                    {requester.avatarUrl ? (
+                        // [FIXED] Dense list of pending requests — force static,
+                        // same reasoning as the friends list and search results.
+                        <Image
+                            src={getStaticAvatarUrl(
+                                requester.avatarUrl,
+                                "friendsList"
+                            )}
+                            alt=""
+                            width={40}
+                            height={40}
+                            className="h-full w-full object-cover"
+                            unoptimized
+                        />
+                    ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[rgba(200,168,75,0.5)]">
+                            {requester.displayName.slice(0, 1).toUpperCase()}
+                        </div>
+                    )}
+                </div>
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[#f0e6c8]">
+                        {requester.displayName}
+                    </p>
+                    <p className="truncate text-xs text-[rgba(200,168,75,0.40)]">
+                        @{requester.username}
+                    </p>
+                </div>
+            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+                <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onAccept}
+                    className="flex h-8 items-center gap-1 rounded-md border border-ayakashi-gold bg-ayakashi-gold px-2.5 text-[10px] font-bold uppercase tracking-widest text-black transition-colors hover:brightness-110 disabled:opacity-50"
+                >
+                    <Check className="h-3 w-3" /> Accept
+                </button>
+                <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onDecline}
+                    className="flex h-8 items-center justify-center rounded-md border border-red-500/40 px-2.5 text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
             </div>
-          )}
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-[#f0e6c8]">
-            {requester.displayName}
-          </p>
-          <p className="truncate text-xs text-[rgba(200,168,75,0.40)]">
-            @{requester.username}
-          </p>
-        </div>
-      </Link>
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onAccept}
-          className="flex h-8 items-center gap-1 rounded-md border border-ayakashi-gold bg-ayakashi-gold px-2.5 text-[10px] font-bold uppercase tracking-widest text-black transition-colors hover:brightness-110 disabled:opacity-50"
-        >
-          <Check className="h-3 w-3" /> Accept
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onDecline}
-          className="flex h-8 items-center justify-center rounded-md border border-red-500/40 px-2.5 text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
+    );
 }
 
 // ── Sort options ──────────────────────────────────────────────────
 const SORT_OPTIONS = [
-  { id: "newest" as const, label: "Newest" },
-  { id: "rarity" as const, label: "Rarity" },
-  { id: "name" as const, label: "Name" },
+    { id: "newest" as const, label: "Newest" },
+    { id: "rarity" as const, label: "Rarity" },
+    { id: "name" as const, label: "Name" }
 ];
 
 // ── Tab config — extend this array to add Achievements/Guild later ──
 type TabId = "decks" | "cards" | "friends";
 const TABS: { id: TabId; label: string }[] = [
-  { id: "decks", label: "Decks" },
-  { id: "cards", label: "Cards" },
-  { id: "friends", label: "Friends" },
+    { id: "decks", label: "Decks" },
+    { id: "cards", label: "Cards" },
+    { id: "friends", label: "Friends" }
 ];
 
 // ── Main page ──────────────────────────────────────────────────────
 export default function ProfilePage({
-  params,
+    params
 }: {
-  params: Promise<{ username: string }>;
+    params: Promise<{ username: string }>;
 }) {
-  const { username } = usePromise(params);
-  const router = useRouter();
+    const { username } = usePromise(params);
+    const router = useRouter();
 
-  const [data, setData] = useState<ProfileResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+    const [data, setData] = useState<ProfileResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-  const [cardsPage, setCardsPage] = useState(1);
-  const [cardsSort, setCardsSort] = useState<"newest" | "rarity" | "name">(
-    "newest",
-  );
-  const [cardsQ, setCardsQ] = useState("");
-  const [cardsQInput, setCardsQInput] = useState(""); // debounced separately from cardsQ so typing doesn't fire a request per keystroke
-  const [cardsLoading, setCardsLoading] = useState(false);
+    const [cardsPage, setCardsPage] = useState(1);
+    const [cardsSort, setCardsSort] = useState<"newest" | "rarity" | "name">(
+        "newest"
+    );
+    const [cardsQ, setCardsQ] = useState("");
+    const [cardsQInput, setCardsQInput] = useState(""); // debounced separately from cardsQ so typing doesn't fire a request per keystroke
+    const [cardsLoading, setCardsLoading] = useState(false);
 
-  const [likeLoading, setLikeLoading] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [liked, setLiked] = useState(false);
+    const [likeLoading, setLikeLoading] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
+    const [liked, setLiked] = useState(false);
 
-  const [friendStatus, setFriendStatus] = useState<FriendStatus>("none");
-  const [friendBusy, setFriendBusy] = useState(false);
-  const [pendingBusy, setPendingBusy] = useState<string | null>(null);
+    const [friendStatus, setFriendStatus] = useState<FriendStatus>("none");
+    const [friendBusy, setFriendBusy] = useState(false);
+    const [pendingBusy, setPendingBusy] = useState<string | null>(null);
 
-  const [quickSheet, setQuickSheet] = useState<"avatar" | "banner" | null>(
-    null,
-  );
+    const [quickSheet, setQuickSheet] = useState<"avatar" | "banner" | null>(
+        null
+    );
 
-  // ── swipeable tabs ──
-  const [activeTab, setActiveTab] = useState<TabId>("decks");
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const isProgrammaticScroll = useRef(false);
+    // ── swipeable tabs ──
+    const [activeTab, setActiveTab] = useState<TabId>("decks");
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const isProgrammaticScroll = useRef(false);
 
-  const load = useCallback(
-    async (page = 1, sort: "newest" | "rarity" | "name" = "newest", q = "") => {
-      if (page === 1 && sort === "newest" && !q) setLoading(true);
-      else setCardsLoading(true);
-      setError("");
-      try {
-        const res = await getProfile(username, {
-          cardsPage: page,
-          cardsSort: sort,
-          cardsQ: q || undefined,
-        });
-        setData(res);
-        setLikeCount(res.identity.likeCount);
-        setLiked(res.identity.isLikedByViewer);
-        setFriendStatus(res.identity.friendStatus);
-      } catch (err) {
-        if (err instanceof ApiResponseError && err.status === 401) {
-          router.push("/login");
-          return;
+    const load = useCallback(
+        async (
+            page = 1,
+            sort: "newest" | "rarity" | "name" = "newest",
+            q = ""
+        ) => {
+            if (page === 1 && sort === "newest" && !q) setLoading(true);
+            else setCardsLoading(true);
+            setError("");
+            try {
+                const res = await getProfile(username, {
+                    cardsPage: page,
+                    cardsSort: sort,
+                    cardsQ: q || undefined
+                });
+                setData(res);
+                setLikeCount(res.identity.likeCount);
+                setLiked(res.identity.isLikedByViewer);
+                setFriendStatus(res.identity.friendStatus);
+            } catch (err) {
+                if (err instanceof ApiResponseError && err.status === 401) {
+                    router.push("/login");
+                    return;
+                }
+                if (err instanceof ApiResponseError && err.status === 404)
+                    setError("Player not found.");
+                else setError("Couldn't load profile. Try refreshing.");
+            } finally {
+                setLoading(false);
+                setCardsLoading(false);
+            }
+        },
+        [username, router]
+    );
+
+    useEffect(() => {
+        load(1, "newest", "");
+    }, [load]);
+
+    // Debounce search input — wait for a pause in typing before firing a
+    // request, same reasoning as the auction listing modal's card picker.
+    // Search always resets to page 1 (a filtered result set has a
+    // different totalPages than the unfiltered one, so staying on the
+    // previous page number would be meaningless).
+    useEffect(() => {
+        const t = setTimeout(() => {
+            if (cardsQInput === cardsQ) return;
+            setCardsQ(cardsQInput);
+            setCardsPage(1);
+            load(1, cardsSort, cardsQInput);
+        }, 350);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cardsQInput]);
+
+    const handleSortChange = (s: "newest" | "rarity" | "name") => {
+        setCardsSort(s);
+        setCardsPage(1);
+        load(1, s, cardsQ);
+    };
+    const handlePageChange = (p: number) => {
+        setCardsPage(p);
+        load(p, cardsSort, cardsQ);
+    };
+
+    const handleLike = async () => {
+        if (!data || data.identity.isOwnProfile || likeLoading) return;
+        setLikeLoading(true);
+        try {
+            const res = await likeProfile(username);
+            setLiked(res.liked);
+            setLikeCount(res.likeCount);
+        } catch {
+            /* noop */
+        } finally {
+            setLikeLoading(false);
         }
-        if (err instanceof ApiResponseError && err.status === 404)
-          setError("Player not found.");
-        else setError("Couldn't load profile. Try refreshing.");
-      } finally {
-        setLoading(false);
-        setCardsLoading(false);
-      }
-    },
-    [username, router],
-  );
+    };
 
-  useEffect(() => {
-    load(1, "newest", "");
-  }, [load]);
+    const handleFriendAction = async (
+        action: "add" | "accept" | "decline" | "remove"
+    ) => {
+        setFriendBusy(true);
+        try {
+            if (action === "add")
+                setFriendStatus(
+                    (await sendFriendRequest(username)).friendStatus
+                );
+            else if (action === "accept")
+                setFriendStatus(
+                    (await acceptFriendRequest(username)).friendStatus
+                );
+            else setFriendStatus((await removeFriend(username)).friendStatus); // covers both remove & decline
+        } catch {
+            /* noop */
+        } finally {
+            setFriendBusy(false);
+        }
+    };
 
-  // Debounce search input — wait for a pause in typing before firing a
-  // request, same reasoning as the auction listing modal's card picker.
-  // Search always resets to page 1 (a filtered result set has a
-  // different totalPages than the unfiltered one, so staying on the
-  // previous page number would be meaningless).
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (cardsQInput === cardsQ) return;
-      setCardsQ(cardsQInput);
-      setCardsPage(1);
-      load(1, cardsSort, cardsQInput);
-    }, 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardsQInput]);
+    const handlePendingAction = async (
+        requesterUsername: string,
+        action: "accept" | "decline"
+    ) => {
+        setPendingBusy(requesterUsername);
+        try {
+            if (action === "accept")
+                await acceptFriendRequest(requesterUsername);
+            else await removeFriend(requesterUsername); // decline == remove, per backend
+            await load(cardsPage, cardsSort); // refresh pendingReceived + friends list
+        } catch {
+            /* noop */
+        } finally {
+            setPendingBusy(null);
+        }
+    };
 
-  const handleSortChange = (s: "newest" | "rarity" | "name") => {
-    setCardsSort(s);
-    setCardsPage(1);
-    load(1, s, cardsQ);
-  };
-  const handlePageChange = (p: number) => {
-    setCardsPage(p);
-    load(p, cardsSort, cardsQ);
-  };
+    // ── tab <-> scroll sync ──
+    const scrollToTab = (tabId: TabId) => {
+        const idx = TABS.findIndex(t => t.id === tabId);
+        const el = scrollerRef.current;
+        if (!el) return;
+        isProgrammaticScroll.current = true;
+        el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+        setActiveTab(tabId);
+        setTimeout(() => {
+            isProgrammaticScroll.current = false;
+        }, 400);
+    };
 
-  const handleLike = async () => {
-    if (!data || data.identity.isOwnProfile || likeLoading) return;
-    setLikeLoading(true);
-    try {
-      const res = await likeProfile(username);
-      setLiked(res.liked);
-      setLikeCount(res.likeCount);
-    } catch {
-      /* noop */
-    } finally {
-      setLikeLoading(false);
-    }
-  };
+    const handleScroll = () => {
+        if (isProgrammaticScroll.current) return;
+        const el = scrollerRef.current;
+        if (!el) return;
+        const idx = Math.round(el.scrollLeft / el.clientWidth);
+        const tab = TABS[idx];
+        if (tab && tab.id !== activeTab) setActiveTab(tab.id);
+    };
 
-  const handleFriendAction = async (
-    action: "add" | "accept" | "decline" | "remove",
-  ) => {
-    setFriendBusy(true);
-    try {
-      if (action === "add")
-        setFriendStatus((await sendFriendRequest(username)).friendStatus);
-      else if (action === "accept")
-        setFriendStatus((await acceptFriendRequest(username)).friendStatus);
-      else setFriendStatus((await removeFriend(username)).friendStatus); // covers both remove & decline
-    } catch {
-      /* noop */
-    } finally {
-      setFriendBusy(false);
-    }
-  };
+    if (loading)
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <svg
+                    className="h-8 w-8 animate-spin text-ayakashi-gold"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                >
+                    <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                    />
+                    <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                </svg>
+            </div>
+        );
 
-  const handlePendingAction = async (
-    requesterUsername: string,
-    action: "accept" | "decline",
-  ) => {
-    setPendingBusy(requesterUsername);
-    try {
-      if (action === "accept") await acceptFriendRequest(requesterUsername);
-      else await removeFriend(requesterUsername); // decline == remove, per backend
-      await load(cardsPage, cardsSort); // refresh pendingReceived + friends list
-    } catch {
-      /* noop */
-    } finally {
-      setPendingBusy(null);
-    }
-  };
+    if (error || !data)
+        return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
+                <p className="text-sm text-[rgba(200,168,75,0.60)]">
+                    {error || "Something went wrong."}
+                </p>
+                <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="brush-btn w-40"
+                >
+                    Go Back
+                </button>
+            </div>
+        );
 
-  // ── tab <-> scroll sync ──
-  const scrollToTab = (tabId: TabId) => {
-    const idx = TABS.findIndex((t) => t.id === tabId);
-    const el = scrollerRef.current;
-    if (!el) return;
-    isProgrammaticScroll.current = true;
-    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
-    setActiveTab(tabId);
-    setTimeout(() => {
-      isProgrammaticScroll.current = false;
-    }, 400);
-  };
+    const { identity, deck, cards, friends } = data;
+    const pendingCount =
+        (!friends.hidden && friends.pendingReceived?.length) || 0;
 
-  const handleScroll = () => {
-    if (isProgrammaticScroll.current) return;
-    const el = scrollerRef.current;
-    if (!el) return;
-    const idx = Math.round(el.scrollLeft / el.clientWidth);
-    const tab = TABS[idx];
-    if (tab && tab.id !== activeTab) setActiveTab(tab.id);
-  };
-
-  if (loading)
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <svg
-          className="h-8 w-8 animate-spin text-ayakashi-gold"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-          />
-        </svg>
-      </div>
-    );
+        <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 pb-8">
+            {/* ── Hero: overlapping banner + avatar ── */}
+            <div className="relative">
+                <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs text-[#f0e6c8] backdrop-blur-sm transition-colors hover:bg-black/70"
+                >
+                    <ArrowLeft className="h-3.5 w-3.5" /> Back
+                </button>
 
-  if (error || !data)
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
-        <p className="text-sm text-[rgba(200,168,75,0.60)]">
-          {error || "Something went wrong."}
-        </p>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="brush-btn w-40"
-        >
-          Go Back
-        </button>
-      </div>
-    );
-
-  const { identity, deck, cards, friends } = data;
-  const pendingCount =
-    (!friends.hidden && friends.pendingReceived?.length) || 0;
-
-  return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 pb-8">
-      {/* ── Hero: overlapping banner + avatar ── */}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs text-[#f0e6c8] backdrop-blur-sm transition-colors hover:bg-black/70"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </button>
-
-        <button
-          type="button"
-          disabled={!identity.isOwnProfile}
-          onClick={() => identity.isOwnProfile && setQuickSheet("banner")}
-          className={`relative block h-40 w-full overflow-hidden bg-gradient-to-br from-[rgba(200,168,75,0.15)] to-black sm:h-56 ${identity.isOwnProfile ? "group cursor-pointer" : "cursor-default"}`}
-        >
-          {/* [FIXED] next/image (below) can only decode actual image
+                <button
+                    type="button"
+                    disabled={!identity.isOwnProfile}
+                    onClick={() =>
+                        identity.isOwnProfile && setQuickSheet("banner")
+                    }
+                    className={`relative block h-40 w-full overflow-hidden bg-gradient-to-br from-[rgba(200,168,75,0.15)] to-black sm:h-56 ${identity.isOwnProfile ? "group cursor-pointer" : "cursor-default"}`}
+                >
+                    {/* [FIXED] next/image (below) can only decode actual image
               formats — handed an mp4/webm/mov bannerUrl it silently
               renders nothing, same root cause as the blank-avatar bug
               (see AvatarWithFrame). Detect video by extension and
@@ -918,445 +1023,501 @@ export default function ProfilePage({
               everything else since it still earns its keep there
               (automatic responsive sizing/priority-loading for the much
               more common static-image case). */}
-          {identity.bannerUrl &&
-            (/\.(mp4|webm|mov)(\?|$)/i.test(identity.bannerUrl) ? (
-              <video
-                src={identity.bannerUrl}
-                className="absolute inset-0 h-full w-full object-cover"
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            ) : (
-              <Image
-                src={identity.bannerUrl}
-                alt="banner"
-                fill
-                className="object-cover"
-                unoptimized
-                priority
-              />
-            ))}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/10 to-black/30" />
-          {identity.isOwnProfile && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
-              <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-ayakashi-gold">
-                <Camera className="h-3.5 w-3.5" /> Change Banner
-              </span>
-            </div>
-          )}
-        </button>
+                    {identity.bannerUrl &&
+                        (/\.(mp4|webm|mov)(\?|$)/i.test(identity.bannerUrl) ? (
+                            <video
+                                src={identity.bannerUrl}
+                                className="absolute inset-0 h-full w-full object-cover"
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                            />
+                        ) : (
+                            <Image
+                                src={identity.bannerUrl}
+                                alt="banner"
+                                fill
+                                className="object-cover"
+                                unoptimized
+                                priority
+                            />
+                        ))}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/10 to-black/30" />
+                    {identity.isOwnProfile && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+                            <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-ayakashi-gold">
+                                <Camera className="h-3.5 w-3.5" /> Change Banner
+                            </span>
+                        </div>
+                    )}
+                </button>
 
-        <div className="absolute -bottom-12 left-4 z-10 sm:-bottom-14 sm:left-6">
-          <button
-            type="button"
-            disabled={!identity.isOwnProfile}
-            onClick={() => identity.isOwnProfile && setQuickSheet("avatar")}
-            className={`group relative block rounded-full ${identity.isOwnProfile ? "cursor-pointer" : "cursor-default"}`}
-          >
-            {/* [CHANGED — this pass] Switched from AvatarWithFrame to
-                StaticAvatar — product decision that ONLY the
-                leaderboard shows a player's real animated
-                avatar/frame; every other context, including a player's
-                own profile page, shows the static poster frame
-                instead. See staticAvatarUrl.ts's header. */}
-            <StaticAvatar
-              preset="profile"
-              avatarSrc={
-                identity.avatarUrl ??
-                "/user-profile/user-profile/default-avatar.webp"
-              }
-              frameSrc={
-                identity.frameUrl ??
-                "/user-profile/user-profile/default-avatar-frame.webp"
-              }
-              innerSize={104}
-            />
-            {identity.isOwnProfile && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 transition-all group-hover:bg-black/50 group-hover:opacity-100">
-                <Camera className="h-5 w-5 text-ayakashi-gold" />
-              </div>
-            )}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
-        {/* ── Identity header ── */}
-        <div className="flex flex-col gap-3 pt-14 sm:pt-2 sm:pl-[124px]">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="font-display text-2xl font-bold text-[#f0e6c8]">
-                {identity.displayName}
-              </h1>
-              <p className="text-xs text-[rgba(200,168,75,0.45)]">
-                @{identity.username}
-              </p>
+                <div className="absolute -bottom-12 left-4 z-10 sm:-bottom-14 sm:left-6">
+                    <button
+                        type="button"
+                        disabled={!identity.isOwnProfile}
+                        onClick={() =>
+                            identity.isOwnProfile && setQuickSheet("avatar")
+                        }
+                        className={`group relative block rounded-full ${identity.isOwnProfile ? "cursor-pointer" : "cursor-default"}`}
+                    >
+                        {/* [REVERTED] Back to AvatarWithFrame — players pay real
+                currency for animated avatars/frames; their own profile
+                is the highest-visibility "showing off" context there
+                is, so it should never be the place that freezes it.
+                No pulse/ring wrapper — tried one, didn't read well
+                against the frame art, removed. */}
+                        <AvatarWithFrame
+                            avatarSrc={
+                                identity.avatarUrl ??
+                                "/user-profile/user-profile/default-avatar.webp"
+                            }
+                            frameSrc={
+                                identity.frameUrl ??
+                                "/user-profile/user-profile/default-avatar-frame.webp"
+                            }
+                            innerSize={104}
+                        />
+                        {identity.isOwnProfile && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 transition-all group-hover:bg-black/50 group-hover:opacity-100">
+                                <Camera className="h-5 w-5 text-ayakashi-gold" />
+                            </div>
+                        )}
+                    </button>
+                </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {!identity.isOwnProfile && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleLike}
-                    disabled={likeLoading}
-                    className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                      liked
-                        ? "border-red-500/60 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                        : "border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.60)] hover:border-red-500/60 hover:text-red-400"
-                    }`}
-                  >
-                    <Heart
-                      className={`h-3.5 w-3.5 ${liked ? "fill-red-400" : ""}`}
-                    />
-                    {fmt(likeCount)}
-                  </button>
-                  <FriendButton
-                    status={friendStatus}
-                    busy={friendBusy}
-                    onAdd={() => handleFriendAction("add")}
-                    onAccept={() => handleFriendAction("accept")}
-                    onDecline={() => handleFriendAction("decline")}
-                    onRemove={() => handleFriendAction("remove")}
-                  />
-                </>
-              )}
-              {identity.isOwnProfile && (
-                <>
-                  {/* Own-profile like count IS shown — read-only, since
+            <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8">
+                {/* ── Identity header ── */}
+                <div className="flex flex-col gap-3 pt-10 sm:pt-2 sm:pl-[124px]">
+                    {/* [TIGHTENED — this pass] Was pt-14 (56px) — mathematically
+              exact clearance for the avatar's 104px circle at -bottom-12
+              (48px) overlap, but a circle doesn't fill its own bounding
+              box, so exact clearance still reads as a bigger visual gap
+              than it should. pt-10 (40px) sits the name block closer
+              while still clearing the avatar's actual rendered edge. */}
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h1 className="font-display text-2xl font-bold text-[#f0e6c8]">
+                                {identity.displayName}
+                            </h1>
+                            <p className="text-xs text-[rgba(200,168,75,0.45)]">
+                                @{identity.username}
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {!identity.isOwnProfile && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handleLike}
+                                        disabled={likeLoading}
+                                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+                                            liked
+                                                ? "border-red-500/60 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                                : "border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.60)] hover:border-red-500/60 hover:text-red-400"
+                                        }`}
+                                    >
+                                        <Heart
+                                            className={`h-3.5 w-3.5 ${liked ? "fill-red-400" : ""}`}
+                                        />
+                                        {fmt(likeCount)}
+                                    </button>
+                                    <FriendButton
+                                        status={friendStatus}
+                                        busy={friendBusy}
+                                        onAdd={() => handleFriendAction("add")}
+                                        onAccept={() =>
+                                            handleFriendAction("accept")
+                                        }
+                                        onDecline={() =>
+                                            handleFriendAction("decline")
+                                        }
+                                        onRemove={() =>
+                                            handleFriendAction("remove")
+                                        }
+                                    />
+                                </>
+                            )}
+                            {identity.isOwnProfile && (
+                                <>
+                                    {/* Own-profile like count IS shown — read-only, since
                       the like button itself is meaningless on your own
                       profile (can't self-like), but the count is still
                       relevant information about you. */}
-                  <span className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.20)] px-3 py-1.5 text-xs font-bold text-[rgba(200,168,75,0.55)]">
-                    <Heart className="h-3.5 w-3.5" /> {fmt(likeCount)}
-                  </span>
-                  <Link
-                    href="/settings"
-                    className="rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
-                  >
-                    Edit Profile
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-
-          <XpBar xp={identity.xp} level={identity.level} />
-
-          {identity.bio && (
-            <p className="text-sm leading-6 text-[#a89880]">{identity.bio}</p>
-          )}
-
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
-            {!friends.hidden && (
-              <span>👥 {friends.friends.length} friends</span>
-            )}
-            <span>
-              📅 Joined{" "}
-              {new Date(identity.joinedAt).toLocaleDateString("en-US", {
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
-          </div>
-        </div>
-
-        <hr className="gold-rule" />
-
-        {/* ── Tab bar ── */}
-        <div className="flex gap-0 border-b border-[rgba(200,168,75,0.15)]">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => scrollToTab(t.id)}
-              className={`relative flex-1 px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
-                activeTab === t.id
-                  ? "text-ayakashi-gold"
-                  : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
-              }`}
-            >
-              <span className="flex items-center justify-center gap-1.5">
-                {t.label}
-                {t.id === "friends" && pendingCount > 0 && (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                    {pendingCount}
-                  </span>
-                )}
-              </span>
-              {activeTab === t.id && (
-                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-ayakashi-gold shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Swipeable panels ── */}
-        <div
-          ref={scrollerRef}
-          onScroll={handleScroll}
-          className="flex snap-x snap-mandatory overflow-x-auto scrollbar-none"
-          style={{ scrollBehavior: "smooth" }}
-        >
-          {/* Decks panel */}
-          <div className="w-full shrink-0 snap-start px-0.5">
-            <BigDeckView
-              deckSection={deck}
-              isOwnProfile={identity.isOwnProfile}
-            />
-            {identity.isOwnProfile && (
-              <Link
-                href="/decks"
-                className="mt-4 inline-block text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)] transition-colors hover:text-ayakashi-gold"
-              >
-                Manage Decks →
-              </Link>
-            )}
-          </div>
-
-          {/* Cards panel */}
-          <div className="w-full shrink-0 snap-start px-0.5">
-            {cards.hidden ? (
-              <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                This player has hidden their card collection.
-              </p>
-            ) : (
-              <>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs text-[rgba(200,168,75,0.45)]">
-                    {fmt(cards.totalCount)} card
-                    {cards.totalCount !== 1 ? "s" : ""}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="text"
-                      value={cardsQInput}
-                      onChange={(e) => setCardsQInput(e.target.value)}
-                      placeholder="Search cards..."
-                      className="form-input h-8 w-40 border px-2.5 text-xs outline-none sm:w-48"
-                    />
-                    <div className="flex gap-0 overflow-hidden rounded-md border border-[rgba(200,168,75,0.20)]">
-                      {SORT_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => handleSortChange(opt.id)}
-                          className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                            cardsSort === opt.id
-                              ? "bg-ayakashi-gold/15 text-ayakashi-gold"
-                              : "text-[rgba(200,168,75,0.40)] hover:text-[rgba(200,168,75,0.70)]"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {cardsLoading ? (
-                  <div className="flex h-40 items-center justify-center">
-                    <svg
-                      className="h-6 w-6 animate-spin text-ayakashi-gold"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      />
-                    </svg>
-                  </div>
-                ) : cards.results.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                    {cardsQ ? "No cards match your search." : "No cards yet."}
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {cards.results.map((item) => (
-                      <CardTile
-                        key={item.instanceId}
-                        card={{
-                          shortId: item.shortId,
-                          name: item.name,
-                          seriesName: item.seriesName ?? "",
-                          rarity: item.rarity,
-                          isEvent: item.isEvent,
-                          eventName: item.eventName,
-                          thumbUrl: item.thumbUrl,
-                          mediaType: item.mediaType,
-                          fileExtension: item.fileExtension,
-                          ownerCount: item.ownerCount,
-                          wishlistCount: item.wishlistCount,
-                          totalIssued: item.totalIssued,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {!cardsLoading && cards.totalPages > 1 && (
-                  <div className="mt-5 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      disabled={cardsPage <= 1}
-                      onClick={() => handlePageChange(cardsPage - 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md border border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <div className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.55)]">
-                      <input
-                        type="number"
-                        min={1}
-                        max={cards.totalPages}
-                        value={cardsPage}
-                        onChange={(e) => {
-                          const p = Math.min(
-                            cards.totalPages,
-                            Math.max(1, Number(e.target.value) || 1),
-                          );
-                          handlePageChange(p);
-                        }}
-                        className="form-input h-8 w-14 border px-1.5 text-center text-xs outline-none"
-                      />
-                      <span>/ {cards.totalPages}</span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={cardsPage >= cards.totalPages}
-                      onClick={() => handlePageChange(cardsPage + 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md border border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Friends panel */}
-          <div className="w-full shrink-0 snap-start px-0.5">
-            {friends.hidden ? (
-              <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                This player has hidden their friends list.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-6">
-                {identity.isOwnProfile &&
-                  friends.pendingReceived &&
-                  friends.pendingReceived.length > 0 && (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
-                        Requests ({friends.pendingReceived.length})
-                      </p>
-                      {friends.pendingReceived.map((r) => (
-                        <PendingRequestRow
-                          key={r.username}
-                          requester={r}
-                          busy={pendingBusy === r.username}
-                          onAccept={() =>
-                            handlePendingAction(r.username, "accept")
-                          }
-                          onDecline={() =>
-                            handlePendingAction(r.username, "decline")
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                <div className="flex flex-col gap-2">
-                  {friends.friends.length > 0 && (
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
-                      Friends ({friends.friends.length})
-                    </p>
-                  )}
-                  {friends.friends.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-[rgba(200,168,75,0.40)]">
-                      No friends yet.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {friends.friends.map((f) => (
-                        <Link
-                          key={f.username}
-                          href={`/profile/${f.username}`}
-                          className="flex items-center gap-3 rounded-lg border border-[rgba(200,168,75,0.15)] bg-white/[0.02] p-3 transition-colors hover:border-ayakashi-gold/40"
-                        >
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
-                            {f.avatarUrl ? (
-                              // [FIXED] Friends list — force static,
-                              // same reasoning as pending requests and
-                              // search results.
-                              <Image
-                                src={getStaticAvatarUrl(
-                                  f.avatarUrl,
-                                  "friendsList",
-                                )}
-                                alt=""
-                                width={40}
-                                height={40}
-                                className="h-full w-full object-cover"
-                                unoptimized
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[rgba(200,168,75,0.5)]">
-                                {f.displayName.slice(0, 1).toUpperCase()}
-                              </div>
+                                    <span className="flex items-center gap-1.5 rounded-md border border-[rgba(200,168,75,0.20)] px-3 py-1.5 text-xs font-bold text-[rgba(200,168,75,0.55)]">
+                                        <Heart className="h-3.5 w-3.5" />{" "}
+                                        {fmt(likeCount)}
+                                    </span>
+                                    <Link
+                                        href="/settings"
+                                        className="rounded-md border border-[rgba(200,168,75,0.30)] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.60)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold"
+                                    >
+                                        Edit Profile
+                                    </Link>
+                                </>
                             )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-[#f0e6c8]">
-                              {f.displayName}
-                            </p>
-                            <p className="truncate text-xs text-[rgba(200,168,75,0.40)]">
-                              @{f.username}
-                            </p>
-                          </div>
-                        </Link>
-                      ))}
+                        </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {quickSheet && identity.isOwnProfile && (
-        <CosmeticQuickSheet
-          slot={quickSheet}
-          unlocked={Boolean(
-            (quickSheet === "avatar"
-              ? identity.avatarPassCount
-              : identity.bannerPassCount) ?? 0,
-          )}
-          banked={Boolean(
-            quickSheet === "avatar"
-              ? identity.avatarBanked
-              : identity.bannerBanked,
-          )}
-          onClose={() => setQuickSheet(null)}
-          onDone={() => {
-            setQuickSheet(null);
-            load(cardsPage, cardsSort);
-          }}
-        />
-      )}
-    </section>
-  );
+                    <XpBar xp={identity.xp} level={identity.level} />
+
+                    {identity.bio && (
+                        <p className="text-sm leading-6 text-[#a89880]">
+                            {identity.bio}
+                        </p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] uppercase tracking-widest text-[rgba(200,168,75,0.40)]">
+                        {!friends.hidden && (
+                            <span className="flex items-center gap-1.5">
+                                <Users className="h-3 w-3" />{" "}
+                                {friends.friends.length} friends
+                            </span>
+                        )}
+                        <span className="flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3" /> Joined{" "}
+                            {new Date(identity.joinedAt).toLocaleDateString(
+                                "en-US",
+                                {
+                                    month: "short",
+                                    year: "numeric"
+                                }
+                            )}
+                        </span>
+                    </div>
+                </div>
+
+                <hr className="gold-rule" />
+
+                {/* ── Tab bar ── */}
+                <div className="flex gap-0 border-b border-[rgba(200,168,75,0.15)]">
+                    {TABS.map(t => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => scrollToTab(t.id)}
+                            className={`relative flex-1 px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
+                                activeTab === t.id
+                                    ? "text-ayakashi-gold"
+                                    : "text-[rgba(200,168,75,0.35)] hover:text-[rgba(200,168,75,0.70)]"
+                            }`}
+                        >
+                            <span className="flex items-center justify-center gap-1.5">
+                                {t.label}
+                                {t.id === "friends" && pendingCount > 0 && (
+                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                                        {pendingCount}
+                                    </span>
+                                )}
+                            </span>
+                            {activeTab === t.id && (
+                                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-ayakashi-gold shadow-[0_0_8px_rgba(200,168,75,0.6)]" />
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* ── Swipeable panels ── */}
+                <div
+                    ref={scrollerRef}
+                    onScroll={handleScroll}
+                    className="flex snap-x snap-mandatory overflow-x-auto scrollbar-none"
+                    style={{ scrollBehavior: "smooth" }}
+                >
+                    {/* Decks panel */}
+                    <div className="w-full shrink-0 snap-start px-0.5">
+                        <BigDeckView
+                            deckSection={deck}
+                            isOwnProfile={identity.isOwnProfile}
+                        />
+                        {identity.isOwnProfile && (
+                            <Link
+                                href="/decks"
+                                className="mt-4 inline-block text-xs font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)] transition-colors hover:text-ayakashi-gold"
+                            >
+                                Manage Decks →
+                            </Link>
+                        )}
+                    </div>
+
+                    {/* Cards panel */}
+                    <div className="w-full shrink-0 snap-start px-0.5">
+                        {cards.hidden ? (
+                            <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                                This player has hidden their card collection.
+                            </p>
+                        ) : (
+                            <>
+                                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                    <span className="text-xs text-[rgba(200,168,75,0.45)]">
+                                        {fmt(cards.totalCount)} card
+                                        {cards.totalCount !== 1 ? "s" : ""}
+                                    </span>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={cardsQInput}
+                                            onChange={e =>
+                                                setCardsQInput(e.target.value)
+                                            }
+                                            placeholder="Search cards..."
+                                            className="form-input h-8 w-40 border px-2.5 text-xs outline-none sm:w-48"
+                                        />
+                                        <div className="flex gap-0 overflow-hidden rounded-md border border-[rgba(200,168,75,0.20)]">
+                                            {SORT_OPTIONS.map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleSortChange(opt.id)
+                                                    }
+                                                    className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                                                        cardsSort === opt.id
+                                                            ? "bg-ayakashi-gold/15 text-ayakashi-gold"
+                                                            : "text-[rgba(200,168,75,0.40)] hover:text-[rgba(200,168,75,0.70)]"
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {cardsLoading ? (
+                                    <div className="flex h-40 items-center justify-center">
+                                        <svg
+                                            className="h-6 w-6 animate-spin text-ayakashi-gold"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            />
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                            />
+                                        </svg>
+                                    </div>
+                                ) : cards.results.length === 0 ? (
+                                    <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                                        {cardsQ
+                                            ? "No cards match your search."
+                                            : "No cards yet."}
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                                        {cards.results.map(item => (
+                                            <CardTile
+                                                key={item.instanceId}
+                                                card={{
+                                                    shortId: item.shortId,
+                                                    name: item.name,
+                                                    seriesName:
+                                                        item.seriesName ?? "",
+                                                    rarity: item.rarity,
+                                                    isEvent: item.isEvent,
+                                                    eventName: item.eventName,
+                                                    thumbUrl: item.thumbUrl,
+                                                    mediaType: item.mediaType,
+                                                    fileExtension:
+                                                        item.fileExtension,
+                                                    ownerCount: item.ownerCount,
+                                                    wishlistCount:
+                                                        item.wishlistCount,
+                                                    totalIssued:
+                                                        item.totalIssued
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {!cardsLoading && cards.totalPages > 1 && (
+                                    <div className="mt-5 flex items-center justify-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={cardsPage <= 1}
+                                            onClick={() =>
+                                                handlePageChange(cardsPage - 1)
+                                            }
+                                            className="flex h-9 w-9 items-center justify-center rounded-md border border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </button>
+                                        <div className="flex items-center gap-1.5 text-xs text-[rgba(200,168,75,0.55)]">
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={cards.totalPages}
+                                                value={cardsPage}
+                                                onChange={e => {
+                                                    const p = Math.min(
+                                                        cards.totalPages,
+                                                        Math.max(
+                                                            1,
+                                                            Number(
+                                                                e.target.value
+                                                            ) || 1
+                                                        )
+                                                    );
+                                                    handlePageChange(p);
+                                                }}
+                                                className="form-input h-8 w-14 border px-1.5 text-center text-xs outline-none"
+                                            />
+                                            <span>/ {cards.totalPages}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                cardsPage >= cards.totalPages
+                                            }
+                                            onClick={() =>
+                                                handlePageChange(cardsPage + 1)
+                                            }
+                                            className="flex h-9 w-9 items-center justify-center rounded-md border border-[rgba(200,168,75,0.30)] text-[rgba(200,168,75,0.65)] transition-colors hover:border-ayakashi-gold hover:text-ayakashi-gold disabled:cursor-not-allowed disabled:opacity-30"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Friends panel */}
+                    <div className="w-full shrink-0 snap-start px-0.5">
+                        {friends.hidden ? (
+                            <p className="py-10 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                                This player has hidden their friends list.
+                            </p>
+                        ) : (
+                            <div className="flex flex-col gap-6">
+                                {identity.isOwnProfile &&
+                                    friends.pendingReceived &&
+                                    friends.pendingReceived.length > 0 && (
+                                        <div className="flex flex-col gap-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+                                                Requests (
+                                                {friends.pendingReceived.length}
+                                                )
+                                            </p>
+                                            {friends.pendingReceived.map(r => (
+                                                <PendingRequestRow
+                                                    key={r.username}
+                                                    requester={r}
+                                                    busy={
+                                                        pendingBusy ===
+                                                        r.username
+                                                    }
+                                                    onAccept={() =>
+                                                        handlePendingAction(
+                                                            r.username,
+                                                            "accept"
+                                                        )
+                                                    }
+                                                    onDecline={() =>
+                                                        handlePendingAction(
+                                                            r.username,
+                                                            "decline"
+                                                        )
+                                                    }
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+
+                                <div className="flex flex-col gap-2">
+                                    {friends.friends.length > 0 && (
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(200,168,75,0.50)]">
+                                            Friends ({friends.friends.length})
+                                        </p>
+                                    )}
+                                    {friends.friends.length === 0 ? (
+                                        <p className="py-6 text-center text-sm text-[rgba(200,168,75,0.40)]">
+                                            No friends yet.
+                                        </p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            {friends.friends.map(f => (
+                                                <Link
+                                                    key={f.username}
+                                                    href={`/profile/${f.username}`}
+                                                    className="flex items-center gap-3 rounded-lg border border-[rgba(200,168,75,0.15)] bg-white/[0.02] p-3 transition-colors hover:border-ayakashi-gold/40"
+                                                >
+                                                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[rgba(200,168,75,0.1)]">
+                                                        {f.avatarUrl ? (
+                                                            // [FIXED] Friends list — force static,
+                                                            // same reasoning as pending requests and
+                                                            // search results.
+                                                            <Image
+                                                                src={getStaticAvatarUrl(
+                                                                    f.avatarUrl,
+                                                                    "friendsList"
+                                                                )}
+                                                                alt=""
+                                                                width={40}
+                                                                height={40}
+                                                                className="h-full w-full object-cover"
+                                                                unoptimized
+                                                            />
+                                                        ) : (
+                                                            <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[rgba(200,168,75,0.5)]">
+                                                                {f.displayName
+                                                                    .slice(0, 1)
+                                                                    .toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-bold text-[#f0e6c8]">
+                                                            {f.displayName}
+                                                        </p>
+                                                        <p className="truncate text-xs text-[rgba(200,168,75,0.40)]">
+                                                            @{f.username}
+                                                        </p>
+                                                    </div>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {quickSheet && identity.isOwnProfile && (
+                <CosmeticQuickSheet
+                    slot={quickSheet}
+                    unlocked={Boolean(
+                        (quickSheet === "avatar"
+                            ? identity.avatarPassCount
+                            : identity.bannerPassCount) ?? 0
+                    )}
+                    banked={Boolean(
+                        quickSheet === "avatar"
+                            ? identity.avatarBanked
+                            : identity.bannerBanked
+                    )}
+                    onClose={() => setQuickSheet(null)}
+                    onDone={() => {
+                        setQuickSheet(null);
+                        load(cardsPage, cardsSort);
+                    }}
+                />
+            )}
+        </section>
+    );
 }
