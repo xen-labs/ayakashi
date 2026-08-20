@@ -86,6 +86,11 @@ function ListingTile({
     const ref = useRef<HTMLDivElement>(null);
     const [style, setStyle] = useState<CSSProperties>({});
     const [active, setActive] = useState(false);
+    // See CardTile.tsx for the full reasoning — same card-back
+    // placeholder pattern, kept local to this tile for the same reason
+    // the rest of ListingTile is local (different data shape than the
+    // catalog browser's CardTile).
+    const [artLoaded, setArtLoaded] = useState(false);
 
     const updateFromPoint = useCallback((clientX: number, clientY: number) => {
         const el = ref.current;
@@ -144,43 +149,71 @@ function ListingTile({
             >
                 <div className="relative aspect-[3/4] w-full">
                     {card ? (
-                        isVideo ? (
-                            <video
-                                src={card.mediaUrl}
-                                className="h-full w-full object-cover"
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                                preload="metadata"
-                            />
-                        ) : (
-                            // eslint-disable-next-line @next/next/no-img-element
+                        <>
+                            {/* Loading placeholder — see CardTile.tsx for
+                                full reasoning. Sits under the real art,
+                                fades out once it's loaded. */}
                             <img
-                                src={card.mediaUrl}
-                                alt={card.name}
-                                className="h-full w-full object-cover"
-                                loading="lazy"
+                                src="/cardback/cardback-neutral.webp"
+                                alt=""
+                                aria-hidden="true"
+                                className={`absolute inset-0 z-0 h-full w-full object-contain transition-opacity duration-300 ${
+                                    artLoaded ? "opacity-0" : "opacity-100"
+                                }`}
                             />
-                        )
+                            {isVideo ? (
+                                <video
+                                    src={card.mediaUrl}
+                                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                                        artLoaded ? "opacity-100" : "opacity-0"
+                                    }`}
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                    onLoadedData={() => setArtLoaded(true)}
+                                />
+                            ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={card.mediaUrl}
+                                    alt={card.name}
+                                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                                        artLoaded ? "opacity-100" : "opacity-0"
+                                    }`}
+                                    loading="lazy"
+                                    onLoad={() => setArtLoaded(true)}
+                                    ref={img => {
+                                        if (img?.complete) setArtLoaded(true);
+                                    }}
+                                />
+                            )}
+                        </>
                     ) : (
                         <div className="flex h-full w-full items-center justify-center bg-[rgba(200,168,75,0.04)] text-[rgba(200,168,75,0.25)]">
                             <PackageOpen className="h-8 w-8" />
                         </div>
                     )}
 
-                    <div className="card-tile-sheen absolute inset-0" />
+                    {/* z-[2] on everything below — sits above BOTH art
+                        layers (card-back placeholder z-0, real art z-1)
+                        regardless of which is currently visible. Previously
+                        unset, which put these at the same stacking level as
+                        the placeholder and let the real art layer cover
+                        them once loaded. */}
+                    <div className="card-tile-sheen absolute inset-0 z-[2]" />
 
                     <span
-                        className={`absolute left-1.5 top-1.5 rounded-sm border bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${rarityClass}`}
+                        className={`absolute left-1.5 top-1.5 z-[2] rounded-sm border bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${rarityClass}`}
                     >
                         {card?.rarity ?? "?"}
                     </span>
-                    <span className="absolute right-1.5 top-1.5 rounded-sm bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-[rgba(200,168,75,0.55)]">
+                    <span className="absolute right-1.5 top-1.5 z-[2] rounded-sm bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-[rgba(200,168,75,0.55)]">
                         #{listing.issueNumber}
                     </span>
 
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent px-2 pb-2 pt-8">
+                    <div className="absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black/95 via-black/60 to-transparent px-2 pb-2 pt-8">
                         <p className="truncate font-ui text-xs font-semibold text-[#f0e6c8]">
                             {card?.name ?? "Unknown Card"}
                         </p>

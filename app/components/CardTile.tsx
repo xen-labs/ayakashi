@@ -64,6 +64,12 @@ export function CardTile({
     const [active, setActive] = useState(false);
     const [liked, setLiked] = useState(wishlisted);
     const [wishBusy, setWishBusy] = useState(false);
+    // Starts false so the card-back placeholder shows immediately on mount
+    // instead of racing the image request — the point of a loading state is
+    // covering that exact gap. Real art crossfades in once it actually
+    // finishes loading (onLoad/onLoadedData), not on a timer, so a
+    // cached/instant load never shows the card-back flash at all.
+    const [artLoaded, setArtLoaded] = useState(false);
 
     const updateFromPoint = useCallback((clientX: number, clientY: number) => {
         const el = ref.current;
@@ -140,15 +146,34 @@ export function CardTile({
                 style={style}
             >
                 <div className="relative aspect-[3/4] w-full">
+                    {/* Loading placeholder — the card-back art, shown underneath
+              until the real thumbnail/video actually finishes loading.
+              Plain <img>, not next/image: this is a small static local
+              asset, next/image's optimization pipeline buys nothing here
+              and only adds a loader round-trip for something that should
+              be instant. z-0 so it's always behind the real art layer;
+              opacity (not unmount) so the crossfade has something to
+              transition against. */}
+                    <img
+                        src="/cardback/cardback-neutral.webp"
+                        alt=""
+                        aria-hidden="true"
+                        className={`absolute inset-0 z-0 h-full w-full object-contain transition-opacity duration-300 ${
+                            artLoaded ? "opacity-0" : "opacity-100"
+                        }`}
+                    />
                     {isVideo ? (
                         <video
                             src={card.thumbUrl}
-                            className="h-full w-full object-contain"
+                            className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                                artLoaded ? "opacity-100" : "opacity-0"
+                            }`}
                             autoPlay
                             loop
                             muted
                             playsInline
                             preload="metadata"
+                            onLoadedData={() => setArtLoaded(true)}
                         />
                     ) : (
                         // Plain <img>, not next/image, for every format here — gif
@@ -158,20 +183,40 @@ export function CardTile({
                         <img
                             src={card.thumbUrl}
                             alt={card.name}
-                            className="h-full w-full object-contain"
+                            className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                                artLoaded ? "opacity-100" : "opacity-0"
+                            }`}
                             loading="lazy"
+                            onLoad={() => setArtLoaded(true)}
+                            ref={img => {
+                                // Cache-safety net: a cached image can already be
+                                // .complete by the time this ref runs, in which case
+                                // onLoad never fires again and the placeholder would be
+                                // stuck showing forever underneath a fully-loaded image.
+                                if (img?.complete) setArtLoaded(true);
+                            }}
                         />
                     )}
 
-                    {/* sheen — tracks pointer via CSS vars set above */}
-                    <div className="card-tile-sheen absolute inset-0" />
+                    {/* sheen — tracks pointer via CSS vars set above. z-[2]
+                        so it always sits above BOTH art layers (card-back
+                        placeholder at z-0, real art at z-1) regardless of
+                        which one is currently visible — previously had no
+                        explicit z-index, which put it at the same
+                        stacking level as the placeholder and let the real
+                        art layer cover it once loaded. */}
+                    <div className="card-tile-sheen absolute inset-0 z-[2]" />
 
-                    {/* rarity tag — quiet, corner, informational only */}
-                    <span className="absolute left-1.5 top-1.5 rounded-sm bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a84b]">
+                    {/* rarity tag — quiet, corner, informational only.
+                        Same z-[2] fix as the sheen above — this and the
+                        wishlist badge were rendering BETWEEN the
+                        card-back placeholder and the real art instead of
+                        above both. */}
+                    <span className="absolute left-1.5 top-1.5 z-[2] rounded-sm bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a84b]">
                         {card.rarity}
                     </span>
 
-                    <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+                    <div className="absolute right-1.5 top-1.5 z-[2] flex items-center gap-1">
                         {card.isEvent && (
                             <span className="rounded-sm bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#e6c96a]">
                                 ✦

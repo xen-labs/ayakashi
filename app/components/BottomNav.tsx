@@ -162,10 +162,14 @@ export function BottomNav() {
                         className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
                         onClick={() => setMoreOpen(false)}
                     />
-                    {/* [REDESIGNED] Same translucency fix as the main nav —
-              /98 -> /75, real backdrop-blur-xl so it actually reads as
-              frosted glass over whatever's scrolled underneath. */}
-                    <div className="drawer-slide-up fixed bottom-16 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.20)] bg-[#0d0c00]/75 backdrop-blur-xl">
+                    {/* [FIXED] Was bg-[#0d0c00]/75 with backdrop-blur-xl — over a
+              busy backdrop (a grid of colorful card thumbnails, see
+              MarketplacePage) 25% see-through was enough to make the
+              labels genuinely hard to read, blur or no blur. A menu
+              needs to be legible above almost everything else it does;
+              solid background trades a bit of glass polish for actually
+              being readable, which matters more here. */}
+                    <div className="drawer-slide-up fixed bottom-16 left-0 right-0 z-40 border-t border-[rgba(200,168,75,0.20)] bg-[#0d0c00] shadow-[0_-8px_30px_rgba(0,0,0,0.6)]">
                         <div className="mx-auto grid max-w-lg grid-cols-3 gap-0">
                             {SECONDARY_NAV.map(({ href, label }) => {
                                 const active =
@@ -178,8 +182,8 @@ export function BottomNav() {
                                         onClick={() => setMoreOpen(false)}
                                         className={`flex flex-col items-center justify-center gap-1 border-b border-r border-[rgba(200,168,75,0.10)] px-2 py-4 text-center transition-colors last:border-r-0 ${
                                             active
-                                                ? "bg-[rgba(200,168,75,0.10)] text-[#c8a84b]"
-                                                : "text-[rgba(200,168,75,0.50)] hover:bg-[rgba(200,168,75,0.06)] hover:text-[rgba(200,168,75,0.80)]"
+                                                ? "bg-[rgba(200,168,75,0.14)] text-[#c8a84b]"
+                                                : "text-[rgba(200,168,75,0.65)] hover:bg-[rgba(200,168,75,0.08)] hover:text-[rgba(200,168,75,0.95)]"
                                         }`}
                                     >
                                         <span className="text-[10px] font-bold uppercase tracking-[0.1em]">

@@ -48,6 +48,10 @@ function initials(name: string): string {
 // its own natural aspect ratio inside a max-height constraint, with
 // object-contain (not object-cover) so nothing gets cropped and no
 // bg-black matte shows through the card's alpha-channel edges.
+//
+// Card-back placeholder — see CardTile.tsx for the full reasoning.
+// Each JSX usage gets its own component instance/state, so this single
+// definition covers both call sites below (hero, buy-modal thumbnail).
 function AuctionCardMedia({
     card,
     isVideo,
@@ -57,6 +61,8 @@ function AuctionCardMedia({
     isVideo: boolean;
     className?: string;
 }) {
+    const [artLoaded, setArtLoaded] = useState(false);
+
     if (!card) {
         return (
             <div
@@ -66,23 +72,44 @@ function AuctionCardMedia({
             </div>
         );
     }
-    return isVideo ? (
-        <video
-            src={card.mediaUrl}
-            className={`h-full w-full object-contain ${className}`}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-        />
-    ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-            src={card.mediaUrl}
-            alt={card.name}
-            className={`h-full w-full object-contain ${className}`}
-        />
+    return (
+        <div className={`relative aspect-[3/4] ${className}`}>
+            <img
+                src="/cardback/cardback-neutral.webp"
+                alt=""
+                aria-hidden="true"
+                className={`absolute inset-0 z-0 h-full w-full object-contain transition-opacity duration-300 ${
+                    artLoaded ? "opacity-0" : "opacity-100"
+                }`}
+            />
+            {isVideo ? (
+                <video
+                    src={card.mediaUrl}
+                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                        artLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onLoadedData={() => setArtLoaded(true)}
+                />
+            ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={card.mediaUrl}
+                    alt={card.name}
+                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                        artLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                    onLoad={() => setArtLoaded(true)}
+                    ref={img => {
+                        if (img?.complete) setArtLoaded(true);
+                    }}
+                />
+            )}
+        </div>
     );
 }
 

@@ -190,6 +190,8 @@ export default function CardDetailPage({
     const [showAllWishlisters, setShowAllWishlisters] = useState(false);
     const [wishlisted, setWishlisted] = useState(false);
     const [wishBusy, setWishBusy] = useState(false);
+    // Hero art loading placeholder — see CardTile.tsx for full reasoning.
+    const [heroArtLoaded, setHeroArtLoaded] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -294,27 +296,53 @@ export default function CardDetailPage({
                     <div
                         className={`relative flex justify-center ${isUR ? "welcome-bonus-card" : ""}`}
                     >
-                        {isVideo ? (
-                            <video
-                                src={card.mediaUrl}
-                                className="max-h-[52vh] w-full object-contain"
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                            />
-                        ) : (
-                            // Plain <img> for gif/webp/png/jpg — next/image's
-                            // optimizer isn't guaranteed to preserve GIF/animated-
-                            // webp animation, and this is a single hero image so the
-                            // optimization tradeoff isn't worth losing the motion for.
-                            // eslint-disable-next-line @next/next/no-img-element
+                        <div className="relative aspect-[3/4] max-h-[52vh] w-full">
+                            {/* Loading placeholder — see CardTile.tsx for
+                                full reasoning. */}
                             <img
-                                src={card.mediaUrl}
-                                alt={card.name}
-                                className="max-h-[52vh] w-full object-contain"
+                                src="/cardback/cardback-neutral.webp"
+                                alt=""
+                                aria-hidden="true"
+                                className={`absolute inset-0 z-0 h-full w-full object-contain transition-opacity duration-300 ${
+                                    heroArtLoaded ? "opacity-0" : "opacity-100"
+                                }`}
                             />
-                        )}
+                            {isVideo ? (
+                                <video
+                                    src={card.mediaUrl}
+                                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                                        heroArtLoaded
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                    }`}
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    onLoadedData={() => setHeroArtLoaded(true)}
+                                />
+                            ) : (
+                                // Plain <img> for gif/webp/png/jpg — next/image's
+                                // optimizer isn't guaranteed to preserve GIF/animated-
+                                // webp animation, and this is a single hero image so the
+                                // optimization tradeoff isn't worth losing the motion for.
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={card.mediaUrl}
+                                    alt={card.name}
+                                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                                        heroArtLoaded
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                    }`}
+                                    onLoad={() => setHeroArtLoaded(true)}
+                                    ref={img => {
+                                        if (img?.complete)
+                                            setHeroArtLoaded(true);
+                                    }}
+                                />
+                            )}
+                        </div>
                         {/* A single foil sweep on load for the rarest tier only —
                 a moment, not persistent decoration on every card. */}
                         {isUR && (

@@ -89,6 +89,13 @@ type BuyPhase = "detail" | "confirm" | "buying" | "success" | "fail";
 // Renders at its own natural aspect ratio, constrained only by a max
 // height. object-contain (not object-cover) so nothing gets cropped —
 // the whole point is showing the complete card art edge to edge.
+//
+// Card-back placeholder: shown underneath until the real art actually
+// finishes loading, then crossfades out — see CardTile.tsx for the full
+// reasoning. Each JSX usage of <CardMedia> gets its own component
+// instance (and so its own artLoaded state), so this one definition
+// covers all 3 call sites below (hero, buy-modal thumbnail, price-
+// history row) without them stepping on each other's loaded state.
 function CardMedia({
     card,
     className = ""
@@ -96,6 +103,8 @@ function CardMedia({
     card: MarketplaceCardDetail["card"];
     className?: string;
 }) {
+    const [artLoaded, setArtLoaded] = useState(false);
+
     if (!card) {
         return (
             <div
@@ -105,23 +114,44 @@ function CardMedia({
             </div>
         );
     }
-    return card.mediaType === "video" ? (
-        <video
-            src={card.mediaUrl}
-            className={`h-full w-full object-contain ${className}`}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-        />
-    ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-            src={card.mediaUrl}
-            alt={card.name}
-            className={`h-full w-full object-contain ${className}`}
-        />
+    return (
+        <div className={`relative aspect-[3/4] ${className}`}>
+            <img
+                src="/cardback/cardback-neutral.webp"
+                alt=""
+                aria-hidden="true"
+                className={`absolute inset-0 z-0 h-full w-full object-contain transition-opacity duration-300 ${
+                    artLoaded ? "opacity-0" : "opacity-100"
+                }`}
+            />
+            {card.mediaType === "video" ? (
+                <video
+                    src={card.mediaUrl}
+                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                        artLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onLoadedData={() => setArtLoaded(true)}
+                />
+            ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={card.mediaUrl}
+                    alt={card.name}
+                    className={`relative z-[1] h-full w-full object-contain transition-opacity duration-300 ${
+                        artLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                    onLoad={() => setArtLoaded(true)}
+                    ref={img => {
+                        if (img?.complete) setArtLoaded(true);
+                    }}
+                />
+            )}
+        </div>
     );
 }
 
