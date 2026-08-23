@@ -1194,6 +1194,12 @@ export interface LoadoutTool {
     itemId: string;
     name: string;
     emoji: string;
+    // [NEW] Real webp art path — see routes/loadout.ts's annotateTool.
+    // Empty string means no registry entry exists for this item; the UI
+    // should fall back to the emoji in that case rather than rendering a
+    // broken image.
+    webappImage: string;
+    rarity?: "common" | "uncommon" | "rare" | "epic" | "legendary";
     owned: boolean;
     ownedQuantity: number;
 }
@@ -1217,6 +1223,11 @@ export interface VaultKit {
 export interface LoadoutResponse {
     maxKitsPerTier: number;
     pocketWeaponIds: string[];
+    // [NEW] weaponId -> dedicated counter itemId, from the pocket-rob
+    // tactical rework's weapon↔counter matrix. Lets the kit-builder show
+    // "this weapon's hard counter is X" while a player picks a weapon,
+    // without a second lookup table hardcoded in the frontend.
+    weaponCounters: Record<string, string>;
     vaultEntryStealthIds: string[];
     vaultEntryAggressiveIds: string[];
     vaultBreachIds: string[];
@@ -1282,6 +1293,78 @@ export const deleteLoadout = (tier: LoadoutTier, slotNumber: number) =>
             body: JSON.stringify({ tier, slotNumber })
         }
     );
+
+// ── Rob Log ───────────────────────────────────────────────────────
+// GET /roblog?view=robber|victim&page=&pageSize=
+//
+// [NEW] Paginated rob-history feed backing the loadout page's roblog
+// section (see routes/roblog.ts on the backend). "robber" view is the
+// player's own attempts against others; "victim" view is attempts made
+// against them. robberName/targetName are pre-resolved display-name
+// SNAPSHOTS from the moment of the rob — never render robberId/targetId
+// directly in the UI, always use the *Name fields, and never treat these
+// as mentionable/taggable identities on the website (this is a read-only
+// history view, not a place to @ someone).
+
+export type RobTargetTier = "pocket" | "vault";
+export type RobPathKind = "stealth" | "aggressive";
+export type RobOutcomeReason =
+    | "success"
+    | "failed_roll"
+    | "caught"
+    | "police_intercepted"
+    | "vault_entry_failed"
+    | "vault_no_stash";
+
+export interface RobLogEntry {
+    id: string;
+    createdAt: string;
+    robberId: string;
+    robberName: string;
+    targetId: string;
+    targetName: string;
+    targetTier: RobTargetTier;
+    path: RobPathKind | null;
+    succeeded: boolean;
+    caught: boolean;
+    outcomeReason: RobOutcomeReason;
+    stolenRyo: number;
+    stolenKitsu: number;
+    weaponId: string | null;
+    toolIds: string[];
+    targetHadAnyDefense: boolean | null;
+    counterItemId: string | null;
+    targetHadCounter: boolean | null;
+    successRate: number | null;
+    jailChance: number | null;
+}
+
+export interface RobLogResponse {
+    view: "robber" | "victim";
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    pageSummary: {
+        successCount: number;
+        totalRyo: number;
+        entryCount: number;
+    };
+    entries: RobLogEntry[];
+}
+
+export const getRobLog = (
+    view: "robber" | "victim" = "robber",
+    page = 1,
+    pageSize = 15
+) => {
+    const qs = new URLSearchParams({
+        view,
+        page: String(page),
+        pageSize: String(pageSize)
+    });
+    return apiFetch<RobLogResponse>(`/roblog?${qs.toString()}`);
+};
 
 // ── Cosmetics ─────────────────────────────────────────────────────
 // POST   /cosmetics/upload            (multipart/form-data)
