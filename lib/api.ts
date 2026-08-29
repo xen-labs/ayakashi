@@ -19,6 +19,42 @@ export class ApiResponseError extends Error {
     }
 }
 
+// [NEW] Thrown when a request never reaches the server at all — no
+// connection, DNS failure, or it stalled past REQUEST_TIMEOUT_MS (see
+// below). Deliberately a DIFFERENT class from ApiResponseError, which
+// always means "the server responded, and said no" (a real status code
+// + error body). Every existing call site's `err instanceof
+// ApiResponseError` check keeps working exactly as before — this is
+// additive, not a replacement — but a page CAN now special-case this
+// class to show "You're offline" / "Check your connection" instead of
+// a generic failure message, which matters far more on mobile networks
+// (subway, elevator, spotty handoff between towers) than on stable
+// desktop wifi where this class of failure is rare enough to not need
+// its own message.
+export class NetworkError extends Error {
+    constructor(public readonly cause: "offline" | "timeout" | "unknown") {
+        super(
+            cause === "timeout"
+                ? "The request took too long to respond."
+                : cause === "offline"
+                  ? "You appear to be offline."
+                  : "Couldn't reach the server."
+        );
+        this.name = "NetworkError";
+    }
+}
+
+// How long a request is allowed to hang before apiFetch gives up on it
+// and throws NetworkError("timeout"). Without this, a stalled connection
+// (dead wifi handoff, a dropped cell tower) leaves the calling page's
+// loading state spinning forever with no way out for the person except
+// force-closing the app — there was previously NO timeout at all here.
+// 15s is generous enough for a slow mobile connection loading a real
+// payload (e.g. a paginated card list with images), but still short
+// enough that a stalled request resolves to a visible, actionable error
+// well within the range a person will wait before giving up anyway.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 // ── Core fetch wrapper ────────────────────────────────────────────
 
 let refreshPromise: Promise<void> | null = null;
@@ -28,14 +64,46 @@ async function apiFetch<T>(
     init: RequestInit = {},
     _isRetry = false
 ): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
-        ...init,
-        credentials: "include",
-        headers: {
-            ...(init.body ? { "Content-Type": "application/json" } : {}),
-            ...(init.headers ?? {})
+    // [NEW] AbortController-driven timeout — see REQUEST_TIMEOUT_MS's
+    // doc comment above. If the caller already passed their own
+    // `signal` (none currently do, but this stays forward-compatible
+    // rather than silently overwriting one), this defers to theirs
+    // instead of racing two controllers against the same fetch.
+    const controller = init.signal ? null : new AbortController();
+    const timeoutId = controller
+        ? setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+        : null;
+
+    let res: Response;
+    try {
+        res = await fetch(`${API_BASE}${path}`, {
+            ...init,
+            credentials: "include",
+            signal: controller?.signal ?? init.signal,
+            headers: {
+                ...(init.body ? { "Content-Type": "application/json" } : {}),
+                ...(init.headers ?? {})
+            }
+        });
+    } catch (err) {
+        // [NEW] fetch() itself throws (never reaches res.ok/res.json) for
+        // three distinct reasons a mobile person will actually hit:
+        // aborted by our own timeout above, genuinely offline (checked via
+        // navigator.onLine — a cheap, synchronous, widely-supported signal
+        // for "the device itself has no connection" vs "the server didn't
+        // respond"), or anything else (DNS failure, connection refused,
+        // CORS). Distinguishing these lets a page show the right message
+        // instead of one generic failure string for all three.
+        if (err instanceof DOMException && err.name === "AbortError") {
+            throw new NetworkError("timeout");
         }
-    });
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            throw new NetworkError("offline");
+        }
+        throw new NetworkError("unknown");
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
 
     if (res.ok) {
         if (res.status === 204) return {} as T;
@@ -56,16 +124,34 @@ async function apiFetch<T>(
     if (isRecoverable && !_isRetry) {
         try {
             if (!refreshPromise) {
-                refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
-                    method: "POST",
-                    credentials: "include"
-                })
-                    .then(refreshRes => {
+                refreshPromise = (async () => {
+                    // Same timeout guard as the main request above — a
+                    // stalled refresh call would otherwise hang the
+                    // ENTIRE retry chain indefinitely (the original
+                    // request is waiting on this promise), doubling the
+                    // "spinner never resolves" problem instead of fixing
+                    // it.
+                    const refreshController = new AbortController();
+                    const refreshTimeoutId = setTimeout(
+                        () => refreshController.abort(),
+                        REQUEST_TIMEOUT_MS
+                    );
+                    try {
+                        const refreshRes = await fetch(
+                            `${API_BASE}/auth/refresh`,
+                            {
+                                method: "POST",
+                                credentials: "include",
+                                signal: refreshController.signal
+                            }
+                        );
                         if (!refreshRes.ok) throw new Error("Refresh failed");
-                    })
-                    .finally(() => {
-                        refreshPromise = null;
-                    });
+                    } finally {
+                        clearTimeout(refreshTimeoutId);
+                    }
+                })().finally(() => {
+                    refreshPromise = null;
+                });
             }
 
             await refreshPromise;
@@ -108,6 +194,7 @@ export interface LoginPayload {
     username: string;
     password: string;
     rememberMe: boolean;
+    deviceFingerprint?: string;
 }
 export interface LoginResponse {
     username: string;
@@ -875,6 +962,10 @@ export interface BankVaultResponse {
             remainingMs: number;
             ratePercent: number;
             projectedAmount: number;
+        };
+        withdrawCooldown: {
+            remainingMs: number;
+            cooldownMs: number;
         };
     };
     homeVault:
@@ -1873,6 +1964,67 @@ export const cancelMarketplaceListing = (instanceId: string) =>
         `/marketplace/cancel/${encodeURIComponent(instanceId)}`,
         { method: "POST" }
     );
+
+// ── Food Market ──────────────────────────────────────────────────
+// GET  /market/food/prices — today's per-unit price for every sellable
+//                            food/dish item, no seller identity attached
+// GET  /market/food/mine   — the caller's own pending + recently-settled
+//                            sell orders
+// POST /market/food/sell   — queue a sell order (quantity leaves your
+//                            inventory immediately; pays out at the
+//                            next daily settlement)
+//
+// DELIBERATELY NOT the same shape as Marketplace above — food items are
+// fungible (one player's food_egg is identical to another's), so there
+// is no browse/buy-from-another-player flow here and never will be; see
+// routes/foodMarket.ts's header for the full reasoning. This is a
+// sell-into-a-pool market: you queue a sale, the game settles it once a
+// day at that day's market price for the item.
+
+export interface FoodMarketPriceEntry {
+    itemId: string;
+    name: string;
+    emoji: string;
+    webappImage: string;
+    price: number;
+}
+export interface FoodMarketPricesResponse {
+    prices: FoodMarketPriceEntry[];
+}
+export const getFoodMarketPrices = () =>
+    apiFetch<FoodMarketPricesResponse>("/market/food/prices");
+
+export type FoodSellOrderStatus = "pending" | "settled";
+export interface FoodSellOrderView {
+    orderId: string;
+    itemId: string;
+    name: string;
+    emoji: string;
+    quantity: number;
+    status: FoodSellOrderStatus;
+    submittedAt: string;
+    settledPrice?: number;
+    settledAt?: string;
+}
+export interface FoodMarketMineResponse {
+    pending: FoodSellOrderView[];
+    recentSettled: FoodSellOrderView[];
+}
+export const getMyFoodSellOrders = () =>
+    apiFetch<FoodMarketMineResponse>("/market/food/mine");
+
+export interface SubmitFoodSellOrderResponse {
+    orderId: string;
+    itemId: string;
+    quantity: number;
+    estimatedPrice: number;
+    estimatedTotal: number;
+}
+export const submitFoodSellOrder = (itemId: string, quantity: number) =>
+    apiFetch<SubmitFoodSellOrderResponse>("/market/food/sell", {
+        method: "POST",
+        body: JSON.stringify({ itemId, quantity })
+    });
 
 export interface OwnedCard {
     instanceId: string;

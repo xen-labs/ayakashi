@@ -213,6 +213,12 @@ body {
 .form-card {
     background-color: rgba(10, 8, 0, 0.75);
     border-color: rgba(200, 168, 75, 0.25);
+    /* Default radius — most .form-card call sites across the app pair
+     this with a plain `border` utility and no rounded-* class,
+      leaving those cards with hard 90° corners next to buttons/inputs
+     that ARE rounded. This makes every .form-card smooth by default;
+    a call site's own rounded-* class still overrides it. */
+    border-radius: 0.75rem;
     box-shadow:
         0 4px 32px rgba(0, 0, 0, 0.7),
         inset 0 1px 0 rgba(200, 168, 75, 0.08);

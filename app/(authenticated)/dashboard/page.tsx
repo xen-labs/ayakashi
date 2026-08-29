@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import {
+    useEffect,
+    useState,
+    useCallback,
+    useRef,
+    type ReactNode
+} from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -174,6 +180,49 @@ function CurrencyChip({
     );
 }
 
+// ── Small art thumbnail for the Bank/Vault glance cards — same source
+// images the full Bank & Vault page's hero panels use
+// (/assets/webapp/vault/*.webp), just cropped into a small rounded
+// square instead of a full-width banner. Falls back to the lucide icon
+// on error, same as BankHero/VaultHero on that page, so a missing asset
+// never leaves a blank gap. Previously these glance cards used ONLY the
+// icon-in-a-circle fallback treatment even when the real art existed —
+// this is what made the dashboard read as a stripped-down, generic
+// version of the real page instead of a consistent preview of it.
+function GlanceThumb({
+    src,
+    fallback,
+    danger
+}: {
+    src: string;
+    fallback: ReactNode;
+    danger?: boolean;
+}) {
+    const [broken, setBroken] = useState(false);
+    return (
+        <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-black/40 ${
+                danger
+                    ? "border-red-500/40 text-red-400"
+                    : "border-[rgba(200,168,75,0.25)] text-ayakashi-gold"
+            }`}
+        >
+            {!broken ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={src}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-full object-cover"
+                    onError={() => setBroken(true)}
+                />
+            ) : (
+                fallback
+            )}
+        </div>
+    );
+}
+
 // ── Transaction row ──────────────────────────────────────────────
 function TxRow({ tx }: { tx: DashboardTransaction }) {
     const positive = tx.amount >= 0;
@@ -195,10 +244,8 @@ function TxRow({ tx }: { tx: DashboardTransaction }) {
                 </span>
             </div>
             <span
-                className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-sm font-bold tabular-nums ${
-                    positive
-                        ? "border-green-500/25 text-green-400"
-                        : "border-red-500/25 text-red-400"
+                className={`flex shrink-0 items-center gap-1.5 text-sm font-bold tabular-nums ${
+                    positive ? "text-green-400" : "text-red-400"
                 }`}
             >
                 {positive ? "+" : ""}
@@ -337,15 +384,42 @@ export default function Dashboard() {
     const [txPage, setTxPage] = useState(1);
     const [txLoading, setTxLoading] = useState(false);
     const [pendingTrades, setPendingTrades] = useState<Trade[]>([]);
+    // Tracks "have we ever successfully loaded data" WITHOUT being a
+    // reactive dependency of `load` itself — using `data` directly in
+    // load's body would require adding it to load's useCallback deps,
+    // which recreates `load` on every successful fetch and re-fires the
+    // mount effect (`useEffect(() => load(1), [load])`) in a loop. A ref
+    // reads the latest value without ever changing `load`'s identity.
+    const hasLoadedRef = useRef(false);
 
     const load = useCallback(
         async (page = 1) => {
-            if (page === 1) setLoading(true);
-            else setTxLoading(true);
+            // [FIXED] Was `if (page === 1) setLoading(true)` — every
+            // post-action refetch (claim daily, claim interest, and
+            // anywhere else this fires after page 1) tripped the SAME
+            // `loading` flag the page uses for its full-screen spinner
+            // (see the `if (loading) return <spinner/>` branch below),
+            // which replaces the ENTIRE page with a spinner and redraws
+            // it from scratch — visually indistinguishable from a hard
+            // reload, even though nothing here actually reloads the
+            // page. `loading` should only ever mean "we have nothing to
+            // show yet" (i.e. first mount, data === null). Any refetch
+            // after that point is a quiet background update — data
+            // swaps in place once it resolves, with no full-page
+            // blank-and-redraw. Page > 1 still uses the small, already-
+            // scoped txLoading spinner (just the transaction list, not
+            // the whole page) since that IS a visible list-content
+            // change worth indicating.
+            if (page === 1) {
+                if (!hasLoadedRef.current) setLoading(true);
+            } else {
+                setTxLoading(true);
+            }
             setError("");
             try {
                 const res = await getDashboard(page);
                 setData(res);
+                hasLoadedRef.current = true;
             } catch (err) {
                 if (err instanceof ApiResponseError && err.status === 401) {
                     router.push("/login");
@@ -561,9 +635,10 @@ export default function Dashboard() {
                     href="/bank-vault"
                     className="form-card flex items-center gap-3 border p-4 transition-colors hover:border-ayakashi-gold/40"
                 >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(200,168,75,0.25)] bg-black/40 text-ayakashi-gold">
-                        <Landmark className="h-4 w-4" />
-                    </div>
+                    <GlanceThumb
+                        src="/assets/webapp/vault/bank.webp"
+                        fallback={<Landmark className="h-4 w-4" />}
+                    />
                     <div className="flex flex-col gap-0.5">
                         <span className="font-display text-base font-bold tabular-nums text-[#e6c96a]">
                             {fmt(currency.bank)}
@@ -579,15 +654,15 @@ export default function Dashboard() {
                         href="/bank-vault"
                         className="form-card flex items-center gap-3 border p-4 transition-colors hover:border-ayakashi-gold/40"
                     >
-                        <div
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-black/40 ${
+                        <GlanceThumb
+                            src={
                                 vault.health < vault.maxHealth * 0.3
-                                    ? "border-red-500/40 text-red-400"
-                                    : "border-[rgba(200,168,75,0.25)] text-ayakashi-gold"
-                            }`}
-                        >
-                            <HomeIcon className="h-4 w-4" />
-                        </div>
+                                    ? "/assets/webapp/vault/home_vault_critical.webp"
+                                    : "/assets/webapp/vault/home_vault.webp"
+                            }
+                            fallback={<HomeIcon className="h-4 w-4" />}
+                            danger={vault.health < vault.maxHealth * 0.3}
+                        />
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                             <span className="font-display text-base font-bold tabular-nums text-[#e6c96a]">
                                 {fmt(vault.ryo)}{" "}

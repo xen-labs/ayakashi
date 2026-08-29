@@ -53,6 +53,7 @@ const PRIMARY_NAV = [
 // Secondary nav — shown in overflow drawer
 const SECONDARY_NAV = [
     { href: "/inventory", label: "Items" },
+    { href: "/food-market", label: "Food Market" },
     { href: "/craft", label: "Craft" },
     { href: "/upgrade", label: "Upgrade" },
     { href: "/fusion", label: "Fusion" },
